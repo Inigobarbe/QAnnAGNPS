@@ -21,6 +21,8 @@
  *                                                                         *
  ***************************************************************************/
 """
+
+    
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt
 from PyQt5.QtWidgets import QFrame
 from qgis.PyQt.QtGui import QIcon
@@ -35,6 +37,7 @@ from PyQt5.QtGui import QFont,QColor
 from qgis.PyQt.QtWidgets import QApplication, QMainWindow, QProgressBar, QLabel, QWidget, QHBoxLayout, QVBoxLayout
 from qgis.core import QgsTask, QgsApplication
 from PyQt5.QtGui import QPixmap
+
 
 
 import subprocess
@@ -52,10 +55,12 @@ import processing
 import csv
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
-from SALib.sample import saltelli
-from SALib.analyze import sobol
 import statistics
+#Local libraries
+from .libraries.SALib.sample import saltelli
+from .libraries.SALib.analyze import sobol
 
+#Dialog files
 from .ui.inputs_dialog import InputsDialog
 from .ui.mapDialog import MapDialog
 from .ui.coordinate_dialog import Coordinate
@@ -82,8 +87,6 @@ from .resources import *
 # Import the code for the dialog
 from .ui.ephemeral_gully_dialog import EphemeralGullyDialog
 import os.path
-import openpyxl
-from openpyxl.drawing.image import Image
 import webbrowser
 #from .Coordinate_capturer import PrintClickedPoint
 
@@ -192,7 +195,7 @@ class EphemeralGully():
 
         self.add_action(
             QIcon(pixmap),  # Aquí usamos la QPixmap escalada
-            text=self.tr(u'Simulate Ephemeral Gullies'),
+            text=self.tr(u'Simulate'),
             callback=self.run,
     parent=self.iface.mainWindow())
        
@@ -455,15 +458,15 @@ class EphemeralGully():
         #Método para mostrar si los inputs de AnnAGNPS existen o no
         if self.border == False:
             for i in self.lines_dialog:
-                    if i.text()!="" and path.exists(self.dic_folder[i].text()+"\\"+i.text()):
+                    if i.text()!="" and path.exists(self.dic_folder[i].text()+"\\"+i.text()) and i.text()!="-- Provided by TopAGNPS --":
                         i.setStyleSheet("QLineEdit {border: 3px solid #00FF00; }\n QLineEdit { background-color: rgb(196, 240, 119) ; }")
-                    elif i.text()!="" and not path.exists(self.dic_folder[i].text()+"\\"+i.text()):
+                    elif i.text()!="" and not path.exists(self.dic_folder[i].text()+"\\"+i.text()) and i.text()!="-- Provided by TopAGNPS --":
                         i.setStyleSheet("QLineEdit {border: 3px solid red;}\n QLineEdit { background-color: rgb(196, 240, 119) ; }")
         if self.border == True:
             for i in self.lines_dialog:
-                if i.text()!="":
+                if i.text()!="" and i.text()!="-- Provided by TopAGNPS --":
                     i.setStyleSheet("QLineEdit { background-color: rgb(196, 240, 119) ; }")
-                else:
+                elif i.text()!="-- Provided by TopAGNPS --":
                     i.setStyleSheet("QLineEdit { background-color: rgb(250, 159, 160) ; }")
         if self.border == True: self.border =False #esto es para que sepa que en el plugin no están puestos los bordes
         else : self.border =True
@@ -502,6 +505,8 @@ class EphemeralGully():
         self.output.usda_label.mousePressEvent  = self.url_usda
         #Símbolo plugin
         put_image("images/logo.svg",self.dlg.plugin_label,200)
+        #Nombre plugin
+        put_image("images/logo.png",self.dlg.label_7,200)
         #AnnAGNPS
         put_image("images/general.png",self.dlg.annagnps_label,500)
         #Delete previous data
@@ -3625,7 +3630,7 @@ class EphemeralGully():
         Si = sobol.analyze(problem, np.array(self.resultados))
         
         #Creación del gráfico y del excel
-        plt.rcParams["figure.figsize"] = [19, 12]
+        plt.rcParams["figure.figsize"] = [23, 12]
         fig = plt.figure()
         ax0 = plt.subplot(1,3,1)
         ax1 =  plt.subplot(1,3,2)
@@ -3649,49 +3654,15 @@ class EphemeralGully():
         ax2.tick_params(axis = "both",colors = "black",labelsize = 15)
         ax2.set_title("Total order sensitivity", fontsize=15,weight = "bold",color = "black")
         #Guardar gráfico
-        plt.savefig("Sensibilidad.png",transparent=False,bbox_inches = "tight",dpi=300)
+        plt.savefig("Sensitivity.png",transparent=False,bbox_inches = "tight",dpi=300)
         #Ahora se pasan los resultados a un excel
         resultados = pd.DataFrame(data = {"Pixel_size":param_values[:,0],"CTI":param_values[:,1],"EG erosion (Mg)":np.array(self.resultados)})
-        resultados.to_excel("Sensitivity.xlsx", index=False, float_format='%.5f')
-        book = openpyxl.load_workbook("Sensitivity.xlsx")
-        sheet = book.active
-        img = Image("Sensibilidad.png")
-        img.width = 900
-        img.height = 568
-        sheet.add_image(img,anchor = "L2")
-        sheet["F1"]="First order sensitivity"
-        sheet["H1"]="Second order sensitivity"
-        sheet["I1"]="Total order sensitivity"
-        sheet.merge_cells(start_row=1,start_column=6,end_row=1, end_column=7)
-        sheet.merge_cells(start_row=1,start_column=9,end_row=1, end_column=10)
-        sheet["F2"]="Pixel size"
-        sheet["G2"]="CTI"
-        sheet["H2"]="Pixel size-CTI"
-        sheet["I2"]="Pixel size"
-        sheet["J2"]="CTI"
-        sheet["E3"]="Sobol index"
-        sheet["E4"]="Confindence interval"
-        sheet["F3"]=Si["S1"][0]
-        sheet["G3"]=Si["S1"][1]
-        sheet["H3"]=Si["S2"][0][1]
-        sheet["I3"]=Si["ST"][0]
-        sheet["J3"]=Si["ST"][1]
-        sheet["F4"]=Si["S1_conf"][0]
-        sheet["G4"]=Si["S1_conf"][1]
-        sheet["H4"]=Si["S2_conf"][0][1]
-        sheet["I4"]=Si["ST_conf"][0]
-        sheet["J4"]=Si["ST_conf"][1]
-        sheet["F6"]= "Minimum"
-        sheet["G6"] = "Maximum"
-        sheet["E7"]= "Pixel size range"
-        sheet["E8"] = "CTI range"
-        sheet["F7"]= float(self.dlg.lineEdit_3.text())
-        sheet["G7"] = float(self.dlg.lineEdit_5.text())
-        sheet["F8"]= float(self.dlg.lineEdit_6.text())
-        sheet["G8"] = float(self.dlg.lineEdit_4.text())
-        
-        problem = {'num_vars': 2,'names': ['Pixel_size', 'CTI'],'bounds': [[float(self.dlg.lineEdit_3.text()), float(self.dlg.lineEdit_5.text())],[float(self.dlg.lineEdit_6.text()), float(self.dlg.lineEdit_4.text())]]}
-        book.save("Sensitivity.xlsx")
+        resultados.to_csv("Outputs_Sensitivity.csv", index=False, float_format='%.5f')
+        resultados = pd.DataFrame(data = {"First Order Pixel":[Si["S1"][0]],"First Order CTI":[Si["S1"][1]],"Second Order":[Si["S2"][0][1]],"Total Order Pixel":[Si["ST"][0]],"Total Order CTI":[Si["ST"][1]],"Pixel_distribution":[f"{float(self.dlg.lineEdit_3.text())}-{float(self.dlg.lineEdit_5.text())}"],"CTI_distribution":[f"{float(self.dlg.lineEdit_6.text())}-{float(self.dlg.lineEdit_4.text())}"]})
+        resultados.to_csv("Results_Sensitivity.csv", index=False, float_format='%.5f')
+        os.startfile("Outputs_Sensitivity.csv")
+        os.startfile("Results_Sensitivity.csv")
+        os.startfile("Sensitivity.png")
 
     def append_result(self):
         #Esta función sirve para guardar los resultados obtenidos del análisis de sensibilidad
