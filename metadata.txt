@@ -3,17 +3,17 @@
 # This file should be included when you package your plugin.# Mandatory items:
 
 [general]
-name=Ephemeral Gully model
+name=QAnnAGNPS
 qgisMinimumVersion=3.0
-description=This plugin models the behaviour of the Ephemeral Gullies in terms of soil erosion
+description=This plugin integrates the AnnAGNPS model into QGIS
 version=0.1
-author=Iñigo Barberena
+author=Iñigo Barberena Ruiz
 email=inigo.barberena@unavarra.es
 
-about=This plugin models the behaviour of Ephemeral Gullies in terms of soil erosion
+about=This plugin facilitates the use of AnnAGNPS in the execution and in the visualization of the results. In addition, the extra functionality of a global Sobol sensitivity analysis has been added. Although it is intended to use AnnAGNPS as a whole in a more user-friendly way, the plugin has given great emphasis to the ephemeral gullies module. 
 
-tracker=http://bugs
-repository=http://repo
+tracker=https://github.com/Inigobarbe/QGIS-AnnAGNPS/issues
+repository=https://github.com/Inigobarbe/QGIS-AnnAGNPS
 # End of mandatory metadata
 
 # Recommended items:
@@ -23,11 +23,11 @@ hasProcessingProvider=no
 # changelog=
 
 # Tags are comma separated with spaces allowed
-tags=python
+tags=python, AnnAGNPS, modelation, soil erosion, ephemeral gully
 
-homepage=http://homepage
-category=Vector
-icon=icon.png
+homepage=https://github.com/Inigobarbe/QGIS-AnnAGNPS
+category=Modulation
+icon=images/logo.svg
 # experimental flag
 experimental=True
 

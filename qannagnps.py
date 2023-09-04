@@ -93,7 +93,7 @@ import webbrowser
 from datetime import datetime
 
 
-class EphemeralGully():
+class qannagnps():
 
     def __init__(self, iface):
         # Save reference to the QGIS interface

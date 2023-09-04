@@ -32,5 +32,5 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :type iface: QgsInterface
     """
     #
-    from .ephemeral_gully import EphemeralGully
-    return EphemeralGully(iface)
+    from .qannagnps import qannagnps
+    return qannagnps(iface)
