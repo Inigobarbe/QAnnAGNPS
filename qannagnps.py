@@ -856,7 +856,7 @@ class qannagnps():
     def ejecucion_completa(self):
         #Esta función es en donde se ejecuta el modelo
         #Primero se establece la variable que contiene las capas del proyecto
-        layers = self.layers
+        layers = QgsProject.instance().layerTreeRoot().children()
         
         #Establecer directorio de DEM y EPSG del proyecto
         selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
