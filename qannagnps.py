@@ -53,9 +53,6 @@ import csv
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 import statistics
-#Local libraries
-from .libraries.SALib.sample import saltelli
-from .libraries.SALib.analyze import sobol
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -238,26 +235,11 @@ class qannagnps():
         self.craspro.pushButton.clicked.connect(self.create_control_file_raspro)
         self.dednm.pushButton.clicked.connect(self.create_control_file_dednm)
         self.agflow.pushButton.clicked.connect(self.create_control_file_agflow)
-
-        #Borrar archivos de ejecuciones anteriores
-        self.dlg.pushButton.clicked.connect(self.delete_Inputs)
         
-        #Hacer que aparezcan los PEG con las ID en el botón de crear mapa
-        self.output.pushButton.clicked.connect(self.display_peg)
-               
         #Cambiar el nombre en el control file de AGBUF.csv de las columnas Buffer y Vegetation al seleccionar una capa
         self.dlg.comboBox_2.currentIndexChanged.connect(self.buffer_nombre)
         self.dlg.comboBox_3.currentIndexChanged.connect(self.vegetation_nombre)
-        
-        #Añadir las distribuciones posibles en el análisis de sensibilidad. También el cambio de parámetros de distribución. 
-        self.dlg.comboBox_4.addItems(["Uniform","Triangular","Normal","Lognormal"])
-        self.dlg.comboBox_5.addItems(["Uniform","Triangular","Normal","Lognormal"])
-        self.dlg.comboBox_4.currentIndexChanged.connect(self.sensitivity_parameters)
-        self.dlg.comboBox_5.currentIndexChanged.connect(self.sensitivity_parameters)
-        
-        #Poner el número de muestras cuando se cambia el número de latigazos
-        self.dlg.lineEdit_9.textChanged.connect(self.change_samples)
-        
+                        
         #Cambiar los colores de los inputs de AnnAGNPS según se hayan elegido o no. También se crean los archivos si es que no estaban creados. 
         #Primero se crean los diccionarios que relacionan el boton de abrir o crear documento con las líneas de texto
         dic_buttons_watershed = {self.inputs.w22:self.inputs.l_2,self.inputs.w23:self.inputs.l_3,self.inputs.w24:self.inputs.l_4,self.inputs.w25:self.inputs.l_5,self.inputs.w26:self.inputs.l_6,self.inputs.w27:self.inputs.l_7,self.inputs.w28:self.inputs.l_8,self.inputs.w29:self.inputs.l_9,self.inputs.w30:self.inputs.l_10,self.inputs.w31:self.inputs.l_11,self.inputs.w32:self.inputs.l_12,self.inputs.w33:self.inputs.l_13,self.inputs.w34:self.inputs.l_14,self.inputs.w35:self.inputs.l_15,self.inputs.w36:self.inputs.l_16,self.inputs.w37:self.inputs.l_17,self.inputs.w38:self.inputs.l_18,self.inputs.w39:self.inputs.l_19,self.inputs.w40:self.inputs.l_20,self.inputs.w41:self.inputs.l_21,self.inputs.w42:self.inputs.l_22}
@@ -395,12 +377,7 @@ class qannagnps():
         out_minmax_col = ["Min_Evt_Date","Max_Evt_Date","Max_Number_Evts","Min_Rnof_Evt","Min_Rnof_Cell","Min_Rnof_Outlet","Min_Subarea_ID","Max_Subarea_ID","Subarea_Units_Positn","Max_Vrfy_File_Access","Max_Vrfy_File_Bytes","Input_Units_Code"]
         dic_bc_simulation = {self.inputs.s19:annaid_col,self.inputs.s20:global_error_col,self.inputs.s21:global_ids_col,self.inputs.s22:pesticide_initial_col,self.inputs.s23:pl_calibration_col,self.inputs.s24:rcn_col,self.inputs.s25:sim_col,self.inputs.s26:soil_initial_col,self.inputs.s27:rusle2_col,self.inputs.s28:out_global_col,self.inputs.s29:out_csv_col,self.inputs.s30:out_dpp_col,self.inputs.s31:out_inver_col,self.inputs.s32:out_sim_col,self.inputs.s33:out_aa_col,self.inputs.s34:out_ev_col,self.inputs.s35:out_tbl_col,self.inputs.s36:out_minmax_col}
         self.dic_boton_columnas = {**dic_bc_watershed,**dic_bc_general,**dic_bc_climate,**dic_bc_simulation}
-        
-        #Cambiar el color de las lineEdit del análisis de sensibilidad
-        sens_lines = [self.dlg.lineEdit_6,self.dlg.lineEdit_4,self.dlg.lineEdit_3,self.dlg.lineEdit_5,self.dlg.lineEdit_9,self.dlg.lineEdit_10]
-        for i in sens_lines:
-            i.textChanged.connect(lambda _, b=i: self.change_sensitivity_color(b))
-        
+                
         #Si se selecciona en outputs select all que se seleccionen todos esos outputs
         general_outputs_lines = [self.output.checkBox_4,self.output.checkBox_8,self.output.checkBox_3,self.output.checkBox_9,self.output.checkBox_5,self.output.checkBox_10,self.output.checkBox_7,self.output.checkBox_12,self.output.checkBox_11,self.output.checkBox_13,self.output.checkBox_14,self.output.checkBox_15]
         self.output.checkBox_43.stateChanged.connect(self.check_box)
@@ -446,7 +423,6 @@ class qannagnps():
         #Ejecutar si se da a OK
         self.dlg.pushButton_6.clicked.connect(self.ejecuciones)
         self.dlg.pushButton_4.clicked.connect(self.ejecuciones)
-        self.dlg.pushButton_2.clicked.connect(self.ejecuciones)
         
         #Cuando se cierre o ejecute el diálogo que se guarden los índices de los combobox
         self.dlg.finished.connect(self.combo_save)
@@ -509,9 +485,6 @@ class qannagnps():
         put_image("images/logo.png",self.dlg.label_7,200)
         #AnnAGNPS
         put_image("images/general.png",self.dlg.annagnps_label,500)
-        #Delete previous data
-        delete_icon = os.path.join(self.plugin_directory, "images/delete_previous.svg")
-        self.dlg.pushButton.setIcon(QIcon(delete_icon))
         #AnnAGNPS input
         input_icon = os.path.join(self.plugin_directory, "images/annagnps_input.svg")
         self.dlg.pb_ann.setIcon(QIcon(input_icon))
@@ -679,46 +652,6 @@ class qannagnps():
             #self.iface.addDockWidget(Qt.LeftDockWidgetArea, self.dockwidget)
             #self.dockwidget.show()'''
                 
-    def delete_Inputs(self):
-        #Borrar archivos de ejecuciones anteriores
-        try:
-            os.chdir(self.direccion)
-        except:
-            iface.messageBar().pushMessage("Select a DEM", "To delete previous simulation data first select the dem which will be in the same folder as the files to delete",level=Qgis.Warning, duration=10)
-            return 
-        ficheros = os.listdir(self.direccion)
-        sdat_files = [x for x in ficheros if x.split(".")[-1]=="sdat"] #los que acaban en sdat
-        cell_prj = [x for x in ficheros if x.split("_")[0]=="cell"] #los que empiezan por cell_
-        aux_xml_files = [x for x in ficheros if x.split(".")[-1]=="xml" and x.split(".")[-2]=="aux"] #los que acaban en .xml.aux
-        mgrd_files = [x for x in ficheros if x.split(".")[-1]=="mgrd" and (x[-10:-5]=="DEDNM" or x[-11:-5]=="Buffer" or x[-15:-5]=="Vegetation")] #los que acaban en mgrd y tienen el DEDNM, buffer o vegetation
-        prj_files = [x for x in ficheros if x.split(".")[-1]=="prj" and (x[-9:-4]=="DEDNM" or x[-10:-4]=="Buffer" or x[-14:-4]=="Vegetation")] #los que acaban en prj y tienen el DEDNM, buffer o vegetation
-        sjrd_files = [x for x in ficheros if x.split(".")[-1]=="sgrd" and (x[-10:-5]=="DEDNM" or x[-11:-5]=="Buffer" or x[-15:-5]=="Vegetation" )] #los que acaban en sgrd y tienen el DEDNM, buffer o vegetation
-        asc_files = [x for x in ficheros if (x.split(".")[-1]=="asc" or x.split(".")[-1]=="ASC") and (x[-9:-4]=="DEDNM" or x[-10:-4]=="Buffer" or x[-14:-4]=="Vegetation") and len(x)>9] #los que acaban en asc, tienen el DEDNM, buffer o vegetation y tienen una longitud mayor que DEDNM.asc
-        
-        ficheros_sensibilidad = []
-        for i in ficheros:
-            try:
-                if i[0:4]=="cell" and type(int(i[4]))==int:
-                    ficheros_sensibilidad.append(i)
-            except:
-                pass
-            try:
-                if i[0:6]=="suelos" and type(int(i[6]))==int:
-                    ficheros_sensibilidad.append(i)
-            except:
-                pass
-            try:
-                if i[0:11]=="union_capas" and type(int(i[11]))==int:
-                    ficheros_sensibilidad.append(i)
-            except:
-                pass
-                
-        files_delete = sdat_files+cell_prj+aux_xml_files+ficheros_sensibilidad+mgrd_files+prj_files+sjrd_files+asc_files
-        for i in files_delete:
-            try:
-                os.remove(i)
-            except:
-                pass
     def cambios_suelo(self):
         #Función para que aparezca el nombre de las columnas al seleccionar la capa de suelos
         self.dlg.cbColumnSoil.clear()
@@ -788,7 +721,6 @@ class qannagnps():
         
         #Inicializar variables
         self.segunda_ronda = False #cuando se elige la coordenada automáticamente se ejecuta TOPAGNPS dos veces. Esto es para que se sepa si es la primera o segunda ronda.
-        self.sensitivity = 0 #variable que se usará para saber si se está en sensibilidad o no 
         self.end_sensitivity = 0 #si es igual a 1 entonces se para el análisis de sensibilidad
 
         # Create the dialog with elements (after translation) and keep reference
@@ -848,10 +780,7 @@ class qannagnps():
         #Método para las ejecuciones
         self.dlg.close()
         #Ejecutar
-        if not self.dlg.checkBox_6.isChecked():
-            self.ejecucion_completa()
-        else:
-            self.sensitivity_function()
+        self.ejecucion_completa()
           
     def ejecucion_completa(self):
         #Esta función es en donde se ejecuta el modelo
@@ -879,22 +808,13 @@ class qannagnps():
         executable_directory  = self.plugin_dir+"\\Executables"
         os.chdir(mdt_directory)
         #EJECUCIÓN DE TOPAGNPS
-        if self.dlg.cbTop.isChecked() or self.dlg.checkBox_6.isChecked():
+        if self.dlg.cbTop.isChecked():
             #Si el input output_global Glbl_All_V3_sim no se pone en T no se obtiene el archivo que se necesita para calcular la erosión por cárcavas efímeras (AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv) y por lo tanto no se puede hacer el análisis de sensibilidad
             #Esto se hace primero porque la dirección puede estar dada con el nombre del archivo o en dirección completa
             if os.path.isabs(r"{}".format(str(self.inputs.l_63.text()))):
                 file_glbl = str(self.inputs.l_63.text())
             else:
                 file_glbl = str(self.inputs.l_53.text()) + "/" + str(self.inputs.l_63.text())
-            #Se comprueba la condición
-            if str(self.inputs.l_63.text())=="" and self.dlg.checkBox_6.isChecked():
-                iface.messageBar().pushMessage("Error Input data", "Output Options Global not found, which is necessary for the sensitivity analysis" ,level=Qgis.Warning, duration=10)
-                self.end_sensitivity = 1
-                return 
-            if self.dlg.checkBox_6.isChecked() and path.exists(file_glbl) and pd.read_csv(file_glbl,encoding = "ISO-8859-1",delimiter=",").iloc[0,3]!="T":
-                iface.messageBar().pushMessage("Error Input data", "Please Glbl_All_V3_sim (OUTPUT OPTIONS DATA – GLOBAL) must be set to T to perform the sensitivity analysis" ,level=Qgis.Warning, duration=10)
-                self.end_sensitivity = 1
-                return 
             #Función para que se le diga el nombre del archivo y te devuelva la dirección completa
             def fichero(nombre):
                 return mdt_directory+"\\"+nombre
@@ -904,17 +824,11 @@ class qannagnps():
                 iface.messageBar().pushMessage("Error Input data", "Control file of TopAGNPS, TOPAGNPS.CSV, not found" ,level=Qgis.Warning, duration=10)
                 return
             topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
-            if topagnps_control_file["FILENAME"].iloc[0] != mdt_file and self.sensitivity==0:
+            if topagnps_control_file["FILENAME"].iloc[0] != mdt_file:
                 processing.run("gdal:translate", 
                     {'INPUT':fichero(mdt_file),
                     'TARGET_CRS':epsg,'NODATA':None,'COPY_SUBDATASETS':False,
                     'OPTIONS':'','EXTRA':'','DATA_TYPE':0,'OUTPUT':topagnps_control_file["FILENAME"].iloc[0]})
-            
-            #Cambiar el CTI para el análisis de sensibilidad
-            if self.sensitivity >0:
-                peg_control_file = pd.DataFrame(data = {"Input":[self.cpeg.lineEdit.text()],"CTI_value":self.param_values[self.sensitivity-1,1],
-                                            "Accum_pct":[self.cpeg.lineEdit_3.text()]})
-                peg_control_file.to_csv("PEG.csv", index=False, float_format='%.5f')
             
             #EJECUCIÓN DE TOPAGNPS            
             def main():
@@ -947,7 +861,7 @@ class qannagnps():
                         warp = gdal.Warp(output_raster,input_raster,dstSRS=epsg)
                         warp = None # Closes the files
             #Esto es para cambiar las coordenadas del outlet en TOPAGNPS.csv. Para ello se tiene que estar en primera ronda y se tiene que haber elegido la opción de escoger el outlet automáticamente. 
-            if self.dlg.checkBox_2.isChecked() and not self.segunda_ronda and (self.sensitivity==0 or self.sensitivity==1):
+            if self.dlg.checkBox_2.isChecked() and not self.segunda_ronda:
                 if self.ejecucion_condicion == 0:
                     change_coordinates("AnnAGNPS_Reach_IDs.asc","AnnAGNPS_Reach_IDs_epsg.asc")
                     layer = QgsRasterLayer(fichero("AnnAGNPS_Reach_IDs_epsg.asc"),"reaches")
@@ -962,7 +876,7 @@ class qannagnps():
             #ASIGNAR LOS VALORES DE SUELO Y MANEJO A AnnAGNPS_Cell_Data_Section.csv
             #A esta función le das la capa de celdas y la que se superpone (tipo de suelo o uso) y devuelve el diccionario en el que se muestra a cada celda que valor (de suelo o de uso) le corresponde
             def aplicar(fichero_celdas,fichero_superponer, columna_tipo,numero):
-                numero = str(self.sensitivity)+"."+str(numero) #esto es porque no deja sobreescribir y tengo que crear otra capa por cada ejecución de sensibilidad
+                numero = str(numero) #esto es porque no deja sobreescribir y tengo que crear otra capa por cada ejecución de sensibilidad
                 fichero_cell = fichero_celdas
                 fichero_suelo = fichero_superponer
                 #Esta función devuelve un diccionario en donde a cada suelo/uso se le asigna un numero entero y luego en la capa (de suelos o uso) a cada suelo/uso se le añade el valor del diccionario
@@ -1189,7 +1103,7 @@ class qannagnps():
                 self.iface.messageBar().pushMessage("Coordinate selection", "Please move the mouse to the outlet and click on it",level=Qgis.Info, duration=10)
             
         #EJECUCIÓN DE ANNAGNPS
-        if (self.dlg.cbAnn.isChecked() and not self.segunda_ronda and (self.ejecucion_condicion==1 or not self.dlg.checkBox_2.isChecked())) or self.sensitivity >0 or self.dlg.checkBox_6.isChecked():
+        if (self.dlg.cbAnn.isChecked() and not self.segunda_ronda and (self.ejecucion_condicion==1 or not self.dlg.checkBox_2.isChecked())):
             #CREACIÓN DE LA CARPETA QUE CONTENDRÁ LOS INPUTS DE ANNAGNPS
             directory = "INPUTS"
             parent_dir = mdt_directory
@@ -1452,7 +1366,10 @@ class qannagnps():
                     text = ''.join([i for i in text]) 
                     text = text.replace("\"", "/") 
                     texto = text.splitlines()
-                    txt = texto[2].split(",")[-1]
+                    try:
+                        txt = texto[2].split(",")[-1]
+                    except:
+                        pass
                     iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning, duration=10)
                     self.end_sensitivity = 1
                     #Se abre el archivo de errores
@@ -1470,19 +1387,8 @@ class qannagnps():
             subprocess.Popen(executable_directory + "\\" +"STEAD.exe")
             os.chdir(mdt_directory)
             
-            #CONDICIONES DE SENSIBILIDAD
-            if self.sensitivity==0 and self.dlg.checkBox_6.isChecked():
-                self.sensitivity_function()
-            if self.sensitivity>0:
-                self.append_result()
-            
-            if self.end_sensitivity == 1:
-                self.iface.messageBar().pushMessage("Error in sensitivity analysis:", "Look at the errors",level=Qgis.Warning, duration=10)
-            
-            if self.end_sensitivity != 1:
-                self.iface.messageBar().pushMessage(
-                  "Success", "Succes in the modeling ",
-                  level=Qgis.Success, duration=5)
+            #MENSAJE DE ÉXITO
+            self.iface.messageBar().pushMessage("Success", "Succes in execution ",level=Qgis.Success, duration=5)
                   
     def startCapturing(self):
         self.iface.mapCanvas().setMapTool(self.mapTool)
@@ -2189,853 +2095,9 @@ class qannagnps():
                 renderer = QgsSingleSymbolRenderer(symbol)
                 layer.setRenderer(renderer)
                 layer.triggerRepaint()
-            
-            #PUNTOS PEG
-            if self.output.checkBox.isChecked():
-                try:
-                    #Se importa el fichero donde se tienen las coordenadas de los puntos PEG
-                    fichero_summary = self.direccion+"\\"+"PEG_Summary.txt"
-                    summary = pd.read_csv(fichero_summary,encoding = "ISO-8859-1",delimiter=",")
-                    #Función para crear la capa con los puntos PEG
-                    def create_layer():
-                        layer = QgsVectorLayer("Point?crs={}".format(self.epsg), "PEG_Points", "memory")
-                        layer.dataProvider().addAttributes([QgsField("id", QVariant.String), 
-                                                            QgsField("Drainage_area", QVariant.Double),
-                                                            QgsField("Luparea", QVariant.Double),
-                                                            QgsField("Subarea", QVariant.Double),
-                                                            QgsField("Slope", QVariant.Double),
-                                                            QgsField("CTI", QVariant.Double),
-                                                            QgsField("Headcut_barrier", QVariant.Double),
-                                                            QgsField("Stream_order", QVariant.Double),
-                                                            QgsField("Cell_ID", QVariant.Double),
-                                                            QgsField("Reach_ID", QVariant.Double),
-                                                            QgsField("StreamCNT", QVariant.Double)])
-                        layer.updateFields()
-                        features = []
-                        for i in range(len(summary)):
-                            feature = QgsFeature()
-                            feature.setFields(layer.fields())
-                            x = summary.X.iloc[i]
-                            y = summary.Y.iloc[i]
-                            pt = QgsPointXY(x, y)
-                            geom = QgsGeometry.fromPointXY(pt)
-                            feature.setGeometry(geom)
-                            feature.setAttribute("id", summary['GULLY_ID'].iloc[i])
-                            feature.setAttribute("Drainage_area", float(summary.UPAREA.iloc[i]))
-                            feature.setAttribute("Luparea", float(summary.LUPAREA.iloc[i]))
-                            feature.setAttribute("Subarea", float(summary.SUBAREA.iloc[i]))
-                            feature.setAttribute("Slope", float(summary.SLOPE.iloc[i]))
-                            feature.setAttribute("CTI", float(summary.CTINDEX.iloc[i]))
-                            feature.setAttribute("Headcut_barrier", float(summary.HCUT_B.iloc[i]))
-                            feature.setAttribute("Stream_order", float(summary.STREAM_ORDER.iloc[i]))
-                            feature.setAttribute("Cell_ID", float(summary.CELL_ID.iloc[i]))
-                            feature.setAttribute("Reach_ID", float(summary.REACH_ID.iloc[i]))
-                            feature.setAttribute("StreamCNT", float(summary.STREAMCNT.iloc[i]))
-                            features.append(feature)
-                        layer.dataProvider().addFeatures(features)
-                        return layer
-                    summary_layer = create_layer()
-                    QgsProject.instance().addMapLayer(summary_layer)
-                except:
-                    pass
-            
-            #CTI GRID
-            if self.output.checkBox_6.isChecked():
-                try:
-                    layer = QgsRasterLayer(fichero("PEG_cti_grid.asc"),"CTI_grid")
-                    QgsProject.instance().addMapLayer(layer)
-                except:
-                    pass
-            
-            #DRAINAGE AREA TO EACH VALID PEG RASTER
-            if self.output.checkBox_16.isChecked():
-                try:
-                    layer = QgsRasterLayer(fichero("PEG_Drainage_Area_to_Valid_PEG_Points.asc"),"Drainage_area_to_valid_PEG_ras")
-                    QgsProject.instance().addMapLayer(layer)
-                except:
-                    pass
-            
-            #DRAINAGE AREA TO EACH VALID PEG VECTORIAL
-            if self.output.checkBox_17.isChecked():
-                try:
-                    if not os.path.exists(fichero("valid.gpkg")):
-                        change_coordinates("PEG_Drainage_Area_to_Valid_PEG_Points.ASC","PEG_Drainage_Area_to_Valid_PEG_Points_epsg.ASC")
-                        processing.run("grass7:r.to.vect", {'input':fichero("PEG_Drainage_Area_to_Valid_PEG_Points_epsg.ASC"),
-                            'type':2,'column':'value','-s':False,
-                            '-v':False,'-z':False,'-b':False,'-t':False,
-                            'output':fichero("valid.gpkg"),'GRASS_REGION_PARAMETER':None,
-                            'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
-                            'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
-                            'GRASS_VECTOR_EXPORT_NOCAT':False})
-                    layer = QgsVectorLayer(fichero("valid.gpkg"),"Drainage_area_to_valid_PEG_vec")
-                    #Borrar columnas que no son las que queremos
-                    columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!="Drainage_area"]
-                    field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
-                    data_provider = layer.dataProvider()
-                    layer.startEditing()
-                    data_provider.deleteAttributes(field_index)
-                    layer.updateFields()
-                    layer.commitChanges()
-                    #Cambiar el nombre de la columna value por Drainage_area
-                    for field in layer.fields():
-                        if field.name() == 'value':
-                            with edit(layer):
-                                idx = layer.fields().indexFromName(field.name())
-                                layer.renameAttribute(idx, 'Drainage_area')
-                    QgsProject.instance().addMapLayer(layer)
-                except:
-                    pass
-            
-            #NOT USED PEG POINTS
-            if self.output.checkBox_18.isChecked():
-                try:
-                    #Se importa el fichero donde se tienen las coordenadas de los puntos PEG
-                    fichero_summary = self.direccion+"\\"+"PEG_Points_Not_Used_For_AnnAGNPS.csv"
-                    summary = pd.read_csv(fichero_summary,encoding = "ISO-8859-1",delimiter=",")
-                    #Función para crear la capa con los puntos PEG
-                    def create_layer():
-                        layer = QgsVectorLayer("Point?crs={}".format(self.epsg), "Not_used_PEG", "memory")
-                        layer.dataProvider().addAttributes([QgsField("Drainage_area", QVariant.Double),
-                                                            QgsField("Luparea", QVariant.Double),
-                                                            QgsField("Subarea", QVariant.Double),
-                                                            QgsField("Slope", QVariant.Double),
-                                                            QgsField("CTI", QVariant.Double),
-                                                            QgsField("Headcut_barrier", QVariant.Double),
-                                                            QgsField("Stream_order", QVariant.Double),
-                                                            QgsField("Cell_ID", QVariant.Double),
-                                                            QgsField("Reach_ID", QVariant.Double),
-                                                            QgsField("StreamCNT", QVariant.Double)])
-                        layer.updateFields()
-                        features = []
-                        for i in range(len(summary)):
-                            feature = QgsFeature()
-                            feature.setFields(layer.fields())
-                            x = summary.X.iloc[i]
-                            y = summary.Y.iloc[i]
-                            pt = QgsPointXY(x, y)
-                            geom = QgsGeometry.fromPointXY(pt)
-                            feature.setGeometry(geom)
-                            feature.setAttribute("Drainage_area", float(summary.UPAREA.iloc[i]))
-                            feature.setAttribute("Luparea", float(summary.LUPAREA.iloc[i]))
-                            feature.setAttribute("Subarea", float(summary.SUBAREA.iloc[i]))
-                            feature.setAttribute("Slope", float(summary.SLOPE.iloc[i]))
-                            feature.setAttribute("CTI", float(summary.CTINDEX.iloc[i]))
-                            feature.setAttribute("Headcut_barrier", float(summary.HCUT_B.iloc[i]))
-                            feature.setAttribute("Stream_order", float(summary.STREAM_ORDER.iloc[i]))
-                            feature.setAttribute("Cell_ID", float(summary.CELL_ID.iloc[i]))
-                            feature.setAttribute("Reach_ID", float(summary.REACH_ID.iloc[i]))
-                            feature.setAttribute("StreamCNT", float(summary.STREAMCNT.iloc[i]))
-                            features.append(feature)
-                        layer.dataProvider().addFeatures(features)
-                        return layer
-                    summary_layer = create_layer()
-                    QgsProject.instance().addMapLayer(summary_layer)
-                except:
-                    pass
-            if len(self.output.lineEdit.text())>0:
-                #CREACIÓN DE PLANOS
-                #Archivos utilizados
-                file_eg_erosion = self.direccion+"\\INPUTS"+"\\AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv" 
-                file_repair = self.direccion+"\\INPUTS"+"\\AnnAGNPS_SIM_Ephemeral_Gully_Repair_Date.csv"
-                if not os.path.exists(file_eg_erosion):
-                    iface.messageBar().pushMessage("File not found", "The file AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv is required to visualize the results and it is a file that has not been generated in the run",level=Qgis.Warning, duration=10)
-                    return 
-                if not os.path.exists(file_repair):
-                    iface.messageBar().pushMessage("File not found", "The file AnnAGNPS_SIM_Ephemeral_Gully_Repair_Date.csv is required to visualize the results and it is a file that has not been generated in the run",level=Qgis.Warning, duration=10)
-                    return 
-                #Función para obtener el data frame que contiene los datos de la cárcava efímera. Empieza a coger los datos desde "Gregorian"
-                def df_section(fichero,delete_second =False):
-                    file = open(fichero)
-                    csvreader = csv.reader(file)
-                    rows = []
-                    for row in csvreader:
-                            rows.append(row)
-                    lista = []
-                    a = 0
-                    for i in rows:
-                        try:
-                            if i[0]=="Gregorian":
-                                a = 1
-                                lista.append(i)
-                            elif a ==1:
-                                lista.append(i[:-1])
-                        except:
-                            continue
-                    if delete_second:
-                        lista.pop(1)
-                    return pd.DataFrame(columns = lista[0],data = lista[1:])
-                #Función para obtener el data frame que contiene los datos de la cárcava efímera. Empieza a coger los datos desde "Gregorian"
-                def df_section(fichero,delete_second =False):
-                    file = open(fichero)
-                    csvreader = csv.reader(file)
-                    rows = []
-                    for row in csvreader:
-                            rows.append(row)
-                    lista = []
-                    a = 0
-                    for i in rows:
-                        try:
-                            if i[0]=="Gregorian":
-                                a = 1
-                                lista.append(i)
-                            elif a ==1:
-                                lista.append(i[:-1])
-                        except:
-                            continue
-                    if delete_second:
-                        lista.pop(1)
-                    return pd.DataFrame(columns = lista[0],data = lista[1:])
-                #Se obtienen los datos para el gráfico
-                df = df_section(file_eg_erosion,delete_second=True)
-                #Se crea la variable con el nombre de la peg que se quiere graficar
-                peg = str(self.output.lineEdit.text())
-                #Se elige, del dataframe, los datos de la peg elegida y se cambia el formato de las columnas
-                df = df[df.iloc[:,6]==peg]
-                df["date"]=pd.to_datetime(dict(year=df.Year,month= df.Month,day=df.Day))
-                df=df.set_index("date")
-                #Si el dataframe no tiene datos es que se ha elegido un PEG que no existe
-                if len(df)==0:
-                    iface.messageBar().pushMessage("Error in PEG identification", "No peg {} found in file AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv".format(peg),level=Qgis.Warning, duration=10)
-                    return
-                
-                if self.output.checkBox_19.isChecked() or self.output.checkBox_20.isChecked() or self.output.checkBox_21.isChecked(): 
-                    #Esto es para crear el plano. Se hace independientemente del plano que se haya utilizado
-                    def fichero(nombre):
-                        return self.direccion+"\\"+nombre
-                    
-                    #Añadir la capa de las celdas
-                    if not os.path.exists(fichero("cell.gpkg")):
-                        change_coordinates("AnnAGNPS_Cell_IDs.asc","cell_1.asc")
-                        processing.run("grass7:r.to.vect", {'input':fichero("cell_1.asc"),
-                            'type':2,'column':'value','-s':False,
-                            '-v':False,'-z':False,'-b':False,'-t':False,
-                            'output':fichero("cell.gpkg"),'GRASS_REGION_PARAMETER':None,
-                            'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
-                            'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
-                            'GRASS_VECTOR_EXPORT_NOCAT':False})
-                    cell_layer = QgsVectorLayer(fichero("cell.gpkg"),"Cells")
-                    QgsProject.instance().addMapLayer(cell_layer)
-                    #Añadir la capa del PEG
-                    fichero = self.direccion+"\\PEG_Summary.txt"
-                    summary = pd.read_csv(fichero,encoding = "ISO-8859-1",delimiter=",")
-                    def create_layer():
-                        layer = QgsVectorLayer("Point?crs={}".format(self.epsg),peg,"memory")
-                        layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
-                        layer.updateFields()
-                        features = []
-                        for i in range(len(summary)):
-                            if summary["GULLY_ID"].iloc[i].split(" ")[0]==peg:
-                                feature = QgsFeature()
-                                feature.setFields(layer.fields())
-                                x = summary.X.iloc[i]
-                                y = summary.Y.iloc[i]
-                                pt = QgsPointXY(x,y)
-                                geom = QgsGeometry.fromPointXY(pt)
-                                feature.setGeometry(geom)
-                                feature.setAttribute(0,summary.GULLY_ID.iloc[i])
-                                features.append(feature)
-                            layer.dataProvider().addFeatures(features)
-                        return layer
-                    peg_layer = create_layer()
-                    QgsProject.instance().addMapLayer(peg_layer)
-                    #Cambiar el color de las capas
-                    peg_layer.renderer().symbol().setColor(QColor("red"))
-                    peg_layer.triggerRepaint()
-                    cell_layer.renderer().symbol().setColor(QColor("green"))
-                    cell_layer.triggerRepaint()
-                    #Ocultar el resto de las capas
-                    layer_tree = QgsProject.instance().layerTreeRoot()
-                    all_layers = layer_tree.children()
-                    for layer in all_layers:
-                        if layer.layer() != cell_layer and layer.layer() != peg_layer:
-                            layer.setItemVisibilityChecked(False)
-                
-                if self.output.checkBox_19.isChecked():
-                    #GRÁFICOS DE EROSIÓN
-                    #Se crean los dataframes necesarios para la erosión diaria y los datos de erosion por textura
-                    df["daily_erosion"]=[float(x.strip()) for x in df.iloc[:,-4]]
-                    df_daily = df.resample("D").asfreq().fillna(0)
-                    df_daily["accumulated_erosion"]=df_daily["daily_erosion"].cumsum()
-                    df_daily["clay_n"] = [float(x) for x in df_daily.Clay]
-                    df_daily["silt_n"] = [float(x) for x in df_daily.Silt]
-                    df_daily["sand_n"] = [float(x) for x in df_daily.Sand]
-                    df_daily["sma_n"] = [float(x) for x in df_daily["Sm.Agg."]]
-                    df_daily["lga_n"] = [float(x) for x in df_daily["Lg.Agg."]]
-                    texture_erosion_label =["Clay","Silt","Sand","Small aggregates","Large aggregates"]
-                    texture_erosion_value = [sum(df_daily["clay_n"]),sum(df_daily["silt_n"]),sum(df_daily["sand_n"]),sum(df_daily["sma_n"]),sum(df_daily["lga_n"])]
-
-                    # El gráfico de evolución
-                    plt.style.use('ggplot')
-                    plt.rcParams["figure.figsize"]= [18, 12]
-                    fig = plt.figure()
-                    # Ejes
-                    ax0 = plt.subplot()
-                    ax1 = ax0.twinx()
-                    # El dibujo
-                    ax0.bar(df_daily.index, df_daily.daily_erosion, color="red", width=5, edgecolor="red", label="Daily Erosion")
-                    ax1.plot(np.array(df_daily.index), np.array(df_daily.accumulated_erosion), color="blue", alpha=0.5, label="Accumulated Erosion")
-                    # Quitar el grid
-                    ax1.grid(False)
-                    # Modificar los ticks (los números en el eje x e y)
-                    ax0.tick_params(axis="both", colors="black", labelsize=22)
-                    ax1.tick_params(axis="both", colors="black", labelsize=22)
-                    ax0.set_xlabel("Time", size=35, family="arial", weight="bold", color="black")
-                    ax0.set_ylabel("Daily Erosion (Mg)", size=35, family="arial", weight="bold", color="black")
-                    ax1.set_ylabel("Accumulated Erosion (Mg)", size=35, family="arial", weight="bold", color="black")
-                    # Para que salgan los números de los años y los meses con ticks
-                    ax0.xaxis.set_minor_locator(mdates.MonthLocator())
-                    ax0.xaxis.set_major_locator(mdates.YearLocator())
-                    # Poner la leyenda
-                    legend = fig.legend(loc="upper right", bbox_to_anchor=(0.42, 0.87), framealpha=1, fontsize=25)
-                    legend.legendPatch.set_edgecolor("black")
-                    legend.legendPatch.set_facecolor("white")
-                    legend.legendPatch.set_linewidth(0.5)
-                    # Títulos de los gráficos
-                    ax0.set_title("Evolution of erosion", fontsize=35, weight="bold", color="black")
-                    # Agregar recuadro con texto
-                    text_box = ax0.text(0.02, 0.79, f"Total erosion: {round(df_daily.accumulated_erosion.iloc[-1],2)} Mg", transform=ax0.transAxes,
-                    verticalalignment='top', bbox=dict(facecolor="white", edgecolor="black"))
-                    text_box.set_fontsize(25)
-                    text_box.set_color("black")
-                    #Guardar gráfico
-                    plt.savefig(self.direccion+"\\INPUTS\\"+"evolucion_erosion.png",transparent=False,bbox_inches = "tight",dpi=600)
-
-                    #El grafico de la desagregación textural
-                    #Función para etiquetas
-                    if sum(texture_erosion_value)>0:
-                        #Este if se hace porque si la erosión en todas las texturas es de cero no puede crear el pie chart
-                        def autopct_format(value):
-                            total = sum(texture_erosion_value)
-                            absolute_value = value * total
-                            return "{:.2f} Mg \n({:.1f}%)".format(absolute_value/100,value)
-                        # Gráfico de tarta con etiquetas de valor y porcentaje
-                        fig, ax0 = plt.subplots()
-                        ax0.pie(texture_erosion_value, labels=texture_erosion_label, autopct=autopct_format, textprops={'fontsize': 35})
-                        # Título del gráfico
-                        ax0.set_title("Desagregación de la erosión", fontsize=35, weight="bold", color="black")
-                        #Titulos de los gráficos
-                        ax0.set_title("Disaggregation of erosion", fontsize=35,weight = "bold",color = "black")
-                        #Guardar gráfico
-                        plt.savefig(self.direccion+"\\INPUTS\\"+"dis_erosion.png",transparent=False,bbox_inches = "tight",dpi=600)
-
-                    #GRÁFICO DE EROSIÓN POR TEMPORADAS
-                    #Agrupar dataframe
-                    erosion_anual = df_daily["daily_erosion"].groupby(df_daily.index.year).sum()
-                    erosion_mensual = df_daily["daily_erosion"].groupby(df_daily.index.month).sum()
-
-                    # El gráfico de erosión por año
-                    fig = plt.figure()
-                    # El dibujo
-                    plt.bar(erosion_anual.index, erosion_anual, color="red", width=0.8, edgecolor="red", label="Daily Erosion")
-                    # Configuración de los labels en el eje x
-                    plt.xticks(erosion_anual.index, rotation=45, color="black", fontsize=35)
-                    plt.xlabel("Year", color="black", fontsize = 35)
-                    # Configuración de los labels en el eje y
-                    plt.ylabel("Ephemeral Gully Erosion (Mg)", color="black", fontsize=35)
-                    ytick_values = np.linspace(0, max(erosion_anual), 5)
-                    ytick_labels = [f"{value:.1f}" for value in ytick_values]
-                    plt.yticks(ytick_values, ytick_labels, color="black", fontsize=35)
-                    # Ajustar los límites en el eje y para dar espacio a las etiquetas
-                    plt.ylim(0, max(erosion_anual) * 1.1)
-                    # Agregar etiquetas de valor a cada barra
-                    for i, value in enumerate(erosion_anual):
-                        plt.text(erosion_anual.index[i], value, f"{value:.2f}", ha="center", va="bottom", color="black", fontsize=30)
-                    # Título
-                    plt.title("Annual erosion",fontsize = 35)
-                    #Guardar gráfico
-                    plt.savefig(self.direccion+"\\INPUTS\\"+"annual_erosion.png",transparent=False,bbox_inches = "tight",dpi=600)
-
-                    # El gráfico de erosión por mes
-                    fig = plt.figure()
-                    # El dibujo
-                    plt.bar(erosion_mensual.index, erosion_mensual, color="red", width=0.8, edgecolor="red", label="Daily Erosion")
-                    # Configuración de los labels en el eje x
-                    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-                    month_positions = np.arange(1, 13)
-                    plt.xticks(month_positions, month_names, rotation=45, color="black", fontsize=35)
-                    plt.xlabel("Month",color="black",fontsize = 35)
-                    # Configuración de los labels en el eje y
-                    plt.ylabel("Ephemeral Gully Erosion (Mg)", color="black", fontsize=35)
-                    ytick_values = np.linspace(0, max(erosion_mensual), 5)
-                    ytick_labels = [f"{value:.1f}" for value in ytick_values]
-                    plt.yticks(ytick_values, ytick_labels, color="black", fontsize=35)
-                    # Ajustar los límites en el eje y para dar espacio a las etiquetas
-                    plt.ylim(0, max(erosion_mensual) * 1.1)
-                    # Agregar etiquetas de valor a cada barra
-                    for i, value in enumerate(erosion_mensual):
-                        if value != 0:
-                            plt.text(month_positions[i], value, f"{value:.2f}", ha="center", va="bottom", color="black", fontsize=30)
-                    # Título
-                    plt.title("Monthly erosion",fontsize = 35)
-                    #Guardar gráfico
-                    plt.savefig(self.direccion+"\\INPUTS\\"+"monthly_erosion.png",transparent=False,bbox_inches = "tight",dpi=600)
-
-                    #SE CREA EL PLANO DE EROSIÓN
-                    project = QgsProject.instance()
-                    manager = project.layoutManager()
-                    layoutName = "Erosion"
-                    layouts_list = manager.printLayouts()
-                    #Remove any duplicate layouts
-                    for layout in layouts_list:
-                        if layout.name()==layoutName:
-                            manager.removeLayout(layout)
-                    layout = QgsPrintLayout(project)
-                    layout.initializeDefaults()
-                    layout.setName(layoutName)
-                    manager.addLayout(layout)
-                    #Create a map item in the layout 
-                    layer = QgsProject.instance().mapLayersByName(peg)[0]
-                    map = QgsLayoutItemMap(layout)
-                    map.setRect(20,20,20,20)
-                    map.zoomToExtent(iface.mapCanvas().extent())
-                    #set the map extent
-                    ms = QgsMapSettings()
-                    ms.setLayers([layer]) #set layers to be mapped
-                    rect = QgsRectangle(ms.fullExtent())
-                    rect.scale(1.0)
-                    ms.setExtent(rect)
-                    ext = cell_layer.extent()
-                    xmin = ext.xMinimum()*0.99995
-                    xmax = ext.xMaximum()*1.00005
-                    ymin = ext.yMinimum()*1.00
-                    ymax = ext.yMaximum()*1.00
-                    print(xmin, ymin, xmax, ymax)
-                    rect =QgsRectangle(xmin, ymin, xmax, ymax)
-                    map.zoomToExtent(rect)
-                    layout.addLayoutItem(map)
-                    map.attemptMove(QgsLayoutPoint(200,100,QgsUnitTypes.LayoutMillimeters))
-                    map.attemptResize(QgsLayoutSize(80,80,QgsUnitTypes.LayoutMillimeters))
-                    #Añadir leyenda
-                    root = QgsLayerTree()
-                    root.addLayer(layer)
-                    legend = QgsLayoutItemLegend(layout)
-                    legend.model().setRootGroup(root)
-                    legend.setId('Legend')
-                    legend.setLinkedMap(map)
-                    layout.addLayoutItem(legend)
-                    legend.attemptMove(QgsLayoutPoint(250,100,QgsUnitTypes.LayoutMillimeters))
-                    legend.attemptResize(QgsLayoutSize(5,5,QgsUnitTypes.LayoutMillimeters))
-                    #Añadir barra de escala
-                    scale=QgsLayoutItemScaleBar(layout)
-                    scale.setStyle('Single Box')
-                    scale.setFont(QFont("Arial",9))
-                    scale.setFontColor(QColor("Black"))
-                    scale.setFillColor(QColor("Black"))
-                    scale.applyDefaultSize(QgsUnitTypes.DistanceMeters)
-                    scale.setMapUnitsPerScaleBarUnit(1.0)
-                    scale.setNumberOfSegments(2)
-                    valores_redondear = [10,20,50,100,500,1000,5000]
-                    #Esto se hace para que la escala tenga un valor como los de valores_redondear no uno que sea como 765.367
-                    def redondear_numero(numero):
-                        for i in range(len(valores_redondear)):
-                            if numero <0:
-                                return 10
-                            if numero <valores_redondear[i]:
-                                return valores_redondear[i-1]
-                    scale.setUnitsPerSegment(redondear_numero((xmax-xmin)/5))
-                    scale.setUnitLabel("m")
-                    scale.setLinkedMap(map)
-                    layout.addLayoutItem(scale)
-                    scale.attemptMove(QgsLayoutPoint(180,160,QgsUnitTypes.LayoutMillimeters))
-                    scale.attemptResize(QgsLayoutSize(9,9,QgsUnitTypes.LayoutMillimeters))
-                    #Añadir flecha de norte
-                    north=QgsLayoutItemPicture(layout)
-                    north.setMode(QgsLayoutItemPicture.FormatSVG)
-                    north.setPicturePath(self.plugin_dir+"\\images\\north.svg")
-                    north.attemptMove(QgsLayoutPoint(190, 110, QgsUnitTypes.LayoutMillimeters))
-                    north.attemptResize(QgsLayoutSize(*[150,150], QgsUnitTypes.LayoutPixels))
-                    layout.addLayoutItem(north)
-                    #Añadir gráfico de evolución de erosión
-                    north=QgsLayoutItemPicture(layout)
-                    north.setMode(QgsLayoutItemPicture.FormatSVG)
-                    north.setPicturePath(self.direccion+"\\INPUTS\\"+"evolucion_erosion.png")
-                    north.attemptMove(QgsLayoutPoint(8, 110, QgsUnitTypes.LayoutMillimeters))
-                    north.attemptResize(QgsLayoutSize(*[1500,1500], QgsUnitTypes.LayoutPixels))
-                    layout.addLayoutItem(north)
-                    #Añadir gráfico de la erosión por año
-                    north=QgsLayoutItemPicture(layout)
-                    north.setMode(QgsLayoutItemPicture.FormatSVG)
-                    north.setPicturePath(self.direccion+"\\INPUTS\\"+"annual_erosion.png")
-                    north.attemptMove(QgsLayoutPoint(8, 25, QgsUnitTypes.LayoutMillimeters))
-                    north.attemptResize(QgsLayoutSize(*[1000,1000], QgsUnitTypes.LayoutPixels))
-                    layout.addLayoutItem(north)
-                    #Añadir gráfico de la erosión mensual
-                    north=QgsLayoutItemPicture(layout)
-                    north.setMode(QgsLayoutItemPicture.FormatSVG)
-                    north.setPicturePath(self.direccion+"\\INPUTS\\"+"monthly_erosion.png")
-                    north.attemptMove(QgsLayoutPoint(100, 25, QgsUnitTypes.LayoutMillimeters))
-                    north.attemptResize(QgsLayoutSize(*[1000,1000], QgsUnitTypes.LayoutPixels))
-                    layout.addLayoutItem(north)
-                    #Añadir gráfico de la erosión textural
-                    if sum(texture_erosion_value)>0:
-                        #Este if se hace porque si la erosión en todas las texturas es de cero no puede crear el pie chart
-                        north=QgsLayoutItemPicture(layout)
-                        north.setMode(QgsLayoutItemPicture.FormatSVG)
-                        north.setPicturePath(self.direccion+"\\INPUTS\\"+"dis_erosion.png")
-                        north.attemptMove(QgsLayoutPoint(200, 25, QgsUnitTypes.LayoutMillimeters))
-                        north.attemptResize(QgsLayoutSize(*[1000,1000], QgsUnitTypes.LayoutPixels))
-                        layout.addLayoutItem(north)
-                    #Título del pdf
-                    def add_text(titulo,fontsize,x,y):
-                        title=QgsLayoutItemLabel(layout)
-                        title.setText(titulo)
-                        title.setFont(QFont("Arial",fontsize,QFont.Bold))
-                        title.adjustSizeToText()
-                        layout.addLayoutItem(title)
-                        title.attemptMove(QgsLayoutPoint(x,y,QgsUnitTypes.LayoutMillimeters))
-                    add_text("EPHEMERAL GULLY EROSION",12,120,10)
-                    #Exportar a pdf
-                    output_path="/QGIS/layout-export-pyqgis"
-                    exporter=QgsLayoutExporter(layout)
-                    exporter=QgsLayoutExporter(layout)
-                    pdf_path=self.direccion+"\\INPUTS\\"+"ephemeral_gully_erosion.pdf"
-                    exporter.exportToPdf(pdf_path,QgsLayoutExporter.PdfExportSettings())
-                    os.startfile(pdf_path)
-                                
-                if self.output.checkBox_20.isChecked():
-                    #DIMENSIONES CÁRCAVAS
-                    #Longitud
-                    #Se obtienen los datos para el gráfico
-                    df_repair = df_section(file_repair,delete_second=True)
-                    #Se elige, del dataframe, los datos de la peg elegida y se cambia el formato de las columnas
-                    df_repair = df_repair[df_repair.iloc[:,9]==peg]
-                    df_repair["date"]=pd.to_datetime(dict(year=df_repair.iloc[:,3],month= df_repair.iloc[:,1],day=df_repair.iloc[:,2]))
-                    df_repair=df_repair.set_index("date")
-                    repair_dates =df_repair.index
-                    #Se crea la columna de longitud
-                    df["long"] = [float(x) for x in df["Distance from Mouth"].iloc[:,-1]]
-                    df["anchura"] = [float(x) for x in df["Width"]]
-                    df["profundidad"] = [float(x) for x in df["Depth"]]
-                    df_daily_long = df.resample('D').asfreq()
-                    #Aquí se añade que cuando hay repair date entonces la longitud es igual a cero
-                    for i in repair_dates:
-                        df_daily_long.loc[i,"long"]=0
-                    #Ahora aquí se rellenan los datos
-                    df_daily_long = df_daily_long.fillna(method='ffill')
-                    #Gráfico Longitud
-                    plt.style.use('ggplot')
-                    plt.rcParams["figure.figsize"]= [18, 12]
-                    fig = plt.figure()
-                    # Ejes
-                    ax0 = plt.subplot()
-                    ax1 = ax0.twinx()
-                    # Quitar el grid
-                    ax1.grid(False)
-                    #Quitar el eje y del ax1
-                    ax1.get_yaxis().set_visible(False)
-                    # El dibujo
-                    ax0.plot(np.array(df_daily_long.index), np.array(df_daily_long.long), color="blue", alpha=1, label="Length")
-                    # Modificar los ticks (los números en el eje x e y)
-                    ax0.tick_params(axis="both", colors="black", labelsize=35)
-                    ax0.set_xlabel("Time", size=35, family="arial", weight="bold", color="black")
-                    ax0.set_ylabel("Length (m))", size=35, family="arial", weight="bold", color="black")
-                    # Para que salgan los números de los años y los meses con ticks
-                    ax0.xaxis.set_minor_locator(mdates.MonthLocator())
-                    ax0.xaxis.set_major_locator(mdates.YearLocator())
-                    #Se ponen las fechas de reparación
-                    for k,i in enumerate(repair_dates):
-                        if k == len(repair_dates)-1:
-                            ax1.axvline(x=i, color='red', linestyle='--', label='Repair date')
-                        else:
-                            ax1.axvline(x=i, color='red', linestyle='--')
-                    # Poner la leyenda
-                    legend = fig.legend(loc="upper right", bbox_to_anchor=(0.30, 0.87), framealpha=1, fontsize=20)
-                    legend.legendPatch.set_edgecolor("black")
-                    legend.legendPatch.set_facecolor("white")
-                    legend.legendPatch.set_linewidth(0.5)
-                    # Títulos de los gráficos
-                    ax0.set_title("Evolution of length", fontsize=30, weight="bold", color="black")
-                    #Guardar gráfico
-                    plt.savefig(self.direccion+"\\INPUTS\\"+"evolucion_longitud.png",transparent=False,bbox_inches = "tight",dpi=600)
-
-                    #Anchura y profundidad en el nickpoint 
-                    #Gráfico anchura y profundidad
-                    fig = plt.figure()
-                    # Ejes
-                    ax0 = plt.subplot()
-                    ax1 = ax0.twinx()
-                    # El dibujo
-                    ax0.plot(np.array(df_daily_long.index), np.array(df_daily_long.anchura), color="blue", alpha=1, label="Nickpoint Width")
-                    ax1.plot(np.array(df_daily_long.index), np.array(df_daily_long.profundidad), color="red", alpha=0.7, label="Nickpoint Depth")
-                    # Quitar el grid
-                    ax1.grid(False)
-                    # Para que salgan los números de los años y los meses con ticks
-                    ax0.xaxis.set_minor_locator(mdates.MonthLocator())
-                    ax0.xaxis.set_major_locator(mdates.YearLocator())
-                    # Modificar los ticks (los números en el eje x e y)
-                    ax0.tick_params(axis="both", colors="black", labelsize=11)
-                    ax1.tick_params(axis="both", colors="black", labelsize=11)
-                    ax0.set_xlabel("Time", size=35, family="arial", weight="bold", color="black")
-                    ax0.set_ylabel("Width (m)", size=35, family="arial", weight="bold", color="black")
-                    ax1.set_ylabel("Depth (m)", size=35, family="arial", weight="bold", color="black")
-                    ax0.set_title("Evolution of width and depth at the nickpoint", fontsize=30, weight="bold", color="black")
-                    # Poner la leyenda
-                    legend = fig.legend(loc="upper right", bbox_to_anchor=(0.35, 0.87), framealpha=1, fontsize=20)
-                    legend.legendPatch.set_edgecolor("black")
-                    legend.legendPatch.set_facecolor("white")
-                    legend.legendPatch.set_linewidth(0.5)
-                    #Guardar gráfico
-                    plt.savefig(self.direccion+"\\INPUTS\\"+"evolucion_anchura_prof.png",transparent=False,bbox_inches = "tight",dpi=600)
-                    
-                    #SE CREA EL PLANO DE DIMENSIONES
-                    project = QgsProject.instance()
-                    manager = project.layoutManager()
-                    layoutName = "Dimensions"
-                    layouts_list = manager.printLayouts()
-                    #Remove any duplicate layouts
-                    for layout in layouts_list:
-                        if layout.name()==layoutName:
-                            manager.removeLayout(layout)
-                    layout = QgsPrintLayout(project)
-                    layout.initializeDefaults()
-                    layout.setName(layoutName)
-                    manager.addLayout(layout)
-                    #Create a map item in the layout 
-                    layer = QgsProject.instance().mapLayersByName(peg)[0]
-                    map = QgsLayoutItemMap(layout)
-                    map.setRect(20,20,20,20)
-                    map.zoomToExtent(iface.mapCanvas().extent())
-                    #set the map extent
-                    ms = QgsMapSettings()
-                    ms.setLayers([layer]) #set layers to be mapped
-                    rect = QgsRectangle(ms.fullExtent())
-                    rect.scale(1.0)
-                    ms.setExtent(rect)
-                    ext = cell_layer.extent()
-                    xmin = ext.xMinimum()*0.99995
-                    xmax = ext.xMaximum()*1.00005
-                    ymin = ext.yMinimum()*1.00
-                    ymax = ext.yMaximum()*1.00
-                    rect =QgsRectangle(xmin, ymin, xmax, ymax)
-                    map.zoomToExtent(rect)
-                    layout.addLayoutItem(map)
-                    map.attemptMove(QgsLayoutPoint(200,100,QgsUnitTypes.LayoutMillimeters))
-                    map.attemptResize(QgsLayoutSize(80,80,QgsUnitTypes.LayoutMillimeters))
-                    #Añadir leyenda
-                    root = QgsLayerTree()
-                    root.addLayer(layer)
-                    legend = QgsLayoutItemLegend(layout)
-                    legend.model().setRootGroup(root)
-                    legend.setId('Legend')
-                    legend.setLinkedMap(map)
-                    layout.addLayoutItem(legend)
-                    legend.attemptMove(QgsLayoutPoint(250,100,QgsUnitTypes.LayoutMillimeters))
-                    legend.attemptResize(QgsLayoutSize(5,5,QgsUnitTypes.LayoutMillimeters))
-                    #Añadir barra de escala
-                    scale=QgsLayoutItemScaleBar(layout)
-                    scale.setStyle('Single Box')
-                    scale.setFont(QFont("Arial",9))
-                    scale.setFontColor(QColor("Black"))
-                    scale.setFillColor(QColor("Black"))
-                    scale.applyDefaultSize(QgsUnitTypes.DistanceMeters)
-                    scale.setMapUnitsPerScaleBarUnit(1.0)
-                    scale.setNumberOfSegments(2)
-                    valores_redondear = [10,20,50,100,500,1000,5000]
-                    #Esto se hace para que la escala tenga un valor como los de valores_redondear no uno que sea como 765.367
-                    def redondear_numero(numero):
-                        for i in range(len(valores_redondear)):
-                            if numero <0:
-                                return 10
-                            if numero <valores_redondear[i]:
-                                return valores_redondear[i-1]
-                    scale.setUnitsPerSegment(redondear_numero((xmax-xmin)/5))
-                    scale.setUnitLabel("m")
-                    scale.setLinkedMap(map)
-                    layout.addLayoutItem(scale)
-                    scale.attemptMove(QgsLayoutPoint(180,160,QgsUnitTypes.LayoutMillimeters))
-                    scale.attemptResize(QgsLayoutSize(9,9,QgsUnitTypes.LayoutMillimeters))
-                    #Añadir flecha de norte
-                    north=QgsLayoutItemPicture(layout)
-                    north.setMode(QgsLayoutItemPicture.FormatSVG)
-                    north.setPicturePath(self.plugin_dir+"\\images"+"\\north.svg")
-                    north.attemptMove(QgsLayoutPoint(190, 110, QgsUnitTypes.LayoutMillimeters))
-                    north.attemptResize(QgsLayoutSize(*[150,150], QgsUnitTypes.LayoutPixels))
-                    layout.addLayoutItem(north)
-                    #Añadir gráfico de evolución de anchura y profundidad
-                    north=QgsLayoutItemPicture(layout)
-                    north.setMode(QgsLayoutItemPicture.FormatSVG)
-                    north.setPicturePath(self.direccion+"\\INPUTS\\"+"evolucion_anchura_prof.png")
-                    north.attemptMove(QgsLayoutPoint(8, 120, QgsUnitTypes.LayoutMillimeters))
-                    north.attemptResize(QgsLayoutSize(*[1500,1500], QgsUnitTypes.LayoutPixels))
-                    layout.addLayoutItem(north)
-                    #Añadir gráfico de evolución longitud
-                    north=QgsLayoutItemPicture(layout)
-                    north.setMode(QgsLayoutItemPicture.FormatSVG)
-                    north.setPicturePath(self.direccion+"\\INPUTS\\"+"evolucion_longitud.png")
-                    north.attemptMove(QgsLayoutPoint(8, 25, QgsUnitTypes.LayoutMillimeters))
-                    north.attemptResize(QgsLayoutSize(*[1500,1500], QgsUnitTypes.LayoutPixels))
-                    layout.addLayoutItem(north)
-                    #Añadir el texto
-                    def add_text(titulo,fontsize,x,y):
-                        title=QgsLayoutItemLabel(layout)
-                        title.setText(titulo)
-                        title.setFont(QFont("Arial",fontsize,QFont.Bold))
-                        title.adjustSizeToText()
-                        layout.addLayoutItem(title)
-                        title.attemptMove(QgsLayoutPoint(x,y,QgsUnitTypes.LayoutMillimeters))
-                    add_text("EPHEMERAL GULLY DIMENSIONS",12,120,10)
-                    add_text("-Maximum length: {} m  ".format(max(df_daily_long.long)),12,150,25)
-                    add_text("-Maximum width at nickpoint: {} m  ".format(round(max(df_daily_long.anchura),3)),12,150,30)
-                    add_text("-Maximum depth at nickpoint: {} m  ".format(max(df_daily_long.profundidad)),12,150,35)
-                    add_text("-Drainage area to mouth: {} ha  ".format(float(df["to Mouth"].iloc[0])),12,150,40)
-                    add_text("-Drainage area to barrier: {} ha  ".format(float(df["to Barrier"].iloc[0])),12,150,45)
-                    add_text("-Headcut distance from mouth to watershed divide: {} m  ".format(float(df["Distance from Mouth"].iloc[0,0])),12,150,50)
-                    add_text("-Headcut distance from mouth to barrier: {} m  ".format(float(df["Distance from Mouth"].iloc[0,1])),12,150,55)
-                    
-                    #Exportar a pdf
-                    output_path="/QGIS/layout-export-pyqgis"
-                    exporter=QgsLayoutExporter(layout)
-                    exporter=QgsLayoutExporter(layout)
-                    pdf_path=self.direccion+"\\INPUTS\\"+"ephemeral_gully_dimensions.pdf"
-                    exporter.exportToPdf(pdf_path,QgsLayoutExporter.PdfExportSettings())
-                    os.startfile(pdf_path)
-                if self.output.checkBox_21.isChecked():
-                    #HIDROLOGÍA
-                    #Se crean las columnas
-                    df["curve"] = [float(x) for x in df["Curve"]]
-                    df["precipitation"] = [float(x) for x in df["Precip"]]
-                    df["run"] = [float(x) for x in df["Runoff"]]
-                    df["peak"] = [float(x) for x in df["Peak Discharge"]]
-                    df_hyd = df.resample('D').asfreq()
-                    df_hyd["curve"]=df_hyd.fillna(method='ffill')["curve"]
-                    df_hyd = df_hyd.fillna(0)
-                    #Se crean los gráficos
-                    plt.rcParams["figure.figsize"]= [18, 12]
-                    fig = plt.figure()
-                    # Ejes
-                    ax0 = plt.subplot()
-                    ax1 = ax0.twinx()
-                    # El dibujo
-                    ax0.bar(df_hyd.index, df_hyd.peak*1000, color="red", label="Runoff", width=5)
-                    ax1.bar(df_hyd.index, df_hyd.precipitation, color="blue", label="Precipitation", width=5)
-                    # Quitar el grid
-                    ax1.grid(False)
-                    #Cambiar los límites del eje y
-                    ax0.set_ylim(0,ax0.get_ylim()[1]*2)
-                    ax1.set_ylim(0,ax1.get_ylim()[1]*2)
-                    #Se invierte el eje
-                    ax1.invert_yaxis()
-                    # Para que salgan los números de los años y los meses con ticks
-                    ax0.xaxis.set_minor_locator(mdates.MonthLocator())
-                    ax0.xaxis.set_major_locator(mdates.YearLocator())
-                    # Modificar los ticks (los números en el eje x e y)
-                    ax0.tick_params(axis="both", colors="black", labelsize=11)
-                    ax1.tick_params(axis="both", colors="black", labelsize=11)
-                    ax0.set_xlabel("Time", size=35, family="arial", weight="bold", color="black")
-                    ax0.set_ylabel("Peak discharge (l/s)", size=35, family="arial", weight="bold", color="black")
-                    ax1.set_ylabel("Precipitation (mm)", size=35, family="arial", weight="bold", color="black")
-                    ax0.set_title("Precipitation and peak discharge at the nickpoint", fontsize=35, weight="bold", color="black")
-                    # Poner la leyenda
-                    legend = fig.legend(loc="upper right", bbox_to_anchor=(0.3, 0.87), framealpha=1, fontsize=20)
-                    legend.legendPatch.set_edgecolor("black")
-                    legend.legendPatch.set_facecolor("white")
-                    legend.legendPatch.set_linewidth(0.5)
-                    #Guardar gráfico
-                    plt.savefig(self.direccion+"\\INPUTS\\"+"precip_peak.png",transparent=False,bbox_inches = "tight",dpi=600)
-                    
-                    #SE CREA EL PLANO DE HIDROLOGÍA
-                    project = QgsProject.instance()
-                    manager = project.layoutManager()
-                    layoutName = "Hydrology"
-                    layouts_list = manager.printLayouts()
-                    #Remove any duplicate layouts
-                    for layout in layouts_list:
-                        if layout.name()==layoutName:
-                            manager.removeLayout(layout)
-                    layout = QgsPrintLayout(project)
-                    layout.initializeDefaults()
-                    layout.setName(layoutName)
-                    manager.addLayout(layout)
-                    #Create a map item in the layout 
-                    layer = QgsProject.instance().mapLayersByName(peg)[0]
-                    map = QgsLayoutItemMap(layout)
-                    map.setRect(20,20,20,20)
-                    map.zoomToExtent(iface.mapCanvas().extent())
-                    #set the map extent
-                    ms = QgsMapSettings()
-                    ms.setLayers([layer]) #set layers to be mapped
-                    rect = QgsRectangle(ms.fullExtent())
-                    rect.scale(1.0)
-                    ms.setExtent(rect)
-                    ext = cell_layer.extent()
-                    xmin = ext.xMinimum()*0.99995
-                    xmax = ext.xMaximum()*1.00005
-                    ymin = ext.yMinimum()*1.00
-                    ymax = ext.yMaximum()*1.00
-                    rect =QgsRectangle(xmin, ymin, xmax, ymax)
-                    map.zoomToExtent(rect)
-                    layout.addLayoutItem(map)
-                    map.attemptMove(QgsLayoutPoint(200,100,QgsUnitTypes.LayoutMillimeters))
-                    map.attemptResize(QgsLayoutSize(80,80,QgsUnitTypes.LayoutMillimeters))
-                    #Añadir leyenda
-                    root = QgsLayerTree()
-                    root.addLayer(layer)
-                    legend = QgsLayoutItemLegend(layout)
-                    legend.model().setRootGroup(root)
-                    legend.setId('Legend')
-                    legend.setLinkedMap(map)
-                    layout.addLayoutItem(legend)
-                    legend.attemptMove(QgsLayoutPoint(250,100,QgsUnitTypes.LayoutMillimeters))
-                    legend.attemptResize(QgsLayoutSize(5,5,QgsUnitTypes.LayoutMillimeters))
-                    #Añadir barra de escala
-                    scale=QgsLayoutItemScaleBar(layout)
-                    scale.setStyle('Single Box')
-                    scale.setFont(QFont("Arial",9))
-                    scale.setFontColor(QColor("Black"))
-                    scale.setFillColor(QColor("Black"))
-                    scale.applyDefaultSize(QgsUnitTypes.DistanceMeters)
-                    scale.setMapUnitsPerScaleBarUnit(1.0)
-                    scale.setNumberOfSegments(2)
-                    valores_redondear = [10,20,50,100,500,1000,5000]
-                    #Esto se hace para que la escala tenga un valor como los de valores_redondear no uno que sea como 765.367
-                    def redondear_numero(numero):
-                        for i in range(len(valores_redondear)):
-                            if numero <0:
-                                return 10
-                            if numero <valores_redondear[i]:
-                                return valores_redondear[i-1]
-                    scale.setUnitsPerSegment(redondear_numero((xmax-xmin)/5))
-                    scale.setUnitLabel("m")
-                    scale.setLinkedMap(map)
-                    layout.addLayoutItem(scale)
-                    scale.attemptMove(QgsLayoutPoint(180,160,QgsUnitTypes.LayoutMillimeters))
-                    scale.attemptResize(QgsLayoutSize(9,9,QgsUnitTypes.LayoutMillimeters))
-                    #Añadir flecha de norte
-                    north=QgsLayoutItemPicture(layout)
-                    north.setMode(QgsLayoutItemPicture.FormatSVG)
-                    north.setPicturePath(self.plugin_dir+"\\images"+"\\north.svg")
-                    north.attemptMove(QgsLayoutPoint(190, 110, QgsUnitTypes.LayoutMillimeters))
-                    north.attemptResize(QgsLayoutSize(*[150,150], QgsUnitTypes.LayoutPixels))
-                    layout.addLayoutItem(north)
-                    #Añadir gráfico de evolución precipitación y peak
-                    north=QgsLayoutItemPicture(layout)
-                    north.setMode(QgsLayoutItemPicture.FormatSVG)
-                    north.setPicturePath(self.direccion+"\\INPUTS\\"+"precip_peak.png")
-                    north.attemptMove(QgsLayoutPoint(8, 25, QgsUnitTypes.LayoutMillimeters))
-                    north.attemptResize(QgsLayoutSize(*[2000,2000], QgsUnitTypes.LayoutPixels))
-                    layout.addLayoutItem(north)
-                    #Añadir el texto
-                    def add_text(titulo,fontsize,x,y):
-                        title=QgsLayoutItemLabel(layout)
-                        title.setText(titulo)
-                        title.setFont(QFont("Arial",fontsize,QFont.Bold))
-                        title.adjustSizeToText()
-                        layout.addLayoutItem(title)
-                        title.attemptMove(QgsLayoutPoint(x,y,QgsUnitTypes.LayoutMillimeters))
-                    add_text("EPHEMERAL GULLY HYDROLOGY",12,120,10)
-                    add_text("-Average curve number: {}   ".format(round(sum([float(x) for x in df.Curve])/len([float(x) for x in df.Curve]),2)),12,190,25)
-                    add_text("-Total precipitation: {} mm  ".format(round(sum([float(x) for x in df.Precip]),2)),12,190,30)
-                    add_text("-Total runoff: {} mm  ".format(round(sum([float(x) for x in df.Runoff]),2)),12,190,35)
-                    #Exportar a pdf
-                    output_path="/QGIS/layout-export-pyqgis"
-                    exporter=QgsLayoutExporter(layout)
-                    exporter=QgsLayoutExporter(layout)
-                    pdf_path=self.direccion+"\\INPUTS\\"+"/ephemeral_gully_hydrology.pdf"
-                    exporter.exportToPdf(pdf_path,QgsLayoutExporter.PdfExportSettings())
-                    os.startfile(pdf_path)
-                    
+           
                 #MENSAJE DE ÉXITO
-                self.iface.messageBar().pushMessage("Success", "Succes in the creation of the map ",level=Qgis.Success, duration=5)
+                self.iface.messageBar().pushMessage("Success", "Succes in data display ",level=Qgis.Success, duration=5)
             
             #CREACIÓN DE CAPA DE CELDAS CON LOS VALORES DE EROSIÓN POR CÁRCAVAS
             if self.output.cbEG.isChecked() or self.output.cbSR.isChecked() or self.output.cbT.isChecked() or self.output.cbN.isChecked() or self.output.cbOC.isChecked() or self.output.cbP.isChecked():
@@ -3469,254 +2531,7 @@ class qannagnps():
             for i in output_options:
                 i.setChecked(False)
             self.output.lineEdit.setText("")
-            
-    def display_peg(self):
-        #Hacer que aparezcan los PEG con las ID en el botón de crear mapa
-        try:
-            fichero = self.direccion+"\\"+"PEG_Summary.txt"
-        except:
-            iface.messageBar().pushMessage("Error in directory", "First select in the simulation button the DEM raster",level=Qgis.Warning, duration=10)
-            return 
-        #Se crea la capa y se añade a la interfaz
-        summary = pd.read_csv(fichero,encoding = "ISO-8859-1",delimiter=",")
-        def create_layer():
-            layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"peg","memory")
-            layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
-            layer.updateFields()
-            features = []
-            for i in range(len(summary)):
-                feature = QgsFeature()
-                feature.setFields(layer.fields())
-                x = summary.X.iloc[i]
-                y = summary.Y.iloc[i]
-                pt = QgsPointXY(x,y)
-                geom = QgsGeometry.fromPointXY(pt)
-                feature.setGeometry(geom)
-                feature.setAttribute(0,summary.GULLY_ID.iloc[i])
-                features.append(feature)
-            layer.dataProvider().addFeatures(features)
-            return layer
-        summary_layer = create_layer()
-        QgsProject.instance().addMapLayer(summary_layer)
-        #Se elige la capa que se ha puesto en la interfaz y se le ponen las etiquetas
-        layers = QgsProject.instance().mapLayersByName("peg")
-        layer = layers[0]
-        pal_layer = QgsPalLayerSettings()
-        text_format = QgsTextFormat()
-        text_format.setFont(QFont("Arial", 12))
-        text_format.setSize(12)
-        pal_layer.setFormat(text_format)
-        pal_layer.fieldName = "id"
-        pal_layer.enabled = True
-        pal_layer.isExpression = True
-        pal_layer.placement = QgsPalLayerSettings.Line
-        labels = QgsVectorLayerSimpleLabeling(pal_layer)
-        layer.setLabeling(labels)
-        layer.setLabelsEnabled(True)
-        layer.triggerRepaint()
 
-    def change_samples(self):
-        #Para que cuando se ponga el N, se ponga automáticamente el número de samples
-        try:
-            samples = str(int(self.dlg.lineEdit_9.text())*(2*2+2))
-            self.dlg.lineEdit_10.setText(samples)
-        except:
-            pass
-        if len(self.dlg.lineEdit_9.text().split())==0:
-            self.dlg.lineEdit_10.setText("")
-
-    def sensitivity_function(self):
-        #Función de sensibilidad
-        #Dar error si no se ha elegido el MDT.
-        if self.dlg.comboBox.currentIndex()==0:
-            iface.messageBar().pushMessage("Error in Sensitivity Analysis", "Please select a DEM raster." ,level=Qgis.Warning, duration=10)
-            return
-        #Dar error si se ha elegido la opción del análisis de sensibilidad con algun dato sin poner
-        if self.dlg.lineEdit_6.text()=="" or self.dlg.lineEdit_4.text()=="" or self.dlg.lineEdit_3.text()=="" or self.dlg.lineEdit_5.text()=="" or self.dlg.lineEdit_9.text() =="":
-            iface.messageBar().pushMessage("Error in Sensitivity Analysis", "Please confirm that you have entered all the required values." ,level=Qgis.Warning, duration=10)
-            return 
-        
-        #Dar error si se ha elegido un input que crea topagnps y se quiere hacer el análisis de sensibilidad. El tamaño de pixel y el CTI cambian el input de ephemeral gully o el de las celdas, entre otros.
-        lista_checks = [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4]
-        lista_lines = [self.inputs.l_3,self.inputs.l_5,self.inputs.l_10,self.inputs.l_41]
-        for i in range(len(lista_checks)):
-            if not lista_checks[i].isChecked() and lista_lines[i].text()!="":
-                iface.messageBar().pushMessage("Error in Sensitivity Analysis", "Cell, ephemeral gully, reach or riparian buffer is not provided directly by TopAGNPS wich can make the inputs not to change at each execution" ,level=Qgis.Warning, duration=10)
-                return
-        
-        #Establecer directorio de DEM, que será el que se utilice para hacer los resamplings
-        layers = self.layers
-        selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
-        selectedLayer = layers[selectedLayerIndex].layer()
-        fichero_dem =  selectedLayer.dataProvider().dataSourceUri()
-        
-        #Cambiar el directorio
-        os.chdir(self.direccion)
-      
-        #Guardar el PEG original que se le ha puesto, para después del análisis de sensibilidad volver a ponérselo
-        self.cti_original = self.cpeg.lineEdit_2.text()
-        #Primero se crean las combinaciones de valores que van a tener el tamaño de pixel y el valor de CTI
-        problem = {'num_vars': 2,'names': ['Pixel_size', 'CTI'],'bounds': [[float(self.dlg.lineEdit_3.text()), float(self.dlg.lineEdit_5.text())],[float(self.dlg.lineEdit_6.text()), float(self.dlg.lineEdit_4.text())]]}
-        try:
-            param_values = saltelli.sample(problem, int(self.dlg.lineEdit_9.text()))
-        except:
-            iface.messageBar().pushMessage("Error in Bounds", "The values of the limits in the sensitivity analysis are erroneous." ,level=Qgis.Warning, duration=10)
-            return 
-        
-        #Se crea variable con los valores de los parámetros
-        self.param_values = param_values
-        
-        #Se importan los control file de TOPAGNPS y de AGBUF (si existe). Son los dos control file en donde se irán cambiando los nombres de los archivos en cada pasada
-        topagnps_control_file = pd.read_csv("TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
-        if path.exists("AGBUF.csv"):
-            agbuf_control_file = pd.read_csv("AGBUF.CSV",encoding = "ISO-8859-1",delimiter=",")
-        #Bucle de creación de archivos resampleados. Se crean todos los archivos con los distintos valores de pixel (valores únicos). 
-        for i in np.unique(param_values[:,0]):
-            #Aquí se resamplea el DEM, BUFFER y VEGETATION a un archivo .sdat. 
-            i = round(i,2) #esto se hace porque el UPAREA.asc (DEDNM.asc no) y otros archivos solo pueden tener tamaños de pixel hasta el segundo decimal
-            #Se resamplea el mdt y buffer y vegetation (estos dos últimos si existen) según el tamaño de pixel de esta pasada
-            processing.run("gdal:warpreproject", 
-                {'INPUT':fichero_dem,'SOURCE_CRS':QgsCoordinateReferenceSystem(f'EPSG:{self.epsg}'),'TARGET_CRS':QgsCoordinateReferenceSystem(f'EPSG:{self.epsg}'),
-                'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':float(i),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,
-                'MULTITHREADING':False,'EXTRA':'','OUTPUT':self.direccion +"\\"+str(i)+"_"+topagnps_control_file["FILENAME"].iloc[0]})
-            
-            #Se resamplean los rasters de buffer y vegetation si existen
-            if path.exists("AGBUF.csv"):
-                processing.run("gdal:warpreproject", 
-                    {'INPUT':self.direccion+"\\"+agbuf_control_file["BUFFER"].iloc[0],
-                    'SOURCE_CRS':QgsCoordinateReferenceSystem(f'EPSG:{self.epsg}'),'TARGET_CRS':QgsCoordinateReferenceSystem(f'EPSG:{self.epsg}'),
-                    'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':float(i),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,
-                    'EXTRA':'','OUTPUT':self.direccion+"\\"+str(i)+"_"+agbuf_control_file["BUFFER"].iloc[0]})
-                processing.run("gdal:warpreproject", 
-                    {'INPUT':self.direccion+"\\"+agbuf_control_file["VEGETATION"].iloc[0],
-                    'SOURCE_CRS':QgsCoordinateReferenceSystem(f'EPSG:{self.epsg}'),'TARGET_CRS':QgsCoordinateReferenceSystem(f'EPSG:{self.epsg}'),
-                    'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':float(i),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,
-                    'EXTRA':'','OUTPUT':self.direccion+"\\"+str(i)+"_"+agbuf_control_file["VEGETATION"].iloc[0]})
-        
-        #Esto se hace para tener los nombres de los archivos DEDNM, VEGETATION, BUFFER y valor CTI originales para volver luego a ponerlos en el csv.
-        peg_control_file = pd.DataFrame(data = {"Input":[self.cpeg.lineEdit.text()],"CTI_value":self.cti_original,
-                                    "Accum_pct":[self.cpeg.lineEdit_3.text()]})
-        original_name = topagnps_control_file["FILENAME"].iloc[0]
-        original_cti = peg_control_file["CTI_value"].iloc[0]
-        if path.exists("AGBUF.csv"):
-            original_buffer = agbuf_control_file["BUFFER"].iloc[0]
-            original_vegetation = agbuf_control_file["VEGETATION"].iloc[0]
-        
-        #Se empieza con el bucle del análisis de sensibilidad
-        self.sensitivity = 1
-        self.resultados = []
-        self.param_values = param_values
-        for i in range(len(param_values)):
-            #Se ejecuta el modelo
-            topagnps_control_file["FILENAME"].iloc[0]=str(round(param_values[i,0],2))+"_"+original_name
-            topagnps_control_file.to_csv("TOPAGNPS.csv", index=False, float_format='%.5f')
-            if path.exists("AGBUF.csv"):
-                agbuf_control_file["BUFFER"].iloc[0] = str(round(param_values[i,0],2))+"_"+original_buffer
-                agbuf_control_file["VEGETATION"].iloc[0] = str(round(param_values[i,0],2))+"_"+original_vegetation
-                agbuf_control_file.to_csv("AGBUF.csv", index=False, float_format='%.5f')
-            self.ejecucion_completa()
-            #Esto es para que pare si hay un error 
-            if self.end_sensitivity == 1:
-                return
-            self.sensitivity+= 1
-        #Se vuelven a añadir los nombres originales a los csv            
-        topagnps_control_file["FILENAME"].iloc[0]=original_name
-        topagnps_control_file.to_csv("TOPAGNPS.csv", index=False, float_format='%.5f')
-        if path.exists("AGBUF.csv"):
-            agbuf_control_file["BUFFER"].iloc[0] = original_buffer
-            agbuf_control_file["VEGETATION"].iloc[0] = original_vegetation
-            agbuf_control_file.to_csv("AGBUF.csv", index=False, float_format='%.5f')
-        peg_control_file["CTI_value"].iloc[0]=original_cti
-        peg_control_file.to_csv("PEG.csv", index=False, float_format='%.5f')
-        self.sensitivity = 0
-        #Se analizan los resultados
-        Si = sobol.analyze(problem, np.array(self.resultados))
-        
-        #Creación del gráfico y del excel
-        plt.rcParams["figure.figsize"] = [23, 12]
-        fig = plt.figure()
-        ax0 = plt.subplot(1,3,1)
-        ax1 =  plt.subplot(1,3,2)
-        ax2 =  plt.subplot(1,3,3)
-        #First order
-        ax0.bar("Pixel size",Si["S1"][0],color = "tab:blue",yerr=Si["S1_conf"][0],capsize = 5)
-        ax0.bar("CTI",Si["S1"][1],color = "tab:blue",yerr=Si["S1_conf"][1],capsize = 5)
-        ax0.set_ylabel("Sobol index",size = 15,family="arial",weight = "bold",color = "black")
-        ax0.tick_params(axis = "both",colors = "black",labelsize = 15)
-        ax0.set_title("First order sensitivity", fontsize=15,weight = "bold",color = "black")
-        #Second order
-        ax1.bar("Pixel size-CTI",Si["S2"][0][1],color = "tab:blue",yerr=Si["S2_conf"][0][1],capsize = 5,width = 1)
-        #ax1.set_position(Bbox([[0.4, 0.13], [0.5, 0.88]]))
-        ax1.set_ylabel("Sobol index",size = 15,family="arial",weight = "bold",color = "black")
-        ax1.tick_params(axis = "both",colors = "black",labelsize = 15)
-        ax1.set_title("Second order sensitivity", fontsize=15,weight = "bold",color = "black")
-        #Total order
-        ax2.bar("Pixel size",Si["ST"][0],color = "tab:blue",yerr=Si["ST_conf"][0],capsize = 5)
-        ax2.bar("CTI",Si["ST"][1],color = "tab:blue",yerr=Si["ST_conf"][1],capsize = 5)
-        ax2.set_ylabel("Sobol index",size = 15,family="arial",weight = "bold",color = "black")
-        ax2.tick_params(axis = "both",colors = "black",labelsize = 15)
-        ax2.set_title("Total order sensitivity", fontsize=15,weight = "bold",color = "black")
-        #Guardar gráfico
-        plt.savefig("Sensitivity.png",transparent=False,bbox_inches = "tight",dpi=300)
-        #Ahora se pasan los resultados a un excel
-        resultados = pd.DataFrame(data = {"Pixel_size":param_values[:,0],"CTI":param_values[:,1],"EG erosion (Mg)":np.array(self.resultados)})
-        resultados.to_csv("Outputs_Sensitivity.csv", index=False, float_format='%.5f')
-        resultados = pd.DataFrame(data = {"First Order Pixel":[Si["S1"][0]],"First Order CTI":[Si["S1"][1]],"Second Order":[Si["S2"][0][1]],"Total Order Pixel":[Si["ST"][0]],"Total Order CTI":[Si["ST"][1]],"Pixel_distribution":[f"{float(self.dlg.lineEdit_3.text())}-{float(self.dlg.lineEdit_5.text())}"],"CTI_distribution":[f"{float(self.dlg.lineEdit_6.text())}-{float(self.dlg.lineEdit_4.text())}"]})
-        resultados.to_csv("Results_Sensitivity.csv", index=False, float_format='%.5f')
-        os.startfile("Outputs_Sensitivity.csv")
-        os.startfile("Results_Sensitivity.csv")
-        os.startfile("Sensitivity.png")
-
-    def append_result(self):
-        #Esta función sirve para guardar los resultados obtenidos del análisis de sensibilidad
-        fichero = self.direccion+"\\INPUTS\\"+"AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv"
-        file = open(fichero)
-        csvreader = csv.reader(file)
-        rows = []
-        for row in csvreader:
-                rows.append(row)
-        lista = []
-        a = 0
-        for i in rows:
-            try:
-                if i[0]=="Day":
-                    a = 1
-                    lista.append(i)
-                elif a ==1:
-                    lista.append(i[:-1])
-            except:
-                continue
-        erosion = [float(lista[x][27]) for x in range(1,len(lista)) if len(lista[x])==30]
-        self.resultados.append(sum(erosion))
-
-    def sensitivity_parameters(self):
-        #Función para cambiar el nombre de los parámetros de entrada para las distribuciones. 
-        #Primero para el CTI
-        if self.dlg.comboBox_4.currentText()=="Uniform":
-                self.dlg.label_22.setText("Minimum")
-                self.dlg.label_26.setText("Maximum")
-        if self.dlg.comboBox_4.currentText()=="Triangular":
-            self.dlg.label_22.setText("Minimum")
-            self.dlg.label_26.setText("Maximum")
-        if self.dlg.comboBox_4.currentText()=="Normal":
-            self.dlg.label_22.setText("Mean")
-            self.dlg.label_26.setText("Standard deviation")
-        if self.dlg.comboBox_4.currentText()=="Lognormal":
-            self.dlg.label_22.setText("Mean")
-            self.dlg.label_26.setText("Standard deviation")
-        #Ahora para el tamaño de pixel
-        if self.dlg.comboBox_5.currentText()=="Uniform":
-                self.dlg.label_25.setText("Minimum")
-                self.dlg.label_19.setText("Maximum")
-        if self.dlg.comboBox_5.currentText()=="Triangular":
-            self.dlg.label_25.setText("Minimum")
-            self.dlg.label_19.setText("Maximum")
-        if self.dlg.comboBox_5.currentText()=="Normal":
-            self.dlg.label_25.setText("Mean")
-            self.dlg.label_19.setText("Standard deviation")
-        if self.dlg.comboBox_5.currentText()=="Lognormal":
-            self.dlg.label_25.setText("Mean")
-            self.dlg.label_19.setText("Standard deviation")
     def files_directory(self):
         #Método para añadir la dirección de la carpeta del mdt a la interfaz de los inputs de AnnAGNPS
         lista = [self.inputs.l_1,self.inputs.l_23,self.inputs.l_47,self.inputs.l_53]
@@ -3942,9 +2757,7 @@ class qannagnps():
         dic_save = {"Input":"value","dem": dem_layer,"dem_name":dem_name,"soil_layer":soil_layer,"soil_name":soil_name,"soil_column":soil_column,"use_layer":use_layer,"use_name":use_name,"use_column":use_column,
             "buffer_layer":buffer_layer,"buffer_name":buffer_name,"vegetation_layer":vegetation_layer,"vegetation_name":vegetation_name,"unique_soil":unique_soil,"unique_landuse":unique_landuse,
             "add_outlet":self.dlg.checkBox_2.isChecked(),"execute_topagnps":self.dlg.cbTop.isChecked(),"execute_annagnps":self.dlg.cbAnn.isChecked(),
-            "make_sensitivity":self.dlg.checkBox_6.isChecked(),"cti_distribution":self.dlg.comboBox_4.currentIndex(),"cti_minimum":self.dlg.lineEdit_6.text(),
-            "cti_maximum":self.dlg.lineEdit_4.text(),"pixel_distribution":self.dlg.comboBox_5.currentIndex(),"pixel_minimum":self.dlg.lineEdit_3.text(),
-            "pixel_maximum":self.dlg.lineEdit_5.text(),"M":self.dlg.lineEdit_9.text(),"watershed_directory":self.inputs.l_1.text(),
+            "watershed_directory":self.inputs.l_1.text(),
             "general_directory":self.inputs.l_23.text(),"climate_directory":self.inputs.l_47.text(),
             "simulation_directory":self.inputs.l_53.text(),"cell_topagpns_provided":self.inputs.checkBox.isChecked(),"eg_topagpns_provided":self.inputs.checkBox_2.isChecked(),
             "reach_topagpns_provided":self.inputs.checkBox_3.isChecked(),"riparian_topagpns_provided":self.inputs.checkBox_4.isChecked()}
@@ -4095,16 +2908,6 @@ class qannagnps():
                 self.dlg.cbTop.setChecked(retrieve_data("execute_topagnps"))
                 #Execute AnnAGNPS
                 self.dlg.cbAnn.setChecked(retrieve_data("execute_annagnps"))
-                #Sensitivity
-                self.dlg.checkBox_6.setChecked(retrieve_data("make_sensitivity"))
-                #Parámetros de sensibilidad
-                self.dlg.comboBox_4.setCurrentIndex(int(retrieve_data("cti_distribution")))
-                self.dlg.comboBox_5.setCurrentIndex(int(retrieve_data("pixel_distribution")))
-                self.dlg.lineEdit_6.setText(str(retrieve_data("cti_minimum")))
-                self.dlg.lineEdit_4.setText(str(retrieve_data("cti_maximum")))
-                self.dlg.lineEdit_3.setText(str(retrieve_data("pixel_minimum")))
-                self.dlg.lineEdit_5.setText(str(retrieve_data("pixel_maximum")))
-                self.dlg.lineEdit_9.setText(str(retrieve_data("M")))
                 #Información de Provided by TopAGNPS
                 self.inputs.checkBox.setChecked(retrieve_data("cell_topagpns_provided"))
                 self.inputs.checkBox_2.setChecked(retrieve_data("eg_topagpns_provided"))
@@ -4274,11 +3077,7 @@ class qannagnps():
         #POTHOLE
         self.cpothole.label.setToolTip(self.tr("This optional keyword allows the user to designate if potholes will be identified and processed. \n If this parameter is not present in the control file or if the value for this parameter is blank then the default \n value is 0 meaning that potholes will be identified."))
         self.cpothole.label_2.setToolTip(self.tr("This optional keyword allows the user to designate the minimum area in hectares that is required \n for a pothole to be considered valid and processed for reporting purposes; that is, \n the minimum surface area threshold has been met."))
-        #SENSITIVITY
-        self.dlg.label.setToolTip(self.tr("In order to perform the sensitivity analysis, you need to create the file that will contain the ephemeral gully erosion. \n To do this, make sure that you are providing the Output Options Global file as Input and that the Glbl_All_V3_sim column has the value of T.\n And of course there must be erosion caused by ephemeral gullies. "))
-        #Delete previous
-        self.dlg.pushButton.setToolTip(self.tr("When a sensitivity analysis is performed, the spatial files are resampled. \nClick this button if you want to delete the resampled files in other runs of the sensitivity analysis. "))
-        
+
         #Searcher of documents in AnnAGNPS inputs
         for i in self.dic_lines_search.values():
             i.setToolTip(self.tr("Search document"))
