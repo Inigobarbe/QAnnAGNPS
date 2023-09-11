@@ -429,6 +429,41 @@ class qannagnps():
         
         #Botón para respositorio de github
         self.dlg.pg_github.clicked.connect(self.url_github)
+        
+        #Cambiar el color de las elecciones de los outputs
+        lista = [self.output.pushButton_2,self.output.pushButton_3,self.output.pushButton_4,self.output.pushButton_5,self.output.pushButton_6,self.output.pushButton_7,self.output.pushButton_8]
+        for i in lista:
+            i.clicked.connect(lambda _, b=i: self.change_color_output(b))
+        
+        #Poner icono de búsqueda en los outputs
+        self.output.pushButton_12.setIcon(QIcon(self.icon_path_search))
+        self.output.pushButton_13.setIcon(QIcon(self.icon_path_search))
+        self.output.pushButton_14.setIcon(QIcon(self.icon_path_search))
+        
+        #Seleccionar archivo DEM en los outputs
+        self.output.pushButton_12.clicked.connect(lambda _, b="Runoff": self.dem_output_file(b))
+        self.output.pushButton_13.clicked.connect(lambda _, b="Erosion": self.dem_output_file(b))
+        self.output.pushButton_14.clicked.connect(lambda _, b="Nutrients": self.dem_output_file(b))
+    
+    def dem_output_file(self,output_type):
+        #Método para seleccionar la carpeta de 
+        if output_type == "Runoff":
+            fname = QFileDialog.getExistingDirectory(self.output, "Select folder", "C/")
+            if fname[0]!="":
+                self.output.lineEdit.setText(fname)
+        if output_type == "Erosion":
+            fname = QFileDialog.getExistingDirectory(self.output, "Select folder", "C/")
+            if fname[0]!="":
+                self.output.lineEdit_2.setText(fname)
+        if output_type == "Nutrients":
+            fname = QFileDialog.getExistingDirectory(self.output, "Select folder", "C/")
+            if fname[0]!="":
+                self.output.lineEdit_3.setText(fname)
+        
+    
+    def change_color_output(self,button):
+        #Método para cambiar el color de los botones que indican qué outpus se quiere mostrar
+        button.setStyleSheet("QPushButton {background-color: #99ff99; /* Verde claro en formato hexadecimal */}")
     
     def path_exist(self):
         #Método para mostrar si los inputs de AnnAGNPS existen o no
@@ -599,7 +634,7 @@ class qannagnps():
             linea.setStyleSheet("QLineEdit { background-color: rgb(250, 159, 160) ; }")
 
     def setDirectory(self):
-        #Para que cuando se seleccione el DEM ya se tenga en todo el código la dirección y el epsg
+        #Método para que cuando se seleccione el DEM ya se tenga en todo el código la dirección y el epsg. También se ponen la dirección de las carpetas en el diálogo de los outputs. 
         if self.dlg.comboBox.currentIndex() >=1:
             try: #el try es para que no de error cuando se escoge una capa que no esté guardada en algún sitio
                 layers = QgsProject.instance().layerTreeRoot().children()
@@ -611,8 +646,13 @@ class qannagnps():
                 self.direccion=mdt_directory
                 self.epsg = selectedLayer.crs().authid()   
                 self.files_directory()
+                #Poner el nombre de la carpeta en los outputs
+                self.output.lineEdit.setText(mdt_directory)
+                self.output.lineEdit_2.setText(mdt_directory)
+                self.output.lineEdit_3.setText(mdt_directory)
             except:
                 pass
+        
         
     def set_coordinates(self):
         #ESTO ES PARA LA CAPTURA DE COORDENADAS
