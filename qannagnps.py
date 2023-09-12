@@ -444,6 +444,18 @@ class qannagnps():
         self.output.pushButton_12.clicked.connect(lambda _, b="Runoff": self.dem_output_file(b))
         self.output.pushButton_13.clicked.connect(lambda _, b="Erosion": self.dem_output_file(b))
         self.output.pushButton_14.clicked.connect(lambda _, b="Nutrients": self.dem_output_file(b))
+        
+        #Cuando se cambie la carpeta de los outputs mirar si existe el archivo necesario
+        self.output.lineEdit.textChanged.connect(lambda _, b="Runoff": self.output_exist(b))
+        self.output.lineEdit_2.textChanged.connect(lambda _, b="Erosion": self.output_exist(b))
+        self.output.lineEdit_3.textChanged.connect(lambda _, b="Nutrients": self.output_exist(b))
+    
+    def output_exist(self, output_type):
+        #Método para que se diga si existe el output o no 
+        if output_type == "Runoff" and path.exists(self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"):
+            self.output.pushButton_9.setStyleSheet("QPushButton {background-color: #99ff99; }")
+        else:
+            self.output.pushButton_9.setStyleSheet("QPushButton {background-color: #87CEEB; }")
     
     def dem_output_file(self,output_type):
         #Método para seleccionar la carpeta de 
@@ -463,7 +475,7 @@ class qannagnps():
     
     def change_color_output(self,button):
         #Método para cambiar el color de los botones que indican qué outpus se quiere mostrar
-        button.setStyleSheet("QPushButton {background-color: #99ff99; /* Verde claro en formato hexadecimal */}")
+        button.setStyleSheet("QPushButton {background-color: #99ff99;}")
     
     def path_exist(self):
         #Método para mostrar si los inputs de AnnAGNPS existen o no
