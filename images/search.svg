@@ -1,64 +1,51 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version="1.0"?>
 <svg
-    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
     xmlns="http://www.w3.org/2000/svg"
-    xmlns:dc="http://purl.org/dc/elements/1.1/"
-    xmlns:ns1="http://sozi.baierouge.fr"
     xmlns:cc="http://web.resource.org/cc/"
-    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:svg="http://www.w3.org/2000/svg"
+    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-    id="svg1"
-    sodipodi:docname="xmag.svg"
-    viewBox="0 0 60 60"
-    sodipodi:version="0.32"
-    _SVGFile__filename="oldscale/apps/xmag.svg"
-    version="1.0"
-    y="0"
-    x="0"
-    inkscape:version="0.40pre4"
-    sodipodi:docbase="/home/danny/work/flat/SVG/mono/scalable/apps"
+    xmlns:ns1="http://sozi.baierouge.fr"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    viewBox="0 0 184 161"
   >
-  <sodipodi:namedview
-      id="base"
-      bordercolor="#666666"
-      inkscape:pageshadow="2"
-      inkscape:window-y="0"
-      pagecolor="#ffffff"
-      inkscape:window-height="699"
-      inkscape:zoom="6.1354289"
-      inkscape:window-x="0"
-      borderopacity="1.0"
-      inkscape:current-layer="svg1"
-      inkscape:cx="46.070445"
-      inkscape:cy="16.062878"
-      inkscape:window-width="1024"
-      inkscape:pageopacity="0.0"
-  />
-  <path
-      id="path1096"
-      style="stroke-linejoin:round;stroke:#ffffff;stroke-linecap:round;stroke-width:8.1225;fill:none"
-      transform="matrix(1.0003 0 0 1.0003 .012290 -.00019884)"
-      d="m24.656 4.6875c-11.018 0-19.937 8.9505-19.937 19.968-0.0002 11.019 8.919 19.969 19.937 19.969 4.525 0 8.682-1.585 12.032-4.125 9.225 13.436 15.699 16.29 17.906 14.156 2.263-2.209-1.221-8.512-13.906-18.187 2.451-3.315 3.937-7.376 3.937-11.813 0-11.018-8.95-19.968-19.969-19.968z"
-  />
-  <path
-      id="path1187"
-      style="stroke-linejoin:round;fill-rule:evenodd;stroke:#000000;stroke-linecap:round;stroke-width:3.2246;fill:#ffffff"
-      transform="matrix(.96911 0 0 .96911 .68733 .89552)"
-      d="m31.914 32.619c12.338 21.099 21.052 25.471 23.73 22.881 2.772-2.705-1.893-11.073-22.11-24.534l-1.62 1.653z"
-  />
-  <path
-      id="path1174"
-      style="stroke-linejoin:round;fill-rule:evenodd;stroke:#000000;stroke-linecap:round;stroke-width:3.2246;fill:#ffffff"
-      transform="matrix(.96911 0 0 .96911 .68733 .89552)"
-      d="m45.373 24.518c0 11.373-9.23 20.604-20.604 20.604-11.373 0-20.604-9.231-20.604-20.604 0.0004-11.374 9.231-20.604 20.604-20.604 11.374-0.0001 20.604 9.23 20.604 20.604z"
-  />
-  <path
-      id="path1175"
-      style="stroke-linejoin:round;fill-rule:evenodd;stroke:#000000;stroke-linecap:round;stroke-width:2.4992;fill:#ffffff"
-      transform="matrix(1.0003 0 0 1.0003 .012290 -.00019884)"
-      d="m40.385 24.648c0 8.674-7.04 15.714-15.714 15.714s-15.713-7.04-15.713-15.714c-0.0003-8.674 7.039-15.713 15.713-15.713 8.674-0.0003 15.714 7.039 15.714 15.713z"
-  />
+  <g
+      id="imagebot_2"
+      label="Layer 1"
+    >
+    <g
+        id="imagebot_3"
+        label="Layer 1"
+        transform="translate(174.67 152.52) matrix(.90792 0 0 .90792 -427.96 -463.36)"
+      >
+      <g
+          id="imagebot_4"
+          stroke="#808080"
+          stroke-linecap="round"
+          fill="none"
+        >
+        <path
+            id="imagebot_6"
+            stroke-linejoin="round"
+            stroke-width="10.63"
+            d="m443.16 414.45c0 36.1-29.27 65.36-65.36 65.36-36.1 0-65.36-29.26-65.36-65.36s29.26-65.36 65.36-65.36c36.09 0 65.36 29.26 65.36 65.36z"
+        />
+        <path
+            id="imagebot_5"
+            stroke-width="21.26"
+            d="m428.3 464.45l42.43 38.39"
+        />
+      </g
+      >
+    </g
+    >
+    <title
+      >Layer 1</title
+    >
+  </g
+  >
   <metadata
     >
     <rdf:RDF
@@ -85,6 +72,49 @@
           </cc:Agent
           >
         </dc:publisher
+        >
+        <dc:title
+          >Magnifier</dc:title
+        >
+        <dc:date
+          >2013-10-23T05:05:38</dc:date
+        >
+        <dc:description
+          >magnifying glass pictogram, "search", "zoom"</dc:description
+        >
+        <dc:source
+          >https://openclipart.org/detail/185356/magnifier-by-dako-185356</dc:source
+        >
+        <dc:creator
+          >
+          <cc:Agent
+            >
+            <dc:title
+              >DaKo</dc:title
+            >
+          </cc:Agent
+          >
+        </dc:creator
+        >
+        <dc:subject
+          >
+          <rdf:Bag
+            >
+            <rdf:li
+              >find</rdf:li
+            >
+            <rdf:li
+              >magnifier</rdf:li
+            >
+            <rdf:li
+              >search</rdf:li
+            >
+            <rdf:li
+              >zoom</rdf:li
+            >
+          </rdf:Bag
+          >
+        </dc:subject
         >
       </cc:Work
       >

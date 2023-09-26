@@ -53,6 +53,7 @@ import csv
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 import statistics
+from functools import partial
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -84,7 +85,6 @@ import os.path
 import webbrowser
 #from .Coordinate_capturer import PrintClickedPoint
 
-from datetime import datetime
 
 
 class qannagnps():
@@ -291,6 +291,14 @@ class qannagnps():
         path_icon = os.path.join(plugin_directory, "images/path_exist.svg")
         self.inputs.path.setIcon(QIcon(path_icon))
         
+        #Icono de que no existe output
+        path_icon = os.path.join(plugin_directory, "images/no_file.svg")
+        self.output.file_ex.setIcon(QIcon(path_icon))
+        
+        #Icono de filtro en los outputs
+        path_icon = os.path.join(plugin_directory, "images/filter.svg")
+        self.output.filter_run.setIcon(QIcon(path_icon))
+        
         #Abrir los archivos de los inputs de AnnAGNPS cuando se le dé al botón correspondiente. 
         for i in self.dic_botones.keys():
             i.clicked.connect(lambda _, b=i: self.open_file(b))
@@ -449,14 +457,653 @@ class qannagnps():
         self.output.lineEdit.textChanged.connect(lambda _, b="Runoff": self.output_exist(b))
         self.output.lineEdit_2.textChanged.connect(lambda _, b="Erosion": self.output_exist(b))
         self.output.lineEdit_3.textChanged.connect(lambda _, b="Nutrients": self.output_exist(b))
+        
+        #Poner las celdas y las fechas para los filtros
+        self.output.filter_run.clicked.connect(self.identify_cells_dates)
+        
+        #Añadir "All cells" a los comboboxes de los outputs
+        self.output.run_cell.addItems(["All cells"])
+        
+        #Para cambiar los valores de las fechas con el slider
+        self.output.horizontalSlider.valueChanged.connect(partial(self.updateLineEdit, 1))
+        self.output.horizontalSlider_2.valueChanged.connect(partial(self.updateLineEdit, 2))
+        
+        #Botones para que aparezcan outputs
+        self.output.pushButton.clicked.connect(self.output_evolution)
+        self.output.pushButton_15.clicked.connect(self.output_top)
+        self.output.pushButton_16.clicked.connect(self.output_month)
+        self.output.pushButton_17.clicked.connect(self.output_year)
+        self.output.pushButton_18.clicked.connect(self.output_season)
+        
+        #Botón para output espacial 
+        self.output.spatial_run.clicked.connect(self.spatial_output)
+        
+        #Botón de datos generales
+        self.output.general_run.clicked.connect(self.general_output)
+        
+        #El filtro no ha sido clickado
+        self.filter_clicked = 0
     
-    def output_exist(self, output_type):
-        #Método para que se diga si existe el output o no 
-        if output_type == "Runoff" and path.exists(self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"):
-            self.output.pushButton_9.setStyleSheet("QPushButton {background-color: #99ff99; }")
+    def general_output(self):
+        #Método para añadir los outputs generales al diálogo
+        self.import_df_spatial()
+        self.output.lineEdit_6.setText(f"{round(float(self.average_total),2)} mm")
+        self.output.lineEdit_7.setText(f"{round(float(self.average_anual),2)} mm")
+        self.output.lineEdit_8.setText(f"{round(float(self.highest_anual[1]),2)} mm")
+        self.output.lineEdit_10.setText(f"{int(self.highest_anual[0])}")
+        self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} mm")
+        self.output.lineEdit_11.setText(f"{int(self.lowest_anual[0])}")
+    
+    def spatial_output(self):
+        #Método para poner los outputs espaciales
+        
+        #Primero se carga el dataframe
+        df = self.import_df_spatial()
+        #Si no existe self.epsg entonces se coge el epsg del proyecto
+        if not hasattr(self,"epsg"):
+            self.epsg = QgsProject.instance().crs().authid()
+        #Se borran todos los archivos previos creados que se puedan 
+        ficheros = os.listdir(self.output.lineEdit.text())
+        delete_files = [x for x in ficheros if x[:16]=="cell_runoff_all_" or x[:16]=="cell_runoff_cell"]
+        for d in delete_files:
+            try:
+                os.remove(self.output.lineEdit.text()+f"\\{d}")
+            except:
+                pass
+        #Función para importar ficheros
+        def fichero(fich):
+            return self.output.lineEdit.text()+f"\\{fich}"
+        #Función para cambiar de coordenadas
+        def change_coordinates(filename,outputname):
+            input_raster = gdal.Open(fichero(filename))
+            output_raster = fichero(outputname)
+            warp = gdal.Warp(output_raster,input_raster,dstSRS=self.epsg)
+            warp = None # Closes the files
+        #Ahora se ponen los datos espaciales en QGIS
+        c = 0
+        while True:
+            c+=1
+            if not os.path.exists(fichero(f"cell_runoff_all_{c}.gpkg")) and not os.path.exists(fichero(f"cell_runoff_all_out_{c}.gpkg")): #para que luego no de error cuando se intente guardar porque ya existe el archivo
+                change_coordinates("AnnAGNPS_Cell_IDs.asc","cell_1.asc")
+                processing.run("grass7:r.to.vect", {'input':fichero("cell_1.asc"),
+                    'type':2,'column':'value','-s':False,
+                    '-v':False,'-z':False,'-b':False,'-t':False,
+                    'output':fichero(f"cell_runoff_all_{c}.gpkg"),'GRASS_REGION_PARAMETER':None,
+                    'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
+                    'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
+                    'GRASS_VECTOR_EXPORT_NOCAT':False})
+                break
+        #Esta función es para crear una copia de archivo y que las columnas se añadan ahí
+        def copiar_archivo(input_file,output):
+            processing.run("native:savefeatures", 
+                {'INPUT':fichero(input_file),
+                'OUTPUT':fichero(output),
+                'LAYER_NAME':'','DATASOURCE_OPTIONS':'','LAYER_OPTIONS':''})
+        copiar_archivo(f"cell_runoff_all_{c}.gpkg",f"cell_runoff_all_out_{c}.gpkg")
+        layer = QgsVectorLayer(fichero(f"cell_runoff_all_out_{c}.gpkg"),"Runoff")
+        #Borrar columnas que no son las que queremos
+        columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!="Cell_ID"]
+        field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
+        data_provider = layer.dataProvider()
+        layer.startEditing()
+        data_provider.deleteAttributes(field_index)
+        layer.updateFields()
+        layer.commitChanges()
+        
+        #Cambiar el nombre de la columna value por Cell_ID
+        for field in layer.fields():
+            if field.name() == 'value':
+                with edit(layer):
+                    idx = layer.fields().indexFromName(field.name())
+                    layer.renameAttribute(idx, 'Cell_ID')
+        
+        #Poner todas las columnas
+        celdas_valores = []
+        for f in layer.getFeatures():
+            celdas_valores.append(f["Cell_ID"])
+        def asignar_erosion(diccionario_conversion,nombre_columna):
+            erosion_final=[]
+            for i in range(len(celdas_valores)):
+                try:
+                    erosion_final.append(diccionario_conversion[celdas_valores[i]])
+                except:
+                    erosion_final.append(0)
+            pv = layer.dataProvider()
+            pv.addAttributes([QgsField(str(nombre_columna),QVariant.Double)])
+            context = QgsExpressionContext()
+            with edit(layer):
+                contador = 0
+                for f in layer.getFeatures():
+                    context.setFeature(f)
+                    f[str(nombre_columna)] = erosion_final[contador]
+                    contador+=1
+                    layer.updateFeature(f)
+            #Cambiar el nombre de la columna value por Cell_ID
+            for field in layer.fields():
+                if field.name() == 'value':
+                    with edit(layer):
+                        idx = layer.fields().indexFromName(field.name())
+                        layer.renameAttribute(idx, 'Cell_ID')
+            return layer
+
+        #Se pone la información de las co.umnas
+        for col in df.columns:
+            dic = {}
+            for ind in df.index:
+                dic[ind]=round(float(df[df.index == ind][col].iloc[0]),3)
+            layer = asignar_erosion(dic,col)
+            layer.updateFields()
+        
+        #Borrar las celdas que no están escogidas
+        if self.cell!="All cells":
+            copiar_archivo(f"cell_runoff_all_out_{c}.gpkg",f"cell_runoff_cell_out_{c}.gpkg")
+            layer = QgsVectorLayer(fichero(f"cell_runoff_cell_out_{c}.gpkg"),"Runoff")
+            ids_delete = [f.id() for f in layer.getFeatures() if int(f["Cell_ID"])!=np.int64(self.cell)]
+            layer.dataProvider().deleteFeatures(ids_delete)
+        QgsProject.instance().addMapLayer(layer)
+        
+        #Poner etiquetas
+        label_settings = QgsPalLayerSettings()
+        label_settings.enabled = True
+        label_settings.fieldName = "Cell_ID"
+        text_format = QgsTextFormat()
+        text_format.setFont(QFont("Arial", 12))
+        text_format.setSize(15)
+        label_settings.setFormat(text_format)
+        layer.setLabeling(QgsVectorLayerSimpleLabeling(label_settings))
+        layer.setLabelsEnabled(True)
+        layer.triggerRepaint()
+        
+    def import_df_spatial(self):
+        #Método para obtener el dataframe para los outputs espaciales
+        self.cell = self.output.run_cell.currentText()
+        date_in = self.output.lineEdit_4.text()
+        date_fin = self.output.lineEdit_5.text()
+        #Se obtienen los datos ordenados
+        path = self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
+        df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
+        df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
+        df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
+        #Se pone la estación
+        def estacion(fecha):
+            estaciones = {
+                1: (datetime(year=fecha.year, month=3, day=21), datetime(year=fecha.year, month=6, day=21)),
+                2: (datetime(year=fecha.year, month=6, day=21), datetime(year=fecha.year, month=9, day=21)),
+                3: (datetime(year=fecha.year, month=9, day=21), datetime(year=fecha.year, month=12, day=21))
+            }
+            for estacion, (inicio,fin) in estaciones.items():
+                if inicio<= fecha < fin:
+                    return estacion
+            return 4
+        df["Season"] = [estacion(x) for x in df.Fecha]
+        #Aquí se filtran por celda
+        if self.cell != "All cells":
+            df = df[df.Cell==np.int64(self.cell)]
+        #Aquí se filtra por fecha
+        date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
+        date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
+        df = df[(df.Fecha>=date_in)&(df.Fecha<=date_fin)]
+
+        #Creación del dataframe final
+        cells = np.unique(df.Cell)
+        #Se añaden meses
+        dic_month = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
+        resultado_final = pd.DataFrame()
+        for i in cells:
+            df_month = df[df.Cell==i]
+            df_month = df_month.groupby('Fecha').mean(numeric_only=True)[["Runoff"]]
+            df_month = df_month.resample('M').sum()
+            df_month = df_month.groupby(df_month.index.month).sum()
+            resultado_concat = pd.DataFrame()
+            for m in df_month.index:
+                resultado_concat[dic_month[m]]=[df_month[df_month.index == m]["Runoff"].iloc[0]]
+            resultado_final = pd.concat([resultado_final, resultado_concat])
+        resultado_final.index = cells
+
+        #Se añaden años
+        resultado = pd.DataFrame()
+        for i in cells:
+            df_year = df[df.Cell==i]
+            df_year = df_year.groupby('Fecha').mean(numeric_only=True)[["Runoff"]]
+            df_year = df_year.resample("Y").sum()
+            df_year = df_year.groupby(df_year.index.year).sum()
+            resultado_concat = pd.DataFrame()
+            for m in df_year.index:
+                resultado_concat[m]=[df_year[df_year.index == m]["Runoff"].iloc[0]]
+            resultado = pd.concat([resultado, resultado_concat])
+        resultado.index = cells
+        year_average = [(x,resultado[x].sum()/len(resultado)) for x in resultado.columns]
+        resultado_final = pd.concat([resultado_final, resultado], axis=1)
+
+        #Se añaden las estaciones
+        dic_season = {1:"Spring",2:"Summer",3:"Autumn",4:"Winter"}
+        resultado = pd.DataFrame()
+        for i in cells:
+            df_season = df[df.Cell==i]
+            df_season = df_season.groupby(df_season.Season).sum(numeric_only=True)["Runoff"]
+            resultado_concat = pd.DataFrame()
+            for m in df_season.index:
+                resultado_concat[dic_season[m]]=[df_season[df_season.index == m].iloc[0]]
+            resultado = pd.concat([resultado, resultado_concat])
+        resultado.index = cells
+        resultado_final = pd.concat([resultado_final, resultado], axis=1)
+
+        #Se añade la columna del total
+        resultado_final.insert(0, 'Total', [df[df.Cell==x]["Runoff"].sum() for x in cells])
+        #Estadísticas generales
+        self.average_total = resultado_final.Total.sum()/len(resultado_final)
+        self.average_anual = self.average_total/((date_fin-date_in).total_seconds()/(365.25*24*60*60))
+        self.highest_anual = max(year_average, key=lambda x: x [1])
+        self.lowest_anual= min(year_average, key=lambda x: x [1])
+        return resultado_final
+
+    def import_df(self):
+        #Método para importar el df que se usará en los outputs
+        #Se obtienen los datos ordenados
+        path = self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
+        df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
+        df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
+        df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
+        #Aquí se filtran por celda y por fecha
+        self.cell = self.output.run_cell.currentText()
+        date_in = self.output.lineEdit_4.text()
+        date_fin = self.output.lineEdit_5.text()
+        if self.cell!="All cells" :
+            df = df[df.Cell==np.int64(self.cell)]
+        #Aquí se filtra por fecha
+        date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
+        date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
+        df = df[(df.Fecha>=date_in)&(df.Fecha<=date_fin)]
+        return df
+    
+    def output_month(self):
+        #Método para que aparezca por mes de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Se importan los datos
+        df = self.import_df()
+        #Primero se crean los datos necesarios
+        df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+        df_graph = df_graph.resample('M').sum()
+        df_graph = df_graph.groupby(df_graph.index.month).sum()
+        df_graph.index = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        #Se crea el gráfico
+        plt.rcParams["figure.figsize"] = [10, 8]
+        fig = plt.figure()
+        ax0 = plt.subplot()
+        ax1 = ax0.twinx()
+        #Se crean los dibujos
+        bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
+        bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+        #Labels de los ejes
+        ax0.set_xlabel("Month",size = 15,family="arial",weight = "bold",color = "black")
+        ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+        ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+        #Cambiar límites de los ejes
+        ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
+        ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
+        #Fuente del eje
+        ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+        ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+        #Invertir eje
+        ax1.invert_yaxis()
+        #Leyenda
+        legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+        legend.legendPatch.set_edgecolor("black")
+        legend.legendPatch.set_facecolor("white")
+        legend.legendPatch.set_linewidth(1)
+        # Agregar etiquetas de valores encima de las barras en ax0
+        for rect in bar0:
+            height = rect.get_height()
+            ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                         xytext=(0, 3), textcoords="offset points",
+                         ha='center', va='bottom',weight = "bold",size = 9)
+
+        # Agregar etiquetas de valores encima de las barras en ax1
+        for rect in bar1:
+            height = rect.get_height()
+            ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                         xytext=(0, 3), textcoords="offset points",
+                         ha='center', va='bottom',weight = "bold",size = 9)
+        #Título del gráfico
+        if self.cell != "All cells":
+            titulo = f"Cell {self.cell}"
         else:
-            self.output.pushButton_9.setStyleSheet("QPushButton {background-color: #87CEEB; }")
+            titulo = "all cells"
+        plt.title(f"Runoff and water inputs per month in {titulo}", y=1.05, fontsize=16)
+        #Guardar gráfico
+        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Month_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+        #Abrir el gráfico 
+        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Month_runoff.png")
+        
+    def output_year(self):
+        #Método para que por año de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Se importan los datos
+        df = self.import_df()
+        #Primero se crean los datos necesarios
+        df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+        df_graph = df_graph.resample('Y').sum()
+        df_graph = df_graph.groupby(df_graph.index.year).sum()
+        df_graph.index = [str(x) for x in df_graph.index]
+        #Se crea el gráfico
+        plt.rcParams["figure.figsize"] = [10, 8]
+        fig = plt.figure()
+        ax0 = plt.subplot()
+        ax1 = ax0.twinx()
+        #Se crean los dibujos
+        bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
+        bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+        #Labels de los ejes
+        ax0.set_xlabel("Year",size = 15,family="arial",weight = "bold",color = "black")
+        ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+        ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+        #Cambiar límites de los ejes
+        ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
+        ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
+        #Fuente del eje
+        ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+        ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+        #Invertir eje
+        ax1.invert_yaxis()
+        #Leyenda
+        legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+        legend.legendPatch.set_edgecolor("black")
+        legend.legendPatch.set_facecolor("white")
+        legend.legendPatch.set_linewidth(1)
+        # Agregar etiquetas de valores encima de las barras en ax0
+        for rect in bar0:
+            height = rect.get_height()
+            ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                         xytext=(0, 3), textcoords="offset points",
+                         ha='center', va='bottom',weight = "bold",size = 12)
+
+        # Agregar etiquetas de valores encima de las barras en ax1
+        for rect in bar1:
+            height = rect.get_height()
+            ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                         xytext=(0, 3), textcoords="offset points",
+                         ha='center', va='bottom',weight = "bold",size = 12)
+        #Título del gráfico
+        if self.cell != "All cells":
+            titulo = f"Cell {self.cell}"
+        else:
+            titulo = "all cells"
+        plt.title(f"Runoff and water inputs per year in {titulo}", y=1.05, fontsize=16)
+        #Guardar gráfico
+        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Year_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+        #Abrir el gráfico 
+        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Year_runoff.png")
+
+    def output_season(self):
+        #Método para que aparezca por estación de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Se importan los datos
+        df = self.import_df()
+        #Primero se crean los datos necesarios
+        df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+        #Función para saber la estación
+        def estacion(fecha):
+            estaciones = {
+                "1": (datetime(year=fecha.year, month=3, day=21), datetime(year=fecha.year, month=6, day=21)),
+                "2": (datetime(year=fecha.year, month=6, day=21), datetime(year=fecha.year, month=9, day=21)),
+                "3": (datetime(year=fecha.year, month=9, day=21), datetime(year=fecha.year, month=12, day=21))
+            }
+            for estacion, (inicio,fin) in estaciones.items():
+                if inicio<= fecha < fin:
+                    return estacion
+            return "4"
+        df_graph["Estacion"] = [estacion(x) for x in df_graph.index]
+        df_graph = df_graph.groupby(df_graph.Estacion).sum()
+        df_graph.index = ["Spring","Summer","Autumn","Winter"]
+        #Se crea el gráfico
+        plt.rcParams["figure.figsize"] = [10, 8]
+        fig = plt.figure()
+        ax0 = plt.subplot()
+        ax1 = ax0.twinx()
+        #Se crean los dibujos
+        bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
+        bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+        #Labels de los ejes
+        ax0.set_xlabel("Season",size = 15,family="arial",weight = "bold",color = "black")
+        ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+        ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+        #Cambiar límites de los ejes
+        ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
+        ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
+        #Fuente del eje
+        ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+        ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+        #Invertir eje
+        ax1.invert_yaxis()
+        #Leyenda
+        legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+        legend.legendPatch.set_edgecolor("black")
+        legend.legendPatch.set_facecolor("white")
+        legend.legendPatch.set_linewidth(1)
+        # Agregar etiquetas de valores encima de las barras en ax0
+        for rect in bar0:
+            height = rect.get_height()
+            ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                         xytext=(0, 3), textcoords="offset points",
+                         ha='center', va='bottom',weight = "bold",size = 12)
+
+        # Agregar etiquetas de valores encima de las barras en ax1
+        for rect in bar1:
+            height = rect.get_height()
+            ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                         xytext=(0, 3), textcoords="offset points",
+                         ha='center', va='bottom',weight = "bold",size = 12)
+        #Título del gráfico
+        if self.cell != "All cells":
+            titulo = f"Cell {self.cell}"
+        else:
+            titulo = "all cells"
+        plt.title(f"Runoff and water inputs per season in {titulo}", y=1.05, fontsize=16)
+        #Guardar gráfico
+        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Season_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+        #Abrir el gráfico 
+        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Season_runoff.png")
+        
+    def output_top(self):
+        #Método para que aparezca el top 10 días de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Se importan los datos
+        df = self.import_df()
+        #Se crean los dataframes dependiendo de si se ha filtrado la celda
+        if type(self.cell) != int:
+            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+        else:
+            df_graph = df
+        #Se calculan los datos
+        n_top_values = 10
+        top_runoff = df_graph['Runoff'].nlargest(n_top_values) 
+        top_runoff_dates = df_graph.index[df_graph['Runoff'].isin(top_runoff)]
+        table_data = {'Fecha': top_runoff_dates, 'Runoff (mm)': round(top_runoff,2)}
+        table_df = pd.DataFrame(table_data)
+        #Se crea el grafico
+        plt.rcParams["figure.figsize"] = [10, 8]
+        fig, ax = plt.subplots()
+        # Ajustar el formato de las fechas en el DataFrame
+        table_df['Fecha'] = table_df['Fecha'].dt.strftime('%Y-%m-%d')
+        table = ax.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center', colColours=['#f5f5f5'] * len(table_df.columns))
+        table.auto_set_font_size(False)
+        table.set_fontsize(12)
+        table.scale(1, 1.5)
+        # Ocultar ejes x e y
+        ax.axis('off')
+        #Título del gráfico
+        if self.cell != "All cells":
+            titulo = f"Cell {self.cell}"
+        else:
+            titulo = "all cells"
+        plt.suptitle(f"Top 10 days with the highest runoff in {titulo} ", y=0.75, fontsize=16)
+        #Guardar gráfico
+        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Top_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+        #Abrir el gráfico 
+        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Top_runoff.png")
+        
+    def output_evolution(self):
+        #Método para que aparezca la evolución de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Se importan los datos
+        df = self.import_df()
+        #SE CREA DE EVOLUCIÓN GRÁFICO
+        #Se crean los dataframes dependiendo de si se ha filtrado la celda
+        if type(self.cell) != int:
+            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+        else:
+            df_graph = df
+        acumulado_runoff = df_graph['Runoff'].cumsum()
+        #Se empieza con el gráfico
+        #Se crean los ejes
+        plt.rcParams["figure.figsize"] = [10, 8]
+        fig = plt.figure()
+        ax0 = plt.subplot()
+        ax1 = ax0.twinx()
+        ax2 = ax0.twinx()
+        #Se crean los dibujos
+        ax0.bar(df_graph.index, df_graph['Runoff'], width =6 ,color='tab:blue', alpha=1, label='Runoff')
+        ax1.bar(df_graph.index, df_graph['RSS'], width =6 ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+        ax2.plot(df_graph.index, acumulado_runoff ,color="green", linestyle='--', label='Accumulated runoff')
+        #Labels de los ejes
+        ax0.set_xlabel("Date",size = 15,family="arial",weight = "bold",color = "black")
+        ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+        ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+        ax2.set_ylabel("Accumulated runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+        #Cambiar límites de los ejes
+        ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.85)
+        ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.85)
+        ax2.set_ylim(ax2.get_ylim()[0],ax2.get_ylim()[1]*1.75)
+        #Fuente del eje
+        ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+        ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+        ax2.tick_params(axis = "both",colors = "black",labelsize = 11)
+        #Mover eje a la derecha
+        ax2.spines['right'].set_position(('outward', 80))
+        ax2.spines["right"].set_color("black")
+        #Invertir eje
+        ax1.invert_yaxis()
+        # Agregar una etiqueta en el último punto del acumulado
+        ultimo_valor_acumulado = acumulado_runoff.iloc[-1]
+        ax2.annotate(f'{ultimo_valor_acumulado:.2f} mm',
+                     xy=(df_graph.index[-1], ultimo_valor_acumulado),
+                     xytext=(-50, 10), textcoords='offset points',
+                     fontsize=11, color='black', weight='bold')
+        #Formato eje x
+        ax0.xaxis.set_major_locator(mdates.YearLocator(base=1, month=1, day=1))
+        ax0.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        ax0.xaxis.set_minor_locator(mdates.MonthLocator())
+        #Leyenda
+        legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+        legend.legendPatch.set_edgecolor("black")
+        legend.legendPatch.set_facecolor("white")
+        legend.legendPatch.set_linewidth(1)
+        #Título del gráfico
+        if self.cell != "All cells":
+            titulo = f"Cell {self.cell}"
+        else:
+            titulo = "all cells"
+        plt.title(f"Evolution of runoff and water inputs in {titulo}", y=1.05, fontsize=16)
+        #Guardar gráfico
+        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Runoff_evolution.png",transparent=False,bbox_inches = "tight",dpi=300)
+        #Abrir el gráfico 
+        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Runoff_evolution.png")
     
+    def updateLineEdit(self,slider_number,value):
+        # Actualizar el valor en el QLineEdit cuando cambie el valor del QSlider
+        slider_one = self.output.horizontalSlider
+        slider_two = self.output.horizontalSlider_2
+        orignal_width = 50
+        original_value = 0
+        or_second = slider_two.width()
+        value_second = 0
+        #Se crean las variables con las posiciones de los sliders
+        self.second_position = slider_two.x()+50-slider_two.value()
+        self.first_position_end = slider_one.x()+slider_one.value()+50
+        #Condiciones para mover los sliders
+        if slider_number==1:
+            print(1, self.first_position_end,slider_two.x())
+            if self.first_position_end >= slider_two.x():
+                self.second_position = slider_two.x()+50-slider_two.value()
+            else:
+                slider_one.setFixedWidth(50+value)
+                self.second_position = slider_two.x()+50-slider_two.value()
+        elif slider_number==2:
+            print(2,slider_two.x(),self.first_position_end)
+            if slider_two.x() <= self.first_position_end:
+                self.second_position = slider_two.x()+50-slider_two.value()
+            else:
+                slider_two.setGeometry(slider_two.x()-value, 190, slider_two.width(), slider_two.height())
+                slider_two.setFixedWidth(50+value)
+                self.second_position = slider_two.x()+50-slider_two.value()
+                
+    def output_exist(self, output_type):
+        #Método para que se diga si existe el output o no
+        if output_type == "Runoff":
+            if path.exists(self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"):
+                #Se cambia el icono
+                path_icon = os.path.join(self.plugin_directory, "images/yes_file.svg")
+                self.output.file_ex.setIcon(QIcon(path_icon))
+                #Se cambia el next step
+                if self.filter_clicked:
+                    self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
+                    self.output.label_6.setText("")
+                else:
+                    self.output.label_9.setText("NEXT STEP: click on 'Add cells and dates' button.")
+                    self.output.label_6.setText("")
+            
+            else:
+                #Se cambia el icono
+                path_icon = os.path.join(self.plugin_directory, "images/no_file.svg")
+                self.output.file_ex.setIcon(QIcon(path_icon))
+                if self.output.label_9.text()!="":
+                    self.output.label_9.setText("NEXT STEP: the folder you have selected does not contain the AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv file.")
+                    self.output.label_6.setText("It is necessary to make a execution where the Insitu_Soil_Moisture_Daily column of the OUTPUT OPTIONS DATA - SIM file is set to T.")
+                else:
+                    self.output.label_9.setText("NEXT STEP: select the folder in which the DEM file is located.")
+                    self.output.label_6.setText("")
+
+    def df_section_output(self,fichero,delete_second =False):
+        #Método que se utiliza para obtener el dataframe de los resultados para crear los gráficos
+        file = open(fichero)
+        csvreader = csv.reader(file)
+        rows = []
+        for row in csvreader:
+               rows.append(row)
+        lista = []
+        a = 0
+        for i in rows:
+           try:
+               if i[0]=="Gregorian":
+                   a = 1
+                   lista.append(i)
+               elif a ==1:
+                   lista.append(i[:-1])
+           except:
+               continue
+        if delete_second:
+           lista.pop(1)
+        return pd.DataFrame(columns = lista[0],data = lista[1:])
+               
+    def identify_cells_dates(self):
+        #Método para poner celdas y fechas que contiene el archivo
+        try: #Este try es para que no de error si se le da al botón de filtros cuando no existe el archivo
+            #Se obtienen los datos ordenados
+            path = self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
+            #Se importan los datos
+            df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
+            df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
+            df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
+            #Se ponen las celdas en el combobox
+            #Primero se borran los elementos que puede haber en el combobox y luego se pone
+            self.output.run_cell.clear()
+            cells = [str(x) for x in np.unique(df.Cell)]
+            cells.insert(0,"All cells")
+            self.output.run_cell.addItems(cells)
+            #Se ponen las fechas
+            self.output.lineEdit_4.setText(f"{df.Fecha.min().day}/{df.Fecha.min().month}/{df.Fecha.min().year}")
+            self.output.lineEdit_5.setText(f"{df.Fecha.max().day}/{df.Fecha.max().month}/{df.Fecha.max().year}")
+            #Se cambia el next step
+            self.filter_clicked = 1
+            self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
+        except:
+            pass
+        
     def dem_output_file(self,output_type):
         #Método para seleccionar la carpeta de 
         if output_type == "Runoff":
@@ -528,7 +1175,7 @@ class qannagnps():
         self.output.usda_label.mousePressEvent  = self.url_usda
         #Símbolo plugin
         put_image("images/logo.svg",self.dlg.plugin_label,200)
-        #Nombre plugin
+        #Nombre 
         put_image("images/logo.png",self.dlg.label_7,200)
         #AnnAGNPS
         put_image("images/general.png",self.dlg.annagnps_label,500)
@@ -541,6 +1188,22 @@ class qannagnps():
         #Documentation
         documentation_icon = os.path.join(self.plugin_directory, "images/documentation.svg")
         self.inputs.pb_doc.setIcon(QIcon(documentation_icon))
+        #Runoff output
+        runoff = [self.output.general_run,self.output.spatial_run,self.output.pushButton,self.output.pushButton_15,self.output.pushButton_16,self.output.pushButton_17,self.output.pushButton_18]
+        icon = os.path.join(self.plugin_directory, "images/water.svg")
+        for i in runoff:
+            i.setIcon(QIcon(icon))
+        #Erosion output
+        runoff = [self.output.general_run_2,self.output.spatial_run_2,self.output.pushButton_9,self.output.pushButton_22,self.output.pushButton_21,self.output.pushButton_23,self.output.pushButton_20]
+        icon = os.path.join(self.plugin_directory, "images/erosion.svg")
+        for i in runoff:
+            i.setIcon(QIcon(icon))
+        #Nutrient output
+        runoff = [self.output.general_run_3,self.output.spatial_run_3,self.output.pushButton_11,self.output.pushButton_26,self.output.pushButton_25,self.output.pushButton_27,self.output.pushButton_24]
+        icon = os.path.join(self.plugin_directory, "images/nutrient.svg")
+        for i in runoff:
+            i.setIcon(QIcon(icon))
+        
         
     def url_upna(self,event):
         #Método para abrir las páginas web de la upna
@@ -2150,439 +2813,6 @@ class qannagnps():
            
                 #MENSAJE DE ÉXITO
                 self.iface.messageBar().pushMessage("Success", "Succes in data display ",level=Qgis.Success, duration=5)
-            
-            #CREACIÓN DE CAPA DE CELDAS CON LOS VALORES DE EROSIÓN POR CÁRCAVAS
-            if self.output.cbEG.isChecked() or self.output.cbSR.isChecked() or self.output.cbT.isChecked() or self.output.cbN.isChecked() or self.output.cbOC.isChecked() or self.output.cbP.isChecked():
-                #Dar error si el archivo que contiene la erosión no está 
-                if not os.path.exists(self.direccion+"\\INPUTS\\AnnAGNPS_AA_Sediment_load_by_source_(unit-area).csv") and (self.output.cbEG.isChecked() or self.output.cbSR.isChecked() or self.output.cbT.isChecked()):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "Output Options Text Files-AA file is needed to display erosion of gullies and sheet & rill erosion",level=Qgis.Warning, duration=10)
-                    return                 
-                #Función para cambiar el color de una capa según un valor
-                def change_color_graduated(layer_name,value_field, ramp_name,num_classes = 5):
-                    classification_method = QgsClassificationEqualInterval()
-                    layer = QgsProject().instance().mapLayersByName(layer_name)[0]
-                    # change format settings as necessary
-                    format = QgsRendererRangeLabelFormat()
-                    format.setFormat("%1 - %2")
-                    format.setPrecision(2)
-                    format.setTrimTrailingZeroes(True)
-                    default_style = QgsStyle().defaultStyle()
-                    color_ramp = default_style.colorRamp(ramp_name)
-                    renderer = QgsGraduatedSymbolRenderer()
-                    renderer.setClassAttribute(value_field)
-                    renderer.setClassificationMethod(classification_method)
-                    renderer.setLabelFormat(format)
-                    renderer.updateClasses(layer, num_classes)
-                    renderer.updateColorRamp(color_ramp)
-                    layer.setRenderer(renderer)
-                    layer.triggerRepaint()
-                #Se abre el archivo que contendrá la información de la erosión por cárcavas y sheet & rill 
-                file = open(self.direccion+"\\INPUTS\\AnnAGNPS_AA_Sediment_load_by_source_(unit-area).csv")
-                csvreader = csv.reader(file)
-                rows = []
-                for row in csvreader:
-                        rows.append(row)
-                lista = []
-                a = 0
-                for i in rows:
-                    try:
-                        if i[0]=="Reach ID":
-                            a = 1
-                            lista.append(i)
-                        elif a ==1:
-                            lista.append(i[:-1])
-                    except:
-                        continue
-                #Se obtienen los datos
-                cell = [int(lista[x][2]) for x in range(1,len(lista)) if lista[x][0]=="OUTLET"]
-                gully = [round(float(lista[x][7])+float(lista[x][8])+float(lista[x][9]),3) for x in range(1,len(lista)) if lista[x][0]=="OUTLET"]
-                cell_gully = {cell[x]:gully[x] for x in range(len(cell))}
-                sheet_rill = [round(float(lista[x][4])+float(lista[x][5])+float(lista[x][6]),3) for x in range(1,len(lista)) if lista[x][0]=="OUTLET"]
-                cell_sheet = {cell[x]:sheet_rill[x] for x in range(len(cell))}
-                total = [round(float(lista[x][4])+float(lista[x][5])+float(lista[x][6])+float(lista[x][7])+float(lista[x][8])+float(lista[x][9]),3) for x in range(1,len(lista)) if lista[x][0]=="OUTLET"]
-                cell_total = {cell[x]:total[x] for x in range(len(cell))}
-                
-                #Si no existe el archivo cell.gpkg entonces se crea
-                if not os.path.exists(self.direccion+"\\cell.gpkg"):
-                    change_coordinates("AnnAGNPS_Cell_IDs.asc","cell_1.asc")
-                    processing.run("grass7:r.to.vect", {'input':self.direccion+"\\cell_1.asc",
-                        'type':2,'column':'value','-s':False,
-                        '-v':False,'-z':False,'-b':False,'-t':False,
-                        'output':self.direccion+"\\cell.gpkg",'GRASS_REGION_PARAMETER':None,
-                        'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
-                        'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
-                        'GRASS_VECTOR_EXPORT_NOCAT':False})
-                
-                #Aquí se empieza a crear la capa con las erosiones por cada celda
-                layer = QgsVectorLayer(self.direccion+"\\cell.gpkg","celda")
-                celdas_valores = []
-                for f in layer.getFeatures():
-                    celdas_valores.append(f["value"])
-                def asignar_erosion(layer_name, diccionario_conversion,nombre_columna):
-                    layer = QgsVectorLayer(self.direccion+"\\"+layer_name,nombre_columna)
-                    gully_erosion_final=[]
-                    for i in range(len(celdas_valores)):
-                        try:
-                            gully_erosion_final.append(diccionario_conversion[celdas_valores[i]])
-                        except:
-                            gully_erosion_final.append(0)
-
-                    pv = layer.dataProvider()
-                    pv.addAttributes([QgsField(nombre_columna,QVariant.Double)])
-                    context = QgsExpressionContext()
-                    with edit(layer):
-                        contador = 0
-                        for f in layer.getFeatures():
-                            context.setFeature(f)
-                            f[nombre_columna] = gully_erosion_final[contador]
-                            contador+=1
-                            layer.updateFeature(f)
-                    layer.updateFields()
-                    #Borrar columnas que no son las que queremos
-                    columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!=nombre_columna]
-                    field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
-                    data_provider = layer.dataProvider()
-                    layer.startEditing()
-                    data_provider.deleteAttributes(field_index)
-                    layer.updateFields()
-                    layer.commitChanges()
-                    #Cambiar el nombre de la columna value por Cell_ID
-                    for field in layer.fields():
-                        if field.name() == 'value':
-                            with edit(layer):
-                                idx = layer.fields().indexFromName(field.name())
-                                layer.renameAttribute(idx, 'Cell_ID')
-                    QgsProject.instance().addMapLayer(layer)
-                    return layer
-                #Esta función es para crear una copia de archivo y que las columnas se añadan ahí
-                def copiar_archivo(input_file,output):
-                    processing.run("native:savefeatures", 
-                        {'INPUT':self.direccion+"\\"+input_file,
-                        'OUTPUT':self.direccion+"\\"+output,
-                        'LAYER_NAME':'','DATASOURCE_OPTIONS':'','LAYER_OPTIONS':''})
-                #Esta función es para añadir etiquetas
-                def etiquetas(fieldname):
-                    label_settings = QgsPalLayerSettings()
-                    label_settings.isExpression = True
-                    label_settings.drawBackground = True
-                    label_settings.fieldName = f'concat(round(to_string("{fieldname}"),3), \' Mg/ha/yr\')'
-                    label_settings.enabled = True
-                    label_settings.bufferDraw = True
-                    label_settings.bufferSize = 1
-                    text_format = QgsTextFormat()
-                    text_format.setFont(QFont("Arial", 12))
-                    text_format.setSize(15) 
-                    text_format.setColor(QColor("black"))
-                    label_settings.setFormat(text_format)
-                    layer.setLabeling(QgsVectorLayerSimpleLabeling(label_settings))
-                    layer.setLabelsEnabled(True)
-                    layer.triggerRepaint()
-            #CREAR ARCHIVO CON LA EROSIÓN POR SHEET & RILL
-            if self.output.cbSR.isChecked():
-                try:
-                    copiar_archivo("cell.gpkg","sheet_rill.gpkg")
-                except:
-                    iface.messageBar().pushMessage("Delete layers", "To recreate the Sheet & Rill erosion layer, remove the Sheet_and_rill_erosion(Mg/ha/yr) layer.",level=Qgis.Warning, duration=10)
-                    return
-                layer = asignar_erosion("sheet_rill.gpkg",cell_sheet,"Sheet_and_rill_erosion(Mg/ha/yr)")
-                #Se cambia el color
-                change_color_graduated("Sheet_and_rill_erosion(Mg/ha/yr)", "Sheet_and_rill_erosion(Mg/ha/yr)","Reds")
-                #Ahora se ponen las etiquetas
-                etiquetas("Sheet_and_rill_erosion(Mg/ha/yr)")
-
-            #CREAR ARCHIVO CON LA EROPSIÓN POR CÁRCAVAS
-            if self.output.cbEG.isChecked():
-                try:
-                    copiar_archivo("cell.gpkg","gully.gpkg")
-                except:
-                    iface.messageBar().pushMessage("Delete layers", "To recreate the Gully erosion layer, remove the Gully_erosion (Mg/ha/yr) layer.",level=Qgis.Warning, duration=10)
-                    return
-                layer = asignar_erosion("gully.gpkg",cell_gully,"Gully_erosion (Mg/ha/yr)")
-                #Se cambia el color
-                change_color_graduated("Gully_erosion (Mg/ha/yr)", "Gully_erosion (Mg/ha/yr)","Reds")
-                #Ahora se ponen las etiquetas
-                etiquetas("Gully_erosion (Mg/ha/yr)")
-            
-            #CREAR ARCHIVO CON LA EROSIÓN TOTAL POR CADA CELDA
-            if self.output.cbT.isChecked():
-                try:
-                    copiar_archivo("cell.gpkg","total_erosion.gpkg")
-                except:
-                    iface.messageBar().pushMessage("Delete layers", "To recreate the Total erosion layer, remove the Total_erosion (Mg/ha/yr) layer.",level=Qgis.Warning, duration=10)
-                    return
-                layer = asignar_erosion("total_erosion.gpkg",cell_total,"Total_erosion (Mg/ha/yr)")
-                #Se cambia el color
-                change_color_graduated("Total_erosion (Mg/ha/yr)", "Total_erosion (Mg/ha/yr)","Reds")
-                #Ahora se ponen las etiquetas
-                etiquetas("Total_erosion (Mg/ha/yr)")
-            #CREAR ARCHIVO CON LA CONTAMINACIÓN POR NITRÓGENO
-            if self.output.cbN.isChecked():
-                #Mensaje de advertencia por si no existen los archivos de nitrógeno 
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Nitrogen_load_UA_RR_Attached_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Nitrogen_load_UA_RR_Attached_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Nitrogen_load_UA_RR_Soluble_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Nitrogen_load_UA_RR_Soluble_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Nitrogen_load_UA_RR_Total_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Nitrogen_load_UA_RR_Total_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return 
-                #Creación de la capa vectorial donde se pondrán los resultados
-                try:
-                    copiar_archivo("cell.gpkg","nitrogen_load.gpkg")
-                except:
-                    iface.messageBar().pushMessage("Delete layers", "To recreate the Nitrogen load layer, remove the Nitrogen_load (kg/ha/yr) layer.",level=Qgis.Warning, duration=10)
-                    return
-                #Se importan los datos
-                n_attached = pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Nitrogen_load_UA_RR_Attached_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                n_soluble = pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Nitrogen_load_UA_RR_Soluble_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                n_total= pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Nitrogen_load_UA_RR_Total_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                #Se crean los diccionarios que dicen el nitrógeno para cada celda
-                dic_attached = {n_attached["Cell_ID"].iloc[x]:n_attached.iloc[:,8].iloc[x] for x in range(len(n_attached))}
-                dic_soluble = {n_soluble["Cell_ID"].iloc[x]:n_soluble.iloc[:,8].iloc[x] for x in range(len(n_soluble))}
-                dic_total = {n_total["Cell_ID"].iloc[x]:n_total.iloc[:,8].iloc[x] for x in range(len(n_total))}
-                
-                #Se crea la función para añadir los valores a la capa
-                def asignar_nitrogeno(layer_name, dic_uno, dic_dos,dic_tres,nombre_columna_uno, nombre_columna_dos,nombre_columna_tres):
-                    layer = QgsVectorLayer(self.direccion+"\\"+layer_name,"Nitrogen_load_(kg/ha/yr)")
-                    #Se crean las listas con los valores ordenados según las celdas
-                    lista_attached=[]
-                    lista_soluble=[]
-                    lista_total=[]
-                    for i in range(len(celdas_valores)):
-                        try:
-                            lista_attached.append(dic_uno[celdas_valores[i]])
-                        except:
-                            lista_attached.append(0)
-                        try:
-                            lista_soluble.append(dic_dos[celdas_valores[i]])
-                        except:
-                            lista_soluble.append(0)
-                        try:
-                            lista_total.append(dic_tres[celdas_valores[i]])
-                        except:
-                            lista_total.append(0)
-                    #Se añaden los valores a la capa
-                    pv = layer.dataProvider()
-                    pv.addAttributes([QgsField(nombre_columna_uno,QVariant.Double)])
-                    pv.addAttributes([QgsField(nombre_columna_dos,QVariant.Double)])
-                    pv.addAttributes([QgsField(nombre_columna_tres,QVariant.Double)])
-                    context = QgsExpressionContext()
-                    with edit(layer):
-                        for k,f in enumerate(layer.getFeatures()):
-                            context.setFeature(f)
-                            f[nombre_columna_uno] = float(lista_attached[k])
-                            f[nombre_columna_dos] = float(lista_soluble[k])
-                            f[nombre_columna_tres] = float(lista_total[k])
-                            layer.updateFeature(f)
-                    layer.updateFields()
-                    #Borrar columnas que no son las que queremos
-                    columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!=nombre_columna_uno and x.name()!=nombre_columna_dos and x.name()!=nombre_columna_tres]
-                    field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
-                    data_provider = layer.dataProvider()
-                    layer.startEditing()
-                    data_provider.deleteAttributes(field_index)
-                    layer.updateFields()
-                    layer.commitChanges()
-                    #Cambiar el nombre de la columna value por Cell_ID
-                    for field in layer.fields():
-                        if field.name() == 'value':
-                            with edit(layer):
-                                idx = layer.fields().indexFromName(field.name())
-                                layer.renameAttribute(idx, 'Cell_ID')
-                    QgsProject.instance().addMapLayer(layer)
-                    return layer
-                #Se usa la función creada
-                layer = asignar_nitrogeno("nitrogen_load.gpkg",dic_attached,dic_soluble,dic_total,"Nitrogen_load_attached_(kg/ha/yr)","Nitrogen_load_soluble_(kg/ha/yr)","Nitrogen_load_total_(kg/ha/yr)")
-                #Se cambia el color
-                change_color_graduated("Nitrogen_load_(kg/ha/yr)", "Nitrogen_load_total_(kg/ha/yr)","Reds")
-                #Ahora se ponen las etiquetas
-                etiquetas("Nitrogen_load_total_(kg/ha/yr)")
-            #CREAR ARCHIVO CON LA CONTAMINACIÓN POR CARBONO ORGÁNICO
-            if self.output.cbOC.isChecked():
-                #Mensaje de advertencia por si no existen los archivos de nitrógeno 
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Organic_Carbon_load_UA_RR_Attached_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Organic_Carbon_load_UA_RR_Attached_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Organic_Carbon_load_UA_RR_Soluble_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Organic_Carbon_load_UA_RR_Soluble_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Organic_Carbon_load_UA_RR_Total_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Organic_Carbon_load_UA_RR_Total_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return 
-                #Creación de la capa vectorial donde se pondrán los resultados
-                try:
-                    copiar_archivo("cell.gpkg","carbon_load.gpkg")
-                except:
-                    iface.messageBar().pushMessage("Delete layers", "To recreate the Organic Carbon load layer, remove the Organic_Carbon_load_(kg/ha/yr) layer.",level=Qgis.Warning, duration=10)
-                    return
-                #Se importan los datos
-                c_attached = pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Organic_Carbon_load_UA_RR_Attached_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                c_soluble = pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Organic_Carbon_load_UA_RR_Soluble_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                c_total= pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Organic_Carbon_load_UA_RR_Total_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                #Se crean los diccionarios que dicen el nitrógeno para cada celda
-                dic_attached = {c_attached["Cell_ID"].iloc[x]:c_attached.iloc[:,8].iloc[x] for x in range(len(c_attached))}
-                dic_soluble = {c_soluble["Cell_ID"].iloc[x]:c_soluble.iloc[:,8].iloc[x] for x in range(len(c_soluble))}
-                dic_total = {c_total["Cell_ID"].iloc[x]:c_total.iloc[:,8].iloc[x] for x in range(len(c_total))}
-                
-                #Se crea la función para añadir los valores a la capa
-                def asignar_carbon(layer_name, dic_uno, dic_dos,dic_tres,nombre_columna_uno, nombre_columna_dos,nombre_columna_tres):
-                    layer = QgsVectorLayer(self.direccion+"\\"+layer_name,"Organic_Carbon_load_(kg/ha/yr)")
-                    #Se crean las listas con los valores ordenados según las celdas
-                    lista_attached=[]
-                    lista_soluble=[]
-                    lista_total=[]
-                    for i in range(len(celdas_valores)):
-                        try:
-                            lista_attached.append(dic_uno[celdas_valores[i]])
-                        except:
-                            lista_attached.append(0)
-                        try:
-                            lista_soluble.append(dic_dos[celdas_valores[i]])
-                        except:
-                            lista_soluble.append(0)
-                        try:
-                            lista_total.append(dic_tres[celdas_valores[i]])
-                        except:
-                            lista_total.append(0)
-                    #Se añaden los valores a la capa
-                    pv = layer.dataProvider()
-                    pv.addAttributes([QgsField(nombre_columna_uno,QVariant.Double)])
-                    pv.addAttributes([QgsField(nombre_columna_dos,QVariant.Double)])
-                    pv.addAttributes([QgsField(nombre_columna_tres,QVariant.Double)])
-                    context = QgsExpressionContext()
-                    with edit(layer):
-                        for k,f in enumerate(layer.getFeatures()):
-                            context.setFeature(f)
-                            f[nombre_columna_uno] = float(lista_attached[k])
-                            f[nombre_columna_dos] = float(lista_soluble[k])
-                            f[nombre_columna_tres] = float(lista_total[k])
-                            layer.updateFeature(f)
-                    layer.updateFields()
-                    #Borrar columnas que no son las que queremos
-                    columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!=nombre_columna_uno and x.name()!=nombre_columna_dos and x.name()!=nombre_columna_tres]
-                    field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
-                    data_provider = layer.dataProvider()
-                    layer.startEditing()
-                    data_provider.deleteAttributes(field_index)
-                    layer.updateFields()
-                    layer.commitChanges()
-                    #Cambiar el nombre de la columna value por Cell_ID
-                    for field in layer.fields():
-                        if field.name() == 'value':
-                            with edit(layer):
-                                idx = layer.fields().indexFromName(field.name())
-                                layer.renameAttribute(idx, 'Cell_ID')
-                    QgsProject.instance().addMapLayer(layer)
-                    return layer
-                #Se usa la función creada
-                layer = asignar_carbon("carbon_load.gpkg",dic_attached,dic_soluble,dic_total,"Organic_carbon_load_attached_(kg/ha/yr)","Organic_carbon_load_soluble_(kg/ha/yr)","Organic_carbon_load_total_(kg/ha/yr)")
-                #Se cambia el color
-                change_color_graduated("Organic_Carbon_load_(kg/ha/yr)", "Organic_carbon_load_total_(kg/ha/yr)","Reds")
-                #Ahora se ponen las etiquetas
-                etiquetas("Organic_carbon_load_total_(kg/ha/yr)")
-            #CREAR ARCHIVO CON LA CONTAMINACIÓN POR FÓSFORO
-            if self.output.cbP.isChecked():
-                #Mensaje de advertencia por si no existen los archivos de nitrógeno 
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Phosphorus_load_UA_RR_Attached_Inorganic_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Phosphorus_load_UA_RR_Attached_Inorganic_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Phosphorus_load_UA_RR_Attached_Organic_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Phosphorus_load_UA_RR_Attached_Organic_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Phosphorus_load_UA_RR_Soluble Inorganic_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Phosphorus_load_UA_RR_Soluble Inorganic_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return 
-                if not os.path.exists(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Phosphorus_load_UA_RR_Total_OUTLET.csv"):
-                    iface.messageBar().pushMessage("Error AnnAGNPS outputs", "AnnAGNPS_AA_Phosphorus_load_UA_RR_Total_OUTLET.csv file not found. Try to select it in Output Options Text Files-AA.",level=Qgis.Warning, duration=10)
-                    return 
-                #Creación de la capa vectorial donde se pondrán los resultados
-                try:
-                    copiar_archivo("cell.gpkg","phosphorus_load.gpkg")
-                except:
-                    iface.messageBar().pushMessage("Delete layers", "To recreate the Organic Carbon load layer, remove the Organic_Carbon_load_(kg/ha/yr) layer.",level=Qgis.Warning, duration=10)
-                    return
-                #Se importan los datos
-                c_attached_in = pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Phosphorus_load_UA_RR_Attached_Inorganic_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                c_attached_or = pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Phosphorus_load_UA_RR_Attached_Organic_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                c_soluble = pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Phosphorus_load_UA_RR_Soluble Inorganic_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                c_total= pd.read_csv(self.direccion+"\\INPUTS\\CSV_Output_Files\\UA_RR_Output\\AnnAGNPS_AA_Phosphorus_load_UA_RR_Total_OUTLET.csv",encoding = "ISO-8859-1",delimiter=",")
-                #Se crean los diccionarios que dicen el nitrógeno para cada celda
-                dic_attached_in = {c_attached_in["Cell_ID"].iloc[x]:c_attached_in.iloc[:,8].iloc[x] for x in range(len(c_attached_in))}
-                dic_attached_or = {c_attached_or["Cell_ID"].iloc[x]:c_attached_or.iloc[:,8].iloc[x] for x in range(len(c_attached_or))}
-                dic_soluble = {c_soluble["Cell_ID"].iloc[x]:c_soluble.iloc[:,8].iloc[x] for x in range(len(c_soluble))}
-                dic_total = {c_total["Cell_ID"].iloc[x]:c_total.iloc[:,8].iloc[x] for x in range(len(c_total))}
-                
-                #Se crea la función para añadir los valores a la capa
-                def asignar_carbon(layer_name, dic_uno, dic_dos,dic_tres,dic_cuatro,nombre_columna_uno, nombre_columna_dos,nombre_columna_tres,nombre_columna_cuatro):
-                    layer = QgsVectorLayer(self.direccion+"\\"+layer_name,"Phosphorus_load_(kg/ha/yr)")
-                    #Se crean las listas con los valores ordenados según las celdas
-                    lista_attached_in=[]
-                    lista_attached_or=[]
-                    lista_soluble=[]
-                    lista_total=[]
-                    for i in range(len(celdas_valores)):
-                        try:
-                            lista_attached_in.append(dic_uno[celdas_valores[i]])
-                        except:
-                            lista_attached_in.append(0)
-                        try:
-                            lista_attached_or.append(dic_dos[celdas_valores[i]])
-                        except:
-                            lista_attached_or.append(0)
-                        try:
-                            lista_soluble.append(dic_tres[celdas_valores[i]])
-                        except:
-                            lista_soluble.append(0)
-                        try:
-                            lista_total.append(dic_cuatro[celdas_valores[i]])
-                        except:
-                            lista_total.append(0)
-                        
-                    #Se añaden los valores a la capa
-                    pv = layer.dataProvider()
-                    pv.addAttributes([QgsField(nombre_columna_uno,QVariant.Double)])
-                    pv.addAttributes([QgsField(nombre_columna_dos,QVariant.Double)])
-                    pv.addAttributes([QgsField(nombre_columna_tres,QVariant.Double)])
-                    pv.addAttributes([QgsField(nombre_columna_cuatro,QVariant.Double)])
-                    context = QgsExpressionContext()
-                    with edit(layer):
-                        for k,f in enumerate(layer.getFeatures()):
-                            context.setFeature(f)
-                            f[nombre_columna_uno] = float(lista_attached_in[k])
-                            f[nombre_columna_dos] = float(lista_attached_or[k])
-                            f[nombre_columna_tres] = float(lista_soluble[k])
-                            f[nombre_columna_cuatro] = float(lista_total[k])
-                            layer.updateFeature(f)
-                    layer.updateFields()
-                    #Borrar columnas que no son las que queremos
-                    columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!=nombre_columna_uno and x.name()!=nombre_columna_dos and x.name()!=nombre_columna_tres and x.name()!=nombre_columna_cuatro]
-                    field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
-                    data_provider = layer.dataProvider()
-                    layer.startEditing()
-                    data_provider.deleteAttributes(field_index)
-                    layer.updateFields()
-                    layer.commitChanges()
-                    #Cambiar el nombre de la columna value por Cell_ID
-                    for field in layer.fields():
-                        if field.name() == 'value':
-                            with edit(layer):
-                                idx = layer.fields().indexFromName(field.name())
-                                layer.renameAttribute(idx, 'Cell_ID')
-                    QgsProject.instance().addMapLayer(layer)
-                    return layer
-                #Se usa la función creada
-                layer = asignar_carbon("phosphorus_load.gpkg",dic_attached_in,dic_attached_or,dic_soluble,dic_total,"Phosphorus_inorganic_load_attached_(kg/ha/yr)","Phosphorus_organic_load_attached_(kg/ha/yr)","Phosphorus_inorganic_soluble_load_(kg/ha/yr)","Phosphorus_total_load_(kg/ha/yr)")
-                #Se cambia el color
-                change_color_graduated("Phosphorus_load_(kg/ha/yr)", "Phosphorus_total_load_(kg/ha/yr)","Reds")
-                #Ahora se ponen las etiquetas
-                etiquetas("Phosphorus_total_load_(kg/ha/yr)")
-            
-            #Se deseleccionan todos los outputs seleccionados
-            output_options = [self.output.checkBox_4,self.output.checkBox_8,self.output.checkBox_3,self.output.checkBox_9,self.output.checkBox_5,self.output.checkBox_10,self.output.checkBox_7,self.output.checkBox_12,self.output.checkBox_11,self.output.checkBox_13,self.output.checkBox_14,self.output.checkBox_15,self.output.checkBox_43,self.output.checkBox,self.output.checkBox_6,self.output.checkBox_16,self.output.checkBox_17,self.output.checkBox_18,self.output.checkBox_19,self.output.checkBox_20,self.output.checkBox_21,self.output.cbEG,self.output.cbSR,self.output.cbT,self.output.cbN,self.output.cbOC,self.output.cbP]
-            for i in output_options:
-                i.setChecked(False)
-            self.output.lineEdit.setText("")
 
     def files_directory(self):
         #Método para añadir la dirección de la carpeta del mdt a la interfaz de los inputs de AnnAGNPS

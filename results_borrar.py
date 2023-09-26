@@ -10,6 +10,8 @@ from datetime import datetime
 #ESTO SE HACE INDEPENDIENTEMENTE DE LA ELECCIÓN
 #ESCORRENTÍA
 cell = ""
+date_in = "1/1/1998"
+date_fin = "31/12/2001"
 #Se obtienen los datos ordenados
 path = r"D:\SPAIN_Pitillas_Cobaza1\INPUTS\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
 
@@ -37,9 +39,14 @@ def df_section(fichero,delete_second =False):
 df_raw = df_section(path,delete_second=True).iloc[2:,]
 df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
 df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
+#Aquí se filtran por celda
 if type(cell) ==int:
     df = df[df.Cell==cell]
-    
+#Aquí se filtra por fecha
+date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
+date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
+df = df[(df.Fecha>=date_in)&(df.Fecha<=date_fin)]
+
 #ESTO SE EJECUTA DEPENDIENTEMENTE DE LO QUE SE HAYA ELEGIDO
 #SE CREA DE EVOLUCIÓN GRÁFICO
 #Se crean los dataframes dependiendo de si se ha filtrado la celda
