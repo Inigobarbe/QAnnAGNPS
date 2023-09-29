@@ -54,6 +54,7 @@ from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 import statistics
 from functools import partial
+import itertools
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -439,27 +440,26 @@ class qannagnps():
         self.dlg.pg_github.clicked.connect(self.url_github)
         
         #Cambiar el color de las elecciones de los outputs
-        lista = [self.output.pushButton_2,self.output.pushButton_3,self.output.pushButton_4,self.output.pushButton_5,self.output.pushButton_6,self.output.pushButton_7,self.output.pushButton_8]
-        for i in lista:
-            i.clicked.connect(lambda _, b=i: self.change_color_output(b))
-        
+        self.output_selection = {self.output.pushButton_6:"Runoff",self.output.pushButton_2:"Subtotal",self.output.pushButton_3:"Gully",self.output.pushButton_4:"Pond",self.output.pushButton_5:"Sheet & Rill",self.output.pushButton_7:"Nitrogen",self.output.pushButton_8:"Carbon",self.output.pushButton_10:"Phosphorus"}
+        for i in self.output_selection.keys():
+            i.clicked.connect(lambda _,b = i:self.change_color_outputs(b))
+        self.data_type = "Runoff"
+        #El filtro no ha sido clickado
+        self.filter_clicked = 0
+        self.output_exist()
+
         #Poner icono de búsqueda en los outputs
         self.output.pushButton_12.setIcon(QIcon(self.icon_path_search))
-        self.output.pushButton_13.setIcon(QIcon(self.icon_path_search))
-        self.output.pushButton_14.setIcon(QIcon(self.icon_path_search))
         
         #Seleccionar archivo DEM en los outputs
-        self.output.pushButton_12.clicked.connect(lambda _, b="Runoff": self.dem_output_file(b))
-        self.output.pushButton_13.clicked.connect(lambda _, b="Erosion": self.dem_output_file(b))
-        self.output.pushButton_14.clicked.connect(lambda _, b="Nutrients": self.dem_output_file(b))
+        self.output.pushButton_12.clicked.connect(self.dem_output_file)
         
         #Cuando se cambie la carpeta de los outputs mirar si existe el archivo necesario
-        self.output.lineEdit.textChanged.connect(lambda _, b="Runoff": self.output_exist(b))
-        self.output.lineEdit_2.textChanged.connect(lambda _, b="Erosion": self.output_exist(b))
-        self.output.lineEdit_3.textChanged.connect(lambda _, b="Nutrients": self.output_exist(b))
+        self.output.lineEdit.textChanged.connect(self.output_exist)
         
         #Poner las celdas y las fechas para los filtros
         self.output.filter_run.clicked.connect(self.identify_cells_dates)
+        self.filtering = False
         
         #Añadir "All cells" a los comboboxes de los outputs
         self.output.run_cell.addItems(["All cells"])
@@ -481,24 +481,45 @@ class qannagnps():
         #Botón de datos generales
         self.output.general_run.clicked.connect(self.general_output)
         
-        #El filtro no ha sido clickado
-        self.filter_clicked = 0
-    
+        #Variable para decir si hay error cuando se importan luego los dataframes
+        self.error = False
+        
     def general_output(self):
         #Método para añadir los outputs generales al diálogo
         self.import_df_spatial()
-        self.output.lineEdit_6.setText(f"{round(float(self.average_total),2)} mm")
-        self.output.lineEdit_7.setText(f"{round(float(self.average_anual),2)} mm")
-        self.output.lineEdit_8.setText(f"{round(float(self.highest_anual[1]),2)} mm")
-        self.output.lineEdit_10.setText(f"{int(self.highest_anual[0])}")
-        self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} mm")
-        self.output.lineEdit_11.setText(f"{int(self.lowest_anual[0])}")
+        if self.error:
+            self.error = False
+            return
+        #Se ponen los valores
+        if self.data_type == "Runoff":
+            self.output.lineEdit_6.setText(f"{round(float(self.average_total),2)} mm")
+            self.output.lineEdit_7.setText(f"{round(float(self.average_anual),2)} mm")
+            self.output.lineEdit_8.setText(f"{round(float(self.highest_anual[1]),2)} mm")
+            self.output.lineEdit_10.setText(f"{int(self.highest_anual[0])}")
+            self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} mm")
+            self.output.lineEdit_11.setText(f"{int(self.lowest_anual[0])}")
+        elif self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
+            self.output.lineEdit_6.setText(f"{round(float(self.average_total),2)} Mg")
+            self.output.lineEdit_7.setText(f"{round(float(self.average_anual),2)} Mg")
+            self.output.lineEdit_8.setText(f"{round(float(self.highest_anual[1]),2)} Mg")
+            self.output.lineEdit_10.setText(f"{int(self.highest_anual[0])}")
+            self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} Mg")
+            self.output.lineEdit_11.setText(f"{int(self.lowest_anual[0])}")
+        else:
+            self.output.lineEdit_6.setText(f"{round(float(self.average_total),2)} kg")
+            self.output.lineEdit_7.setText(f"{round(float(self.average_anual),2)} kg")
+            self.output.lineEdit_8.setText(f"{round(float(self.highest_anual[1]),2)} kg")
+            self.output.lineEdit_10.setText(f"{int(self.highest_anual[0])}")
+            self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} kg")
+            self.output.lineEdit_11.setText(f"{int(self.lowest_anual[0])}")
     
     def spatial_output(self):
         #Método para poner los outputs espaciales
-        
         #Primero se carga el dataframe
         df = self.import_df_spatial()
+        if self.error:
+            self.error = False
+            return
         #Si no existe self.epsg entonces se coge el epsg del proyecto
         if not hasattr(self,"epsg"):
             self.epsg = QgsProject.instance().crs().authid()
@@ -512,7 +533,7 @@ class qannagnps():
                 pass
         #Función para importar ficheros
         def fichero(fich):
-            return self.output.lineEdit.text()+f"\\{fich}"
+            return os.path.dirname(self.output.lineEdit.text())+f"\\{fich}"
         #Función para cambiar de coordenadas
         def change_coordinates(filename,outputname):
             input_raster = gdal.Open(fichero(filename))
@@ -540,7 +561,15 @@ class qannagnps():
                 'OUTPUT':fichero(output),
                 'LAYER_NAME':'','DATASOURCE_OPTIONS':'','LAYER_OPTIONS':''})
         copiar_archivo(f"cell_runoff_all_{c}.gpkg",f"cell_runoff_all_out_{c}.gpkg")
-        layer = QgsVectorLayer(fichero(f"cell_runoff_all_out_{c}.gpkg"),"Runoff")
+        if self.data_type == "Runoff":
+            name_layer = "Runoff(mm)"
+        elif self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+            name_layer = f"{self.data_type}_yield(Mg)"
+        elif self.data_type == "Subtotal":
+            name_layer = "Total_yield (Mg)"
+        else:
+            name_layer = f"{self.data_type}_yield(kg)"
+        layer = QgsVectorLayer(fichero(f"cell_runoff_all_out_{c}.gpkg"),name_layer)
         #Borrar columnas que no son las que queremos
         columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!="Cell_ID"]
         field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
@@ -597,7 +626,7 @@ class qannagnps():
         #Borrar las celdas que no están escogidas
         if self.cell!="All cells":
             copiar_archivo(f"cell_runoff_all_out_{c}.gpkg",f"cell_runoff_cell_out_{c}.gpkg")
-            layer = QgsVectorLayer(fichero(f"cell_runoff_cell_out_{c}.gpkg"),"Runoff")
+            layer = QgsVectorLayer(fichero(f"cell_runoff_cell_out_{c}.gpkg"),name_layer)
             ids_delete = [f.id() for f in layer.getFeatures() if int(f["Cell_ID"])!=np.int64(self.cell)]
             layer.dataProvider().deleteFeatures(ids_delete)
         QgsProject.instance().addMapLayer(layer)
@@ -616,13 +645,76 @@ class qannagnps():
         
     def import_df_spatial(self):
         #Método para obtener el dataframe para los outputs espaciales
+        #Se crean las variables con los filtros
         self.cell = self.output.run_cell.currentText()
         date_in = self.output.lineEdit_4.text()
         date_fin = self.output.lineEdit_5.text()
+        try:
+            date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
+            date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
+        except:
+            iface.messageBar().pushMessage("Please select correct dates",level=Qgis.Warning, duration=10)
+            self.error = True
+            return
         #Se obtienen los datos ordenados
-        path = self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
-        df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
-        df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
+        if self.data_type == "Runoff":
+            path = self.output.lineEdit.text()+"\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
+            try:
+                df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
+            except:
+                iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                self.error = True
+                return
+            df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
+        else:
+            dic_outputs = {"Subtotal":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Gully":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Pond":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Sheet & Rill":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Nitrogen":["AnnAGNPS_EV_Nitrogen_yield_(mass).csv","Subtotal N [kg]"],"Carbon":["AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv","Subtotal C [kg]"],"Phosphorus":["AnnAGNPS_EV_Phosphorus_yield_(mass).csv","Subtotal P [kg]"]}
+            path = self.output.lineEdit.text()+f"\\{dic_outputs[self.data_type][0]}"
+            try:
+                df_raw = self.df_section_output(path,delete_second=False)
+            except:
+                iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                self.error = True
+                return
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
+                df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[str(x) for x in df_raw["Cell ID"]],"Source":[str(x) for x in df_raw["Source"]],"Runoff":[float(x) for x in df_raw[dic_outputs[self.data_type][1]]]})
+            else:
+               df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[str(x) for x in df_raw["Cell ID"]],"Runoff":[float(x) for x in df_raw[dic_outputs[self.data_type][1]]]}) 
+            #Se quitan las filas que no tengan un Cell ID como "Landscape" o "Watershed"
+            lista = []
+            for i in df.Cell:
+                try:
+                    int(i)
+                    lista.append(1)
+                except:
+                    lista.append(0)
+            df["filtro"]=lista
+            df = df[df.filtro==1].iloc[:,:-1]
+            df["Cell"] = [int(x) for x in df.Cell]
+            #Se filtra por tipo de origen
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
+                df = df[df.Source == self.data_type]
+            #Se pone bien todo el tema de las fechas
+            df = df.assign(Fecha=pd.to_datetime(df[['Year', 'Month', 'Day']]))
+            number_cells = len(np.unique(df.Cell))
+            rango_fechas = pd.date_range(start=date_in, end=date_fin)
+            indice_repetido = np.repeat(rango_fechas, number_cells)
+            df_n = pd.DataFrame(index=indice_repetido)
+            cells = np.tile(np.unique(df.Cell), len(rango_fechas))
+            df_n["Cell"]= cells
+            df_n["Fecha"] = df_n.index
+            fechas_diarias = pd.date_range(start=df_n['Fecha'].min(), end=df_n['Fecha'].max(), freq='D')
+            df_resultado = pd.DataFrame({'Fecha': fechas_diarias})
+            tipos_de_celda = np.unique(df.Cell)
+            combinaciones = list(itertools.product(fechas_diarias, tipos_de_celda))
+            df_combinaciones = pd.DataFrame(combinaciones, columns=['Fecha', 'Cell'])
+            df_resultado = df_combinaciones.merge(df, on=['Fecha', 'Cell'], how='left')
+            df_resultado['Runoff'].fillna(0, inplace=True)
+            df_resultado["Cell"]=np.tile(np.unique(df.Cell), len(rango_fechas))
+            df = df_resultado[["Cell","Fecha","Runoff"]]
+            df.set_index('Fecha', inplace=True)
+            #Se crea el dataframe final
+            df = pd.DataFrame(data = {"Year":[int(x) for x in df.index.year],"Month":[int(x) for x in df.index.month],"Day":[int(x) for x in df.index.day],"Cell":[int(x) for x in df["Cell"]],"Runoff":[float(x) for x in df["Runoff"]]})
+        
         df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
         #Se pone la estación
         def estacion(fecha):
@@ -640,8 +732,6 @@ class qannagnps():
         if self.cell != "All cells":
             df = df[df.Cell==np.int64(self.cell)]
         #Aquí se filtra por fecha
-        date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
-        date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
         df = df[(df.Fecha>=date_in)&(df.Fecha<=date_fin)]
 
         #Creación del dataframe final
@@ -672,7 +762,10 @@ class qannagnps():
                 resultado_concat[m]=[df_year[df_year.index == m]["Runoff"].iloc[0]]
             resultado = pd.concat([resultado, resultado_concat])
         resultado.index = cells
-        year_average = [(x,resultado[x].sum()/len(resultado)) for x in resultado.columns]
+        if self.data_type == "Runoff":
+            year_average = [(x,resultado[x].sum()/len(resultado)) for x in resultado.columns]
+        else:
+            year_average = [(x,resultado[x].sum()) for x in resultado.columns]
         resultado_final = pd.concat([resultado_final, resultado], axis=1)
 
         #Se añaden las estaciones
@@ -691,153 +784,343 @@ class qannagnps():
         #Se añade la columna del total
         resultado_final.insert(0, 'Total', [df[df.Cell==x]["Runoff"].sum() for x in cells])
         #Estadísticas generales
-        self.average_total = resultado_final.Total.sum()/len(resultado_final)
-        self.average_anual = self.average_total/((date_fin-date_in).total_seconds()/(365.25*24*60*60))
-        self.highest_anual = max(year_average, key=lambda x: x [1])
-        self.lowest_anual= min(year_average, key=lambda x: x [1])
+        if self.data_type == "Runoff":
+            self.average_total = resultado_final.Total.sum()/len(resultado_final)
+            self.average_anual = self.average_total/((date_fin-date_in).total_seconds()/(365.25*24*60*60))
+            self.highest_anual = max(year_average, key=lambda x: x [1])
+            self.lowest_anual= min(year_average, key=lambda x: x [1])
+        else:
+            self.average_total = resultado_final.Total.sum()
+            self.average_anual = self.average_total/((date_fin-date_in).total_seconds()/(365.25*24*60*60))
+            self.highest_anual = max(year_average, key=lambda x: x [1])
+            self.lowest_anual= min(year_average, key=lambda x: x [1])
         return resultado_final
 
-    def import_df(self):
+    def import_df(self,data_type):
         #Método para importar el df que se usará en los outputs
-        #Se obtienen los datos ordenados
-        path = self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
-        df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
-        df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
-        df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
-        #Aquí se filtran por celda y por fecha
-        self.cell = self.output.run_cell.currentText()
+        #Dar error si no se han escogido las fechas bien
         date_in = self.output.lineEdit_4.text()
         date_fin = self.output.lineEdit_5.text()
-        if self.cell!="All cells" :
-            df = df[df.Cell==np.int64(self.cell)]
-        #Aquí se filtra por fecha
-        date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
-        date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
-        df = df[(df.Fecha>=date_in)&(df.Fecha<=date_fin)]
+        try:
+            date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
+            date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
+        except:
+            iface.messageBar().pushMessage("Please select correct dates",level=Qgis.Warning, duration=10)
+            self.error = True
+            return 
+        #Primero si se ha elegido Runoff
+        if data_type == "Runoff":
+            #Se obtienen los datos ordenados
+            path = self.output.lineEdit.text()+"\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
+            try:
+                df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
+            except:
+                iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                self.error = True
+                return
+            df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
+            df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
+            #Aquí se filtran por celda y por fecha
+            self.cell = self.output.run_cell.currentText()
+            if self.cell!="All cells" :
+                df = df[df.Cell==np.int64(self.cell)]
+            #Aquí se filtra por fecha
+            df = df[(df.Fecha>=date_in)&(df.Fecha<=date_fin)]
+        else: #Si se ha escogido otra cosa que no sea Runoff
+            #Los filtros
+            self.cell = self.output.run_cell.currentText()
+            #Función para importar los datos que no son Runoff
+            def dataframe_creation(path,subtotal_column, erosion = False, source = None):
+                df_raw = self.df_section_output(path,delete_second=False)
+                if erosion:
+                    df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[str(x) for x in df_raw["Cell ID"]],"Source":[str(x) for x in df_raw["Source"]],"Yield":[float(x) for x in df_raw["Subtotals [Mg]"]]})
+                else:
+                    df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[str(x) for x in df_raw["Cell ID"]],"Yield":[float(x) for x in df_raw[subtotal_column]]})
+                #Se quitan las filas que no tengan un Cell ID como "Landscape" o "Watershed"
+                lista = []
+                for i in df.Cell:
+                    try:
+                        int(i)
+                        lista.append(1)
+                    except:
+                        lista.append(0)
+                df["filtro"]=lista
+                df = df[df.filtro==1].iloc[:,:-1]
+                df["Cell"] = [int(x) for x in df.Cell]
+                #Se filtra por tipo de origen
+                if erosion:      
+                    df = df[df.Source == source]
+                #Aquí se filtran por celda
+                if self.cell!="All cells" :
+                    df = df[df.Cell==np.int64(self.cell)]
+                #Se pone la fecha
+                df = df.assign(Fecha=pd.to_datetime(df[['Year', 'Month', 'Day']]))
+                df = df.groupby('Fecha').sum(numeric_only=True).reset_index()
+                df.set_index('Fecha', inplace=True)
+                df = df["Yield"]
+                rango_fechas_deseado = pd.date_range(start=date_in, end=date_fin, freq='D')
+                df = df.reindex(rango_fechas_deseado, fill_value=0)
+                return df
+            #Se ponen aquí los inputs dependiendo de lo que se haya escogido
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
+                path =  self.output.lineEdit.text()+"\\AnnAGNPS_EV_Sediment_yield_(mass).csv"
+                column_name = "Subtotals [Mg]"
+                try:
+                    df = dataframe_creation(path,column_name,erosion = True, source = self.data_type)
+                except:
+                    iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                    self.error = True
+                    return
+            if self.data_type == "Nitrogen":
+                path =  self.output.lineEdit.text()+"\\AnnAGNPS_EV_Nitrogen_yield_(mass).csv"
+                column_name = "Subtotal N [kg]"
+                try:
+                    df = dataframe_creation(path,column_name)
+                except:
+                    iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                    self.error = True
+                    return
+            if self.data_type == "Carbon":
+                path =  self.output.lineEdit.text()+"\\AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv"
+                column_name = "Subtotal C [kg]"
+                try:
+                    df = dataframe_creation(path,column_name)
+                except:
+                    iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                    self.error = True
+                    return
+            if self.data_type == "Phosphorus":
+                path =  self.output.lineEdit.text()+"\\AnnAGNPS_EV_Phosphorus_yield_(mass).csv"
+                column_name = "Subtotal P [kg]" 
+                try:
+                    df = dataframe_creation(path,column_name)
+                except:
+                    iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                    self.error = True
+                    return
         return df
     
     def output_month(self):
         #Método para que aparezca por mes de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
         #Se importan los datos
-        df = self.import_df()
+        df = self.import_df(self.data_type)
+        if self.error:
+            self.error = False
+            return
         #Primero se crean los datos necesarios
-        df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
-        df_graph = df_graph.resample('M').sum()
-        df_graph = df_graph.groupby(df_graph.index.month).sum()
+        if self.data_type == "Runoff":
+            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+            df_graph = df_graph.resample('M').sum()
+            df_graph = df_graph.groupby(df_graph.index.month).sum()
+        else:
+            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            df_graph = df_graph.resample('M').sum()
+            df_graph = df_graph.groupby(df_graph.index.month).sum()
         df_graph.index = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        #Se crea el gráfico
-        plt.rcParams["figure.figsize"] = [10, 8]
-        fig = plt.figure()
-        ax0 = plt.subplot()
-        ax1 = ax0.twinx()
-        #Se crean los dibujos
-        bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
-        bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
-        #Labels de los ejes
-        ax0.set_xlabel("Month",size = 15,family="arial",weight = "bold",color = "black")
-        ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
-        ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
-        #Cambiar límites de los ejes
-        ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
-        ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
-        #Fuente del eje
-        ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
-        ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
-        #Invertir eje
-        ax1.invert_yaxis()
-        #Leyenda
-        legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
-        legend.legendPatch.set_edgecolor("black")
-        legend.legendPatch.set_facecolor("white")
-        legend.legendPatch.set_linewidth(1)
-        # Agregar etiquetas de valores encima de las barras en ax0
-        for rect in bar0:
-            height = rect.get_height()
-            ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
-                         xytext=(0, 3), textcoords="offset points",
-                         ha='center', va='bottom',weight = "bold",size = 9)
+        if self.data_type == "Runoff":
+            #Se crea el gráfico
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig = plt.figure()
+            ax0 = plt.subplot()
+            ax1 = ax0.twinx()
+            #Se crean los dibujos
+            bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
+            bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+            #Labels de los ejes
+            ax0.set_xlabel("Month",size = 15,family="arial",weight = "bold",color = "black")
+            ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            #Cambiar límites de los ejes
+            ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
+            ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
+            #Fuente del eje
+            ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Invertir eje
+            ax1.invert_yaxis()
+            #Leyenda
+            legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+            legend.legendPatch.set_edgecolor("black")
+            legend.legendPatch.set_facecolor("white")
+            legend.legendPatch.set_linewidth(1)
+            # Agregar etiquetas de valores encima de las barras en ax0
+            for rect in bar0:
+                height = rect.get_height()
+                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                             xytext=(0, 3), textcoords="offset points",
+                             ha='center', va='bottom',weight = "bold",size = 9)
 
-        # Agregar etiquetas de valores encima de las barras en ax1
-        for rect in bar1:
-            height = rect.get_height()
-            ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
-                         xytext=(0, 3), textcoords="offset points",
-                         ha='center', va='bottom',weight = "bold",size = 9)
+            # Agregar etiquetas de valores encima de las barras en ax1
+            for rect in bar1:
+                height = rect.get_height()
+                ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                             xytext=(0, 3), textcoords="offset points",
+                             ha='center', va='bottom',weight = "bold",size = 9)
+        else:
+            #Se crea el gráfico
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig = plt.figure()
+            ax0 = plt.subplot()
+            #Se crean los dibujos
+            bar0 = ax0.bar(df_graph.index, df_graph ,color='tab:blue', alpha=1, label=f'{self.data_type} yield ')
+            #Labels de los ejes
+            ax0.set_xlabel("Month",size = 15,family="arial",weight = "bold",color = "black")
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                ax0.set_ylabel(f"{self.data_type} yield (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+            elif self.data_type == "Subtotal":
+                ax0.set_ylabel(f"Total yield (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+            else:
+                ax0.set_ylabel(f"{self.data_type} yield (kg)",size = 15,family="arial",weight = "bold",color = "black")
+            #Fuente del eje
+            ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Leyenda
+            legend = fig.legend(bbox_to_anchor=(0.02,0.57,0.3,0.3),framealpha=0.7)
+            legend.legendPatch.set_edgecolor("black")
+            legend.legendPatch.set_facecolor("white")
+            legend.legendPatch.set_linewidth(1)
+            # Agregar etiquetas de valores encima de las barras en ax0
+            for rect in bar0:
+                height = rect.get_height()
+                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                             xytext=(0, 3), textcoords="offset points",
+                             ha='center', va='bottom',weight = "bold",size = 9)
         #Título del gráfico
         if self.cell != "All cells":
             titulo = f"Cell {self.cell}"
         else:
             titulo = "all cells"
-        plt.title(f"Runoff and water inputs per month in {titulo}", y=1.05, fontsize=16)
+        if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+            plt.title(f"{self.data_type} erosion yield per month in {titulo}", y=1.05, fontsize=16)
+        elif self.data_type == "Subtotal":
+            plt.title(f"Total erosion yield per month in {titulo}", y=1.05, fontsize=16)
+        else:
+            plt.title(f"{self.data_type} yield per month in {titulo}", y=1.05, fontsize=16)
         #Guardar gráfico
-        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Month_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+        plt.savefig(self.output.lineEdit.text()+f"\\Month_{self.data_type}.png",transparent=False,bbox_inches = "tight",dpi=300)
         #Abrir el gráfico 
-        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Month_runoff.png")
+        os.startfile(self.output.lineEdit.text()+f"\\Month_{self.data_type}.png")
         
-    def output_year(self):
+    def output_year(self,data_type):
         #Método para que por año de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
         #Se importan los datos
-        df = self.import_df()
+        df = self.import_df(self.data_type)
+        if self.error:
+            self.error = False
+            return
         #Primero se crean los datos necesarios
-        df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
-        df_graph = df_graph.resample('Y').sum()
-        df_graph = df_graph.groupby(df_graph.index.year).sum()
+        if self.data_type == "Runoff":
+            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+            df_graph = df_graph.resample('Y').sum()
+            df_graph = df_graph.groupby(df_graph.index.year).sum()
+        else:
+            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            df_graph = df_graph.resample('Y').sum()
+            df_graph = df_graph.groupby(df_graph.index.year).sum()
         df_graph.index = [str(x) for x in df_graph.index]
         #Se crea el gráfico
-        plt.rcParams["figure.figsize"] = [10, 8]
-        fig = plt.figure()
-        ax0 = plt.subplot()
-        ax1 = ax0.twinx()
-        #Se crean los dibujos
-        bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
-        bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
-        #Labels de los ejes
-        ax0.set_xlabel("Year",size = 15,family="arial",weight = "bold",color = "black")
-        ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
-        ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
-        #Cambiar límites de los ejes
-        ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
-        ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
-        #Fuente del eje
-        ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
-        ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
-        #Invertir eje
-        ax1.invert_yaxis()
-        #Leyenda
-        legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
-        legend.legendPatch.set_edgecolor("black")
-        legend.legendPatch.set_facecolor("white")
-        legend.legendPatch.set_linewidth(1)
-        # Agregar etiquetas de valores encima de las barras en ax0
-        for rect in bar0:
-            height = rect.get_height()
-            ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
-                         xytext=(0, 3), textcoords="offset points",
-                         ha='center', va='bottom',weight = "bold",size = 12)
+        if self.data_type == "Runoff":
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig = plt.figure()
+            ax0 = plt.subplot()
+            ax1 = ax0.twinx()
+            #Se crean los dibujos
+            bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
+            bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+            #Labels de los ejes
+            ax0.set_xlabel("Year",size = 15,family="arial",weight = "bold",color = "black")
+            ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            #Cambiar límites de los ejes
+            ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
+            ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
+            #Fuente del eje
+            ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Invertir eje
+            ax1.invert_yaxis()
+            #Leyenda
+            legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+            legend.legendPatch.set_edgecolor("black")
+            legend.legendPatch.set_facecolor("white")
+            legend.legendPatch.set_linewidth(1)
+            # Agregar etiquetas de valores encima de las barras en ax0
+            for rect in bar0:
+                height = rect.get_height()
+                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                             xytext=(0, 3), textcoords="offset points",
+                             ha='center', va='bottom',weight = "bold",size = 12)
 
-        # Agregar etiquetas de valores encima de las barras en ax1
-        for rect in bar1:
-            height = rect.get_height()
-            ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
-                         xytext=(0, 3), textcoords="offset points",
-                         ha='center', va='bottom',weight = "bold",size = 12)
-        #Título del gráfico
-        if self.cell != "All cells":
-            titulo = f"Cell {self.cell}"
+            # Agregar etiquetas de valores encima de las barras en ax1
+            for rect in bar1:
+                height = rect.get_height()
+                ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                             xytext=(0, 3), textcoords="offset points",
+                             ha='center', va='bottom',weight = "bold",size = 12)
+            #Título del gráfico
+            if self.cell != "All cells":
+                titulo = f"Cell {self.cell}"
+            else:
+                titulo = "all cells"
+            plt.title(f"Runoff and water inputs per year in {titulo}", y=1.05, fontsize=16)
+            #Guardar gráfico
+            plt.savefig(self.output.lineEdit.text()+"\\Year_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+            #Abrir el gráfico 
+            os.startfile(self.output.lineEdit.text()+"\\Year_runoff.png")
         else:
-            titulo = "all cells"
-        plt.title(f"Runoff and water inputs per year in {titulo}", y=1.05, fontsize=16)
-        #Guardar gráfico
-        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Year_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
-        #Abrir el gráfico 
-        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Year_runoff.png")
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig = plt.figure()
+            ax0 = plt.subplot()
+            #Se crean los dibujos
+            bar0 = ax0.bar(df_graph.index, df_graph ,color='tab:blue', alpha=1, label=f'{self.data_type} yield ')
+            #Labels de los ejes
+            ax0.set_xlabel("Year",size = 15,family="arial",weight = "bold",color = "black")
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                ax0.set_ylabel(f"{self.data_type} yield (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+            elif self.data_type == "Subtotal":
+                ax0.set_ylabel(f"Total yield (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+            else:
+                ax0.set_ylabel(f"{self.data_type} yield (kg)",size = 15,family="arial",weight = "bold",color = "black")
+            #Fuente del eje
+            ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Leyenda
+            legend = fig.legend(bbox_to_anchor=(0.02,0.57,0.3,0.3),framealpha=0.7)
+            legend.legendPatch.set_edgecolor("black")
+            legend.legendPatch.set_facecolor("white")
+            legend.legendPatch.set_linewidth(1)
+            # Agregar etiquetas de valores encima de las barras en ax0
+            for rect in bar0:
+                height = rect.get_height()
+                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                             xytext=(0, 3), textcoords="offset points",
+                             ha='center', va='bottom',weight = "bold",size = 12)
+            #Título del gráfico
+            if self.cell != "All cells":
+                titulo = f"Cell {self.cell}"
+            else:
+                titulo = "all cells"
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                plt.title(f"{self.data_type} erosion yield per month in {titulo}", y=1.05, fontsize=16)
+            elif self.data_type == "Subtotal":
+                plt.title(f"Total erosion yield per month in {titulo}", y=1.05, fontsize=16)
+            else:
+                plt.title(f"{self.data_type} yield per month in {titulo}", y=1.05, fontsize=16)
+            #Guardar gráfico
+            plt.savefig(self.output.lineEdit.text()+f"\\Year_{self.data_type}.png",transparent=False,bbox_inches = "tight",dpi=300)
+            #Abrir el gráfico 
+            os.startfile(self.output.lineEdit.text()+f"\\Year_{self.data_type}.png")
 
-    def output_season(self):
+    def output_season(self,data_type):
         #Método para que aparezca por estación de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
         #Se importan los datos
-        df = self.import_df()
+        df = self.import_df(data_type)
+        if self.error:
+            self.error = False
+            return
         #Primero se crean los datos necesarios
-        df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+        if self.data_type == "Runoff":
+            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+        else:
+            df_graph = df.groupby(df.index).sum(numeric_only=True)
         #Función para saber la estación
         def estacion(fecha):
             estaciones = {
@@ -849,160 +1132,325 @@ class qannagnps():
                 if inicio<= fecha < fin:
                     return estacion
             return "4"
-        df_graph["Estacion"] = [estacion(x) for x in df_graph.index]
-        df_graph = df_graph.groupby(df_graph.Estacion).sum()
-        df_graph.index = ["Spring","Summer","Autumn","Winter"]
-        #Se crea el gráfico
-        plt.rcParams["figure.figsize"] = [10, 8]
-        fig = plt.figure()
-        ax0 = plt.subplot()
-        ax1 = ax0.twinx()
-        #Se crean los dibujos
-        bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
-        bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
-        #Labels de los ejes
-        ax0.set_xlabel("Season",size = 15,family="arial",weight = "bold",color = "black")
-        ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
-        ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
-        #Cambiar límites de los ejes
-        ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
-        ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
-        #Fuente del eje
-        ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
-        ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
-        #Invertir eje
-        ax1.invert_yaxis()
-        #Leyenda
-        legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
-        legend.legendPatch.set_edgecolor("black")
-        legend.legendPatch.set_facecolor("white")
-        legend.legendPatch.set_linewidth(1)
-        # Agregar etiquetas de valores encima de las barras en ax0
-        for rect in bar0:
-            height = rect.get_height()
-            ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
-                         xytext=(0, 3), textcoords="offset points",
-                         ha='center', va='bottom',weight = "bold",size = 12)
-
-        # Agregar etiquetas de valores encima de las barras en ax1
-        for rect in bar1:
-            height = rect.get_height()
-            ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
-                         xytext=(0, 3), textcoords="offset points",
-                         ha='center', va='bottom',weight = "bold",size = 12)
-        #Título del gráfico
-        if self.cell != "All cells":
-            titulo = f"Cell {self.cell}"
-        else:
-            titulo = "all cells"
-        plt.title(f"Runoff and water inputs per season in {titulo}", y=1.05, fontsize=16)
-        #Guardar gráfico
-        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Season_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
-        #Abrir el gráfico 
-        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Season_runoff.png")
         
-    def output_top(self):
+        #Se crea el gráfico
+        if self.data_type == "Runoff":
+            df_graph["Estacion"] = [estacion(x) for x in df_graph.index]
+            df_graph = df_graph.groupby(df_graph.Estacion).sum()
+            df_graph.index = ["Spring","Summer","Autumn","Winter"]
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig = plt.figure()
+            ax0 = plt.subplot()
+            ax1 = ax0.twinx()
+            #Se crean los dibujos
+            bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
+            bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+            #Labels de los ejes
+            ax0.set_xlabel("Season",size = 15,family="arial",weight = "bold",color = "black")
+            ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            #Cambiar límites de los ejes
+            ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
+            ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
+            #Fuente del eje
+            ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Invertir eje
+            ax1.invert_yaxis()
+            #Leyenda
+            legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+            legend.legendPatch.set_edgecolor("black")
+            legend.legendPatch.set_facecolor("white")
+            legend.legendPatch.set_linewidth(1)
+            # Agregar etiquetas de valores encima de las barras en ax0
+            for rect in bar0:
+                height = rect.get_height()
+                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                             xytext=(0, 3), textcoords="offset points",
+                             ha='center', va='bottom',weight = "bold",size = 12)
+
+            # Agregar etiquetas de valores encima de las barras en ax1
+            for rect in bar1:
+                height = rect.get_height()
+                ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                             xytext=(0, 3), textcoords="offset points",
+                             ha='center', va='bottom',weight = "bold",size = 12)
+            #Título del gráfico
+            if self.cell != "All cells":
+                titulo = f"Cell {self.cell}"
+            else:
+                titulo = "all cells"
+            plt.title(f"Runoff and water inputs per season in {titulo}", y=1.05, fontsize=16)
+            #Guardar gráfico
+            plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Season_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+            #Abrir el gráfico 
+            os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Season_runoff.png")
+        else:
+            df_graph = pd.DataFrame({'Fecha': df_graph.index, 'Yield': df_graph.values})
+            numeric_columns = df_graph.select_dtypes(include='number')
+            df_graph["Estacion"] = [estacion(x) for x in df_graph.Fecha]
+            df_graph = df_graph.groupby('Estacion')[numeric_columns.columns].sum()
+            df_graph.index = ["Spring","Summer","Autumn","Winter"]
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig = plt.figure()
+            ax0 = plt.subplot()
+            #Se crean los dibujos
+            bar0 = ax0.bar(df_graph.index, df_graph["Yield"] ,color='tab:blue', alpha=1, label=f'{self.data_type} yield ')
+            #Labels de los ejes
+            ax0.set_xlabel("Season",size = 15,family="arial",weight = "bold",color = "black")
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                ax0.set_ylabel(f"{self.data_type} yield (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+            elif self.data_type == "Subtotal":
+                ax0.set_ylabel(f"Total yield (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+            else:
+                ax0.set_ylabel(f"{self.data_type} yield (kg)",size = 15,family="arial",weight = "bold",color = "black")
+            #Fuente del eje
+            ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Leyenda
+            legend = fig.legend(bbox_to_anchor=(0.02,0.57,0.3,0.3),framealpha=0.7)
+            legend.legendPatch.set_edgecolor("black")
+            legend.legendPatch.set_facecolor("white")
+            legend.legendPatch.set_linewidth(1)
+            # Agregar etiquetas de valores encima de las barras en ax0
+            for rect in bar0:
+                height = rect.get_height()
+                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                             xytext=(0, 3), textcoords="offset points",
+                             ha='center', va='bottom',weight = "bold",size = 12)
+            #Título del gráfico
+            if self.cell != "All cells":
+                titulo = f"Cell {self.cell}"
+            else:
+                titulo = "all cells"
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                plt.title(f"{self.data_type} erosion yield per month in {titulo}", y=1.05, fontsize=16)
+            elif self.data_type == "Subtotal":
+                plt.title(f"Total erosion yield per month in {titulo}", y=1.05, fontsize=16)
+            else:
+                plt.title(f"{self.data_type} yield per month in {titulo}", y=1.05, fontsize=16)
+            #Guardar gráfico
+            plt.savefig(self.output.lineEdit.text()+f"\\Season_{self.data_type}.png",transparent=False,bbox_inches = "tight",dpi=300)
+            #Abrir el gráfico 
+            os.startfile(self.output.lineEdit.text()+f"\\Season_{self.data_type}.png")
+        
+    def output_top(self,data_type):
         #Método para que aparezca el top 10 días de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
         #Se importan los datos
-        df = self.import_df()
+        df = self.import_df(self.data_type)
+        if self.error:
+            self.error = False
+            return
         #Se crean los dataframes dependiendo de si se ha filtrado la celda
-        if type(self.cell) != int:
+        if self.data_type == "Runoff":
             df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
         else:
-            df_graph = df
+            df_graph = df.groupby(df.index).sum(numeric_only=True)
         #Se calculan los datos
-        n_top_values = 10
-        top_runoff = df_graph['Runoff'].nlargest(n_top_values) 
-        top_runoff_dates = df_graph.index[df_graph['Runoff'].isin(top_runoff)]
-        table_data = {'Fecha': top_runoff_dates, 'Runoff (mm)': round(top_runoff,2)}
-        table_df = pd.DataFrame(table_data)
-        #Se crea el grafico
-        plt.rcParams["figure.figsize"] = [10, 8]
-        fig, ax = plt.subplots()
-        # Ajustar el formato de las fechas en el DataFrame
-        table_df['Fecha'] = table_df['Fecha'].dt.strftime('%Y-%m-%d')
-        table = ax.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center', colColours=['#f5f5f5'] * len(table_df.columns))
-        table.auto_set_font_size(False)
-        table.set_fontsize(12)
-        table.scale(1, 1.5)
-        # Ocultar ejes x e y
-        ax.axis('off')
-        #Título del gráfico
-        if self.cell != "All cells":
-            titulo = f"Cell {self.cell}"
+        if self.data_type == "Runoff":
+            if len(df_graph[df_graph['Runoff']>0])>10:
+                n_top_values = 10
+            else:
+                n_top_values = len(df_graph[df_graph['Runoff']>0])
+            top_runoff = df_graph['Runoff'].nlargest(n_top_values) 
+            top_runoff_dates = df_graph.index[df_graph['Runoff'].isin(top_runoff)]
+            table_data = {'Date': top_runoff_dates, 'Runoff (mm)': round(top_runoff,2)}
+            table_df = pd.DataFrame(table_data)
+            #Se crea el grafico
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig, ax = plt.subplots()
+            # Ajustar el formato de las fechas en el DataFrame
+            table_df['Date'] = table_df['Date'].dt.strftime('%Y-%m-%d')
+            table = ax.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center', colColours=['#f5f5f5'] * len(table_df.columns))
+            table.auto_set_font_size(False)
+            table.set_fontsize(12)
+            table.scale(1, 1.5)
+            # Ocultar ejes x e y
+            ax.axis('off')
+            #Título del gráfico
+            if self.cell != "All cells":
+                titulo = f"Cell {self.cell}"
+            else:
+                titulo = "all cells"
+            plt.suptitle(f"Top 10 days with the highest runoff in {titulo} ", y=0.75, fontsize=16)
+            #Guardar gráfico
+            plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Top_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+            #Abrir el gráfico 
+            os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Top_runoff.png")
         else:
-            titulo = "all cells"
-        plt.suptitle(f"Top 10 days with the highest runoff in {titulo} ", y=0.75, fontsize=16)
-        #Guardar gráfico
-        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Top_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
-        #Abrir el gráfico 
-        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Top_runoff.png")
+            if len(df_graph[df_graph>0])>10:
+                n_top_values = 10
+            else:
+                n_top_values = len(df_graph[df_graph>0])
+            top_runoff = df_graph.nlargest(n_top_values) 
+            top_runoff_dates = df_graph.index[df_graph.isin(top_runoff)]
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                table_data = {'Date': top_runoff_dates, f'{self.data_type} erosion yield (Mg)': round(top_runoff,2)}
+            elif self.data_type == "Subtotal":
+                table_data = {'Date': top_runoff_dates, 'Total erosion yield (Mg)': round(top_runoff,2)}
+            else:
+                table_data = {'Date': top_runoff_dates, f"{self.data_type} yield (kg)": round(top_runoff,2)}
+            table_df = pd.DataFrame(table_data)
+            #Se crea el grafico
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig, ax = plt.subplots()
+            # Ajustar el formato de las fechas en el DataFrame
+            table_df['Date'] = table_df['Date'].dt.strftime('%Y-%m-%d')
+            try:
+                table = ax.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center', colColours=['#f5f5f5'] * len(table_df.columns))
+            except:
+                iface.messageBar().pushMessage("No day with value higher than 0",level=Qgis.Warning, duration=10)
+                return
+            table.auto_set_font_size(False)
+            table.set_fontsize(12)
+            table.scale(1, 1.5)
+            # Ocultar ejes x e y
+            ax.axis('off')
+            #Título del gráfico
+            if self.cell != "All cells":
+                titulo = f"Cell {self.cell}"
+            else:
+                titulo = "all cells"
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                plt.suptitle(f"Top 10 days with the highest {self.data_type} erosion yield in {titulo} ", y=0.75, fontsize=16)
+            elif self.data_type == "Subtotal":
+                plt.suptitle(f"Top 10 days with the highest total erosion yield in {titulo} ", y=0.75, fontsize=16)
+            else:
+                plt.suptitle(f"Top 10 days with the highest {self.data_type} yield in {titulo} ", y=0.75, fontsize=16)
+            #Guardar gráfico
+            plt.savefig(self.output.lineEdit.text()+f"\\Top_{self.data_type}.png",transparent=False,bbox_inches = "tight",dpi=300)
+            #Abrir el gráfico 
+            os.startfile(self.output.lineEdit.text()+f"\\Top_{self.data_type}.png")
         
-    def output_evolution(self):
+    def output_evolution(self,data_type):
         #Método para que aparezca la evolución de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
         #Se importan los datos
-        df = self.import_df()
+        df = self.import_df(self.data_type)
+        if self.error:
+            self.error = False
+            return
         #SE CREA DE EVOLUCIÓN GRÁFICO
         #Se crean los dataframes dependiendo de si se ha filtrado la celda
-        if type(self.cell) != int:
+        if self.data_type == "Runoff":
             df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+            acumulado_runoff = df_graph['Runoff'].cumsum()
         else:
-            df_graph = df
-        acumulado_runoff = df_graph['Runoff'].cumsum()
+            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            acumulado_runoff = df_graph.cumsum()
+        
         #Se empieza con el gráfico
-        #Se crean los ejes
-        plt.rcParams["figure.figsize"] = [10, 8]
-        fig = plt.figure()
-        ax0 = plt.subplot()
-        ax1 = ax0.twinx()
-        ax2 = ax0.twinx()
-        #Se crean los dibujos
-        ax0.bar(df_graph.index, df_graph['Runoff'], width =6 ,color='tab:blue', alpha=1, label='Runoff')
-        ax1.bar(df_graph.index, df_graph['RSS'], width =6 ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
-        ax2.plot(df_graph.index, acumulado_runoff ,color="green", linestyle='--', label='Accumulated runoff')
-        #Labels de los ejes
-        ax0.set_xlabel("Date",size = 15,family="arial",weight = "bold",color = "black")
-        ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
-        ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
-        ax2.set_ylabel("Accumulated runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
-        #Cambiar límites de los ejes
-        ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.85)
-        ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.85)
-        ax2.set_ylim(ax2.get_ylim()[0],ax2.get_ylim()[1]*1.75)
-        #Fuente del eje
-        ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
-        ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
-        ax2.tick_params(axis = "both",colors = "black",labelsize = 11)
-        #Mover eje a la derecha
-        ax2.spines['right'].set_position(('outward', 80))
-        ax2.spines["right"].set_color("black")
-        #Invertir eje
-        ax1.invert_yaxis()
-        # Agregar una etiqueta en el último punto del acumulado
-        ultimo_valor_acumulado = acumulado_runoff.iloc[-1]
-        ax2.annotate(f'{ultimo_valor_acumulado:.2f} mm',
-                     xy=(df_graph.index[-1], ultimo_valor_acumulado),
-                     xytext=(-50, 10), textcoords='offset points',
-                     fontsize=11, color='black', weight='bold')
-        #Formato eje x
-        ax0.xaxis.set_major_locator(mdates.YearLocator(base=1, month=1, day=1))
-        ax0.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
-        ax0.xaxis.set_minor_locator(mdates.MonthLocator())
-        #Leyenda
-        legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
-        legend.legendPatch.set_edgecolor("black")
-        legend.legendPatch.set_facecolor("white")
-        legend.legendPatch.set_linewidth(1)
-        #Título del gráfico
-        if self.cell != "All cells":
-            titulo = f"Cell {self.cell}"
+        if self.data_type == "Runoff":
+            #Se crean los ejes
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig = plt.figure()
+            ax0 = plt.subplot()
+            ax1 = ax0.twinx()
+            ax2 = ax0.twinx()
+            #Se crean los dibujos
+            ax0.bar(df_graph.index, df_graph['Runoff'], width =6 ,color='tab:blue', alpha=1, label='Runoff')
+            ax1.bar(df_graph.index, df_graph['RSS'], width =6 ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+            ax2.plot(df_graph.index, acumulado_runoff ,color="green", linestyle='--', label='Accumulated runoff')
+            #Labels de los ejes
+            ax0.set_xlabel("Date",size = 15,family="arial",weight = "bold",color = "black")
+            ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            ax2.set_ylabel("Accumulated runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            #Cambiar límites de los ejes
+            ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.85)
+            ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.85)
+            ax2.set_ylim(ax2.get_ylim()[0],ax2.get_ylim()[1]*1.75)
+            #Fuente del eje
+            ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+            ax2.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Mover eje a la derecha
+            ax2.spines['right'].set_position(('outward', 80))
+            ax2.spines["right"].set_color("black")
+            #Invertir eje
+            ax1.invert_yaxis()
+            # Agregar una etiqueta en el último punto del acumulado
+            ultimo_valor_acumulado = acumulado_runoff.iloc[-1]
+            ax2.annotate(f'{ultimo_valor_acumulado:.2f} mm',
+                         xy=(df_graph.index[-1], ultimo_valor_acumulado),
+                         xytext=(-50, 10), textcoords='offset points',
+                         fontsize=11, color='black', weight='bold')
+            #Formato eje x
+            ax0.xaxis.set_major_locator(mdates.YearLocator(base=1, month=1, day=1))
+            ax0.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+            ax0.xaxis.set_minor_locator(mdates.MonthLocator())
+            #Leyenda
+            legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+            legend.legendPatch.set_edgecolor("black")
+            legend.legendPatch.set_facecolor("white")
+            legend.legendPatch.set_linewidth(1)
+            #Título del gráfico
+            if self.cell != "All cells":
+                titulo = f"Cell {self.cell}"
+            else:
+                titulo = "all cells"
+            plt.title(f"Evolution of runoff and water inputs in {titulo}", y=1.05, fontsize=16)
+            #Guardar gráfico
+            plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Runoff_evolution.png",transparent=False,bbox_inches = "tight",dpi=300)
+            #Abrir el gráfico 
+            os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Runoff_evolution.png")
         else:
-            titulo = "all cells"
-        plt.title(f"Evolution of runoff and water inputs in {titulo}", y=1.05, fontsize=16)
-        #Guardar gráfico
-        plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Runoff_evolution.png",transparent=False,bbox_inches = "tight",dpi=300)
-        #Abrir el gráfico 
-        os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Runoff_evolution.png")
+            #Se crean los ejes
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig = plt.figure()
+            ax0 = plt.subplot()
+            ax2 = ax0.twinx()
+            #Se crean los dibujos
+            ax0.bar(df_graph.index, df_graph, width =6 ,color='tab:blue', alpha=1, label=f'{self.data_type} yield ')
+            ax2.plot(df_graph.index, acumulado_runoff ,color="green", linestyle='--', label='Accumulated runoff')
+             #Labels de los ejes
+            ax0.set_xlabel("Date",size = 15,family="arial",weight = "bold",color = "black")
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                ax0.set_ylabel(f"{self.data_type} yield (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+                ax2.set_ylabel(f"{self.data_type} accumulated yield (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+            elif self.data_type == "Subtotal":
+                ax0.set_ylabel(f"Total yield erosion (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+                ax2.set_ylabel("Total accumulated yield erosion (Mg)",size = 15,family="arial",weight = "bold",color = "black")
+            else:
+                ax0.set_ylabel(f"{self.data_type} yield (kg)",size = 15,family="arial",weight = "bold",color = "black")
+                ax2.set_ylabel(f"{self.data_type} accumulated yield (kg)",size = 15,family="arial",weight = "bold",color = "black")
+            #Fuente del eje
+            ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            ax2.tick_params(axis = "both",colors = "black",labelsize = 11)
+            # Agregar una etiqueta en el último punto del acumulado
+            ultimo_valor_acumulado = acumulado_runoff.iloc[-1]
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
+                ax2.annotate(f'{ultimo_valor_acumulado:.2f} Mg',
+                             xy=(df_graph.index[-1], ultimo_valor_acumulado),
+                             xytext=(-50, 10), textcoords='offset points',
+                             fontsize=11, color='black', weight='bold')
+            else:
+                ax2.annotate(f'{ultimo_valor_acumulado:.2f} kg',
+                             xy=(df_graph.index[-1], ultimo_valor_acumulado),
+                             xytext=(-50, 10), textcoords='offset points',
+                             fontsize=11, color='black', weight='bold')
+            #Formato eje x
+            ax0.xaxis.set_major_locator(mdates.YearLocator(base=1, month=1, day=1))
+            ax0.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+            ax0.xaxis.set_minor_locator(mdates.MonthLocator())
+            #Leyenda
+            legend = fig.legend(bbox_to_anchor=(0.03,0.57,0.3,0.3),framealpha=0.7)
+            legend.legendPatch.set_edgecolor("black")
+            legend.legendPatch.set_facecolor("white")
+            legend.legendPatch.set_linewidth(1)
+            #Título del gráfico
+            if self.cell != "All cells":
+                titulo = f"Cell {self.cell}"
+            else:
+                titulo = "all cells"
+            if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                plt.title(f"Evolution of {self.data_type} yield erosion in {titulo}", y=1.05, fontsize=16)
+            elif self.data_type == "Subtotal":
+                plt.title(f"Evolution of total yield erosion in {titulo}", y=1.05, fontsize=16)
+            else:
+                plt.title(f"Evolution of {self.data_type} yield in {titulo}", y=1.05, fontsize=16)
+            #Guardar gráfico
+            plt.savefig(self.output.lineEdit.text()+f"\\Evolution_{self.data_type}.png",transparent=False,bbox_inches = "tight",dpi=300)
+            #Abrir el gráfico 
+            os.startfile(self.output.lineEdit.text()+f"\\Evolution_{self.data_type}.png")
     
     def updateLineEdit(self,slider_number,value):
         # Actualizar el valor en el QLineEdit cuando cambie el valor del QSlider
@@ -1017,7 +1465,11 @@ class qannagnps():
         self.first_position_end = slider_one.x()+slider_one.value()+50
         #Condiciones para mover los sliders
         if slider_number==1:
-            print(1, self.first_position_end,slider_two.x())
+            slider_one.setFixedWidth((236-slider_two.value())-10)
+            
+            slider_two.setGeometry(10+slider_one.width()+100-slider_two.value(), 195, slider_two.width(), slider_two.height())
+            slider_two.setValue(100)
+            r'''print(1, self.first_position_end,slider_two.x())
             if self.first_position_end >= slider_two.x():
                 self.second_position = slider_two.x()+50-slider_two.value()
             else:
@@ -1030,36 +1482,48 @@ class qannagnps():
             else:
                 slider_two.setGeometry(slider_two.x()-value, 190, slider_two.width(), slider_two.height())
                 slider_two.setFixedWidth(50+value)
-                self.second_position = slider_two.x()+50-slider_two.value()
+                self.second_position = slider_two.x()+50-slider_two.value()'''
                 
-    def output_exist(self, output_type):
+    def output_exist(self):
         #Método para que se diga si existe el output o no
-        if output_type == "Runoff":
-            if path.exists(self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"):
+        #Se hace función para no repetir todo el rato lo mismo
+        def function_output_exist(file,column,input_file):
+            if path.exists(self.output.lineEdit.text()+f"\\{file}"):
                 #Se cambia el icono
                 path_icon = os.path.join(self.plugin_directory, "images/yes_file.svg")
                 self.output.file_ex.setIcon(QIcon(path_icon))
                 #Se cambia el next step
                 if self.filter_clicked:
                     self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
-                    self.output.label_6.setText("")
                 else:
                     self.output.label_9.setText("NEXT STEP: click on 'Add cells and dates' button.")
-                    self.output.label_6.setText("")
             
             else:
                 #Se cambia el icono
                 path_icon = os.path.join(self.plugin_directory, "images/no_file.svg")
                 self.output.file_ex.setIcon(QIcon(path_icon))
-                if self.output.label_9.text()!="":
-                    self.output.label_9.setText("NEXT STEP: the folder you have selected does not contain the AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv file.")
-                    self.output.label_6.setText("It is necessary to make a execution where the Insitu_Soil_Moisture_Daily column of the OUTPUT OPTIONS DATA - SIM file is set to T.")
+                if self.output.lineEdit.text()!="":
+                    self.output.label_9.setText(f"NEXT STEP: the folder you have selected does not contain the {file} file.It is necessary to make a execution where the {column} column of the {input_file} file is set to T.")
                 else:
-                    self.output.label_9.setText("NEXT STEP: select the folder in which the DEM file is located.")
-                    self.output.label_6.setText("")
-
+                    self.output.label_9.setText(f"NEXT STEP: select the folder in which {file} is located.")
+        #Se ponen las condiciones
+        if self.data_type == "Runoff":
+            function_output_exist("AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv","Insitu_Soil_Moisture_Daily","OUTPUT OPTIONS DATA - SIM")
+        elif self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
+            function_output_exist("AnnAGNPS_EV_Sediment_yield_(mass).csv","EV_Sed_Yld_Mass","OUTPUT OPTIONS DATA – EV")
+        elif self.data_type == "Nitrogen":
+            function_output_exist("AnnAGNPS_EV_Nitrogen_yield_(mass).csv","EV_N_Yld_Mass","OUTPUT OPTIONS DATA – EV")
+        elif self.data_type == "Carbon":
+            function_output_exist("AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv","EV_OC_Yld_Mass","OUTPUT OPTIONS DATA – EV")
+        elif self.data_type == "Phosphorus":
+            function_output_exist("AnnAGNPS_EV_Phosphorus_yield_(mass).csv","EV_P_Yld_Mass","OUTPUT OPTIONS DATA – EV")
+        
     def df_section_output(self,fichero,delete_second =False):
         #Método que se utiliza para obtener el dataframe de los resultados para crear los gráficos
+        if self.data_type == "Runoff" or self.filtering:
+            first_column = "Gregorian"
+        else:
+            first_column = "Month"
         file = open(fichero)
         csvreader = csv.reader(file)
         rows = []
@@ -1069,7 +1533,7 @@ class qannagnps():
         a = 0
         for i in rows:
            try:
-               if i[0]=="Gregorian":
+               if i[0]==first_column:
                    a = 1
                    lista.append(i)
                elif a ==1:
@@ -1084,9 +1548,11 @@ class qannagnps():
         #Método para poner celdas y fechas que contiene el archivo
         try: #Este try es para que no de error si se le da al botón de filtros cuando no existe el archivo
             #Se obtienen los datos ordenados
-            path = self.output.lineEdit.text()+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
+            path = self.output.lineEdit.text()+"\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
             #Se importan los datos
+            self.filtering = True
             df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
+            self.filtering = False
             df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
             df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
             #Se ponen las celdas en el combobox
@@ -1103,27 +1569,25 @@ class qannagnps():
             self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
         except:
             pass
+
         
-    def dem_output_file(self,output_type):
+    def dem_output_file(self):
         #Método para seleccionar la carpeta de 
-        if output_type == "Runoff":
-            fname = QFileDialog.getExistingDirectory(self.output, "Select folder", "C/")
-            if fname[0]!="":
-                self.output.lineEdit.setText(fname)
-        if output_type == "Erosion":
-            fname = QFileDialog.getExistingDirectory(self.output, "Select folder", "C/")
-            if fname[0]!="":
-                self.output.lineEdit_2.setText(fname)
-        if output_type == "Nutrients":
-            fname = QFileDialog.getExistingDirectory(self.output, "Select folder", "C/")
-            if fname[0]!="":
-                self.output.lineEdit_3.setText(fname)
+        fname = QFileDialog.getExistingDirectory(self.output, "Select folder", "C/")
+        if fname[0]!="":
+            self.output.lineEdit.setText(fname)
+    
+    def change_color_outputs(self,button):
+        #Método para cambiar el color de los labels que indican qué outpus se quiere mostrar
+        button.setStyleSheet("background-color: #99ff99")
+        for i in self.output_selection:
+            if i!=button:
+                i.setStyleSheet("background-color: #87CEEB;")
+        #Se le dice al plugin cuál es la elección de output
+        self.data_type = self.output_selection[button]
+        #Se ejecuta el método para que se vea si existe el archivo
+        self.output_exist()
         
-    
-    def change_color_output(self,button):
-        #Método para cambiar el color de los botones que indican qué outpus se quiere mostrar
-        button.setStyleSheet("QPushButton {background-color: #99ff99;}")
-    
     def path_exist(self):
         #Método para mostrar si los inputs de AnnAGNPS existen o no
         if self.border == False:
@@ -1189,21 +1653,12 @@ class qannagnps():
         documentation_icon = os.path.join(self.plugin_directory, "images/documentation.svg")
         self.inputs.pb_doc.setIcon(QIcon(documentation_icon))
         #Runoff output
-        runoff = [self.output.general_run,self.output.spatial_run,self.output.pushButton,self.output.pushButton_15,self.output.pushButton_16,self.output.pushButton_17,self.output.pushButton_18]
-        icon = os.path.join(self.plugin_directory, "images/water.svg")
+        runoff = [self.output.pushButton,self.output.pushButton_15,self.output.pushButton_16,self.output.pushButton_17,self.output.pushButton_18]
+        icon = os.path.join(self.plugin_directory, "images/bar_graph.svg")
         for i in runoff:
-            i.setIcon(QIcon(icon))
-        #Erosion output
-        runoff = [self.output.general_run_2,self.output.spatial_run_2,self.output.pushButton_9,self.output.pushButton_22,self.output.pushButton_21,self.output.pushButton_23,self.output.pushButton_20]
-        icon = os.path.join(self.plugin_directory, "images/erosion.svg")
-        for i in runoff:
-            i.setIcon(QIcon(icon))
-        #Nutrient output
-        runoff = [self.output.general_run_3,self.output.spatial_run_3,self.output.pushButton_11,self.output.pushButton_26,self.output.pushButton_25,self.output.pushButton_27,self.output.pushButton_24]
-        icon = os.path.join(self.plugin_directory, "images/nutrient.svg")
-        for i in runoff:
-            i.setIcon(QIcon(icon))
-        
+            i.setIcon(QIcon(icon)) 
+        icon = os.path.join(self.plugin_directory, "images/spatial_graph.svg")
+        self.output.spatial_run.setIcon(QIcon(icon))
         
     def url_upna(self,event):
         #Método para abrir las páginas web de la upna

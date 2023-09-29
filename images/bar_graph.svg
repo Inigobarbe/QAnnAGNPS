@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<svg xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:svg="http://www.w3.org/2000/svg" id="svg3269" viewBox="0 0 894.76 851.9" version="1.0">
+  <defs id="defs3271">
+    <filter id="filter3387">
+      <feGaussianBlur id="feGaussianBlur3389" stdDeviation="1.877244"/>
+    </filter>
+    <filter id="filter10367">
+      <feGaussianBlur id="feGaussianBlur10369" stdDeviation="0.90687765"/>
+    </filter>
+    <linearGradient id="linearGradient2779" y2="41.516" gradientUnits="userSpaceOnUse" x2="179.85" gradientTransform="matrix(1.9549 0 0 13.703 -55.725 -505.17)" y1="101.63" x1="179.85">
+      <stop id="stop5107" stop-color="#cbcbcb" offset="0"/>
+      <stop id="stop5113" stop-color="#ddd" offset=".81"/>
+      <stop id="stop5109" stop-color="#c5c5c5" offset="1"/>
+    </linearGradient>
+  </defs>
+  <g id="layer1" transform="translate(51.14 -25.505)">
+    <rect id="rect7946" transform="matrix(11.445 0 0 11.445 -1568.2 -3278.6)" height="63.118" filter="url(#filter3387)" width="73.545" y="294.46" x="135.01" fill="#666"/>
+    <rect id="rect7948" height="777.86" width="841.73" y="63.715" x="-23.048" fill="url(#linearGradient2779)"/>
+    <rect id="rect7950" ry="8.5053" height="649.65" width="757.56" y="127.82" x="19.038" fill="#e6e6e6"/>
+    <g id="g10161" filter="url(#filter10367)" transform="matrix(11.445 0 0 11.445 -1552.7 -3272.4)" fill="#4d4d4d">
+      <rect id="rect10163" transform="rotate(90)" height="4.7687" width="43.841" y="-194.05" x="307.06"/>
+      <rect id="rect10165" transform="rotate(90)" height="4.7687" width="43.841" y="-194.05" x="307.06"/>
+      <rect id="rect10167" transform="rotate(90)" height="4.7687" width="32.464" y="-186.1" x="318.44"/>
+      <rect id="rect10169" transform="rotate(90)" height="4.7687" width="43.841" y="-194.05" x="307.06"/>
+      <rect id="rect10171" transform="rotate(90)" height="4.7687" width="24.764" y="-178.14" x="326.14"/>
+      <rect id="rect10173" transform="rotate(90)" height="4.7687" width="43.841" y="-194.05" x="307.06"/>
+      <rect id="rect10175" transform="rotate(90)" height="4.7687" width="41.267" y="-170.19" x="309.64"/>
+      <rect id="rect10177" transform="rotate(90)" height="4.7687" width="32.464" y="-186.1" x="318.44"/>
+      <rect id="rect10179" transform="rotate(90)" height="4.7687" width="43.31" y="-162.23" x="307.6"/>
+      <rect id="rect10181" transform="rotate(90)" height="4.7687" width="24.764" y="-178.14" x="326.14"/>
+      <rect id="rect10183" transform="rotate(90)" height="4.7687" width="49.775" y="-154.28" x="301.13"/>
+      <rect id="rect10185" transform="rotate(90)" height="4.7687" width="41.267" y="-170.19" x="309.64"/>
+      <rect id="rect10187" transform="rotate(90)" height="4.7687" width="43.31" y="-162.23" x="307.6"/>
+      <rect id="rect10189" transform="rotate(90)" height="4.7687" width="49.775" y="-154.28" x="301.13"/>
+    </g>
+    <rect id="rect7952" transform="rotate(90)" height="54.579" width="501.76" y="-652.7" x="235.72" fill="#ccc"/>
+    <rect id="rect7954" transform="rotate(90)" height="54.579" width="501.76" y="-652.7" x="235.72" fill="#f00"/>
+    <rect id="rect7956" transform="rotate(90)" height="54.579" width="371.55" y="-561.66" x="365.93" fill="#ffd42a"/>
+    <rect id="rect8033" transform="rotate(90)" height="54.579" width="501.76" y="-652.7" x="235.72" fill="#ccc"/>
+    <rect id="rect7958" transform="rotate(90)" height="54.579" width="283.42" y="-470.62" x="454.06" fill="#f60"/>
+    <rect id="rect8035" transform="rotate(90)" height="54.579" width="501.76" y="-652.7" x="235.72" fill="#d40000"/>
+    <rect id="rect7960" transform="rotate(90)" height="54.579" width="472.3" y="-379.59" x="265.18" fill="#000080"/>
+    <rect id="rect8037" transform="rotate(90)" height="54.579" width="371.55" y="-561.66" x="365.93" fill="#ffd42a"/>
+    <rect id="rect7962" transform="rotate(90)" height="54.579" width="495.68" y="-288.55" x="241.81" fill="#0f0"/>
+    <rect id="rect8039" transform="rotate(90)" height="54.579" width="283.42" y="-470.62" x="454.06" fill="#f60"/>
+    <rect id="rect7964" transform="rotate(90)" height="54.579" width="569.68" y="-197.51" x="167.81"/>
+    <rect id="rect8041" transform="rotate(90)" height="54.579" width="472.3" y="-379.59" x="265.18" fill="#000080"/>
+    <rect id="rect8043" transform="rotate(90)" height="54.579" width="495.68" y="-288.55" x="241.81" fill="#008000"/>
+    <rect id="rect8045" transform="rotate(90)" height="54.579" width="569.68" y="-197.51" x="167.81" fill="#4d4d4d"/>
+  </g>
+  <metadata>
+    <rdf:RDF>
+      <cc:Work>
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+        <cc:license rdf:resource="http://creativecommons.org/licenses/publicdomain/"/>
+        <dc:publisher>
+          <cc:Agent rdf:about="http://openclipart.org/">
+            <dc:title>Openclipart</dc:title>
+          </cc:Agent>
+        </dc:publisher>
+        <dc:title>Statistics</dc:title>
+        <dc:date>2007-11-19T11:57:03</dc:date>
+        <dc:description>clip art, clipart, diagram, diagram, icon, icon, image, media, png, public domain, settings, settings, statistics, statistics, svg, </dc:description>
+        <dc:source>http://openclipart.org/detail/10760/statistics-by-hawk88-10760</dc:source>
+        <dc:creator>
+          <cc:Agent>
+            <dc:title>hawk88</dc:title>
+          </cc:Agent>
+        </dc:creator>
+        <dc:subject>
+          <rdf:Bag>
+            <rdf:li>clip art</rdf:li>
+            <rdf:li>clipart</rdf:li>
+            <rdf:li>diagram</rdf:li>
+            <rdf:li>icon</rdf:li>
+            <rdf:li>image</rdf:li>
+            <rdf:li>media</rdf:li>
+            <rdf:li>png</rdf:li>
+            <rdf:li>public domain</rdf:li>
+            <rdf:li>settings</rdf:li>
+            <rdf:li>statistics</rdf:li>
+            <rdf:li>svg</rdf:li>
+          </rdf:Bag>
+        </dc:subject>
+      </cc:Work>
+      <cc:License rdf:about="http://creativecommons.org/licenses/publicdomain/">
+        <cc:permits rdf:resource="http://creativecommons.org/ns#Reproduction"/>
+        <cc:permits rdf:resource="http://creativecommons.org/ns#Distribution"/>
+        <cc:permits rdf:resource="http://creativecommons.org/ns#DerivativeWorks"/>
+      </cc:License>
+    </rdf:RDF>
+  </metadata>
+</svg>
