@@ -386,11 +386,7 @@ class qannagnps():
         out_minmax_col = ["Min_Evt_Date","Max_Evt_Date","Max_Number_Evts","Min_Rnof_Evt","Min_Rnof_Cell","Min_Rnof_Outlet","Min_Subarea_ID","Max_Subarea_ID","Subarea_Units_Positn","Max_Vrfy_File_Access","Max_Vrfy_File_Bytes","Input_Units_Code"]
         dic_bc_simulation = {self.inputs.s19:annaid_col,self.inputs.s20:global_error_col,self.inputs.s21:global_ids_col,self.inputs.s22:pesticide_initial_col,self.inputs.s23:pl_calibration_col,self.inputs.s24:rcn_col,self.inputs.s25:sim_col,self.inputs.s26:soil_initial_col,self.inputs.s27:rusle2_col,self.inputs.s28:out_global_col,self.inputs.s29:out_csv_col,self.inputs.s30:out_dpp_col,self.inputs.s31:out_inver_col,self.inputs.s32:out_sim_col,self.inputs.s33:out_aa_col,self.inputs.s34:out_ev_col,self.inputs.s35:out_tbl_col,self.inputs.s36:out_minmax_col}
         self.dic_boton_columnas = {**dic_bc_watershed,**dic_bc_general,**dic_bc_climate,**dic_bc_simulation}
-                
-        #Si se selecciona en outputs select all que se seleccionen todos esos outputs
-        general_outputs_lines = [self.output.checkBox_4,self.output.checkBox_8,self.output.checkBox_3,self.output.checkBox_9,self.output.checkBox_5,self.output.checkBox_10,self.output.checkBox_7,self.output.checkBox_12,self.output.checkBox_11,self.output.checkBox_13,self.output.checkBox_14,self.output.checkBox_15]
-        self.output.checkBox_43.stateChanged.connect(self.check_box)
-        
+                        
         #Importar el archivo master
         self.inputs.pb_master.clicked.connect(self.add_master)
         
@@ -450,9 +446,11 @@ class qannagnps():
 
         #Poner icono de búsqueda en los outputs
         self.output.pushButton_12.setIcon(QIcon(self.icon_path_search))
+        self.output.pushButton_9.setIcon(QIcon(self.icon_path_search))
         
         #Seleccionar archivo DEM en los outputs
-        self.output.pushButton_12.clicked.connect(self.dem_output_file)
+        self.output.pushButton_12.clicked.connect(lambda _,b = "AnnAGNPS":self.dem_output_file(b))
+        self.output.pushButton_9.clicked.connect(lambda _,b = "TopAGNPS":self.dem_output_file(b))
         
         #Cuando se cambie la carpeta de los outputs mirar si existe el archivo necesario
         self.output.lineEdit.textChanged.connect(self.output_exist)
@@ -463,10 +461,6 @@ class qannagnps():
         
         #Añadir "All cells" a los comboboxes de los outputs
         self.output.run_cell.addItems(["All cells"])
-        
-        #Para cambiar los valores de las fechas con el slider
-        self.output.horizontalSlider.valueChanged.connect(partial(self.updateLineEdit, 1))
-        self.output.horizontalSlider_2.valueChanged.connect(partial(self.updateLineEdit, 2))
         
         #Botones para que aparezcan outputs
         self.output.pushButton.clicked.connect(self.output_evolution)
@@ -483,6 +477,11 @@ class qannagnps():
         
         #Variable para decir si hay error cuando se importan luego los dataframes
         self.error = False
+        
+        #Función para los outputs de TopAGNPS
+        dic = {self.output.pushButton_11:"Cell_raster",self.output.pushButton_13:"Cell_vectorial",self.output.pushButton_14:"Boundary_raster",self.output.pushButton_19:"Boundary_vectorial",self.output.pushButton_22:"Reaches_raster",self.output.pushButton_20:"Reaches_vectorial",self.output.pushButton_21:"Accumulated",self.output.pushButton_23:"Terrain_slope",self.output.pushButton_24:"Hydraulic",self.output.pushButton_25:"Terrain_aspect",self.output.pushButton_26:"RUSLE",self.output.pushButton_27:"Longest_raster",self.output.pushButton_28:"Longest_vectorial"}
+        for i in dic.keys():
+            i.clicked.connect(lambda _,b = dic[i]:self.output_topagnps(b))
         
     def general_output(self):
         #Método para añadir los outputs generales al diálogo
@@ -520,15 +519,14 @@ class qannagnps():
         if self.error:
             self.error = False
             return
-        #Si no existe self.epsg entonces se coge el epsg del proyecto
-        if not hasattr(self,"epsg"):
-            self.epsg = QgsProject.instance().crs().authid()
+        #Se pone el epsg del proyecto
+        self.epsg = QgsProject.instance().crs().authid()
         #Se borran todos los archivos previos creados que se puedan 
-        ficheros = os.listdir(self.output.lineEdit.text())
+        ficheros = os.listdir(os.path.dirname(self.output.lineEdit.text()))
         delete_files = [x for x in ficheros if x[:16]=="cell_runoff_all_" or x[:16]=="cell_runoff_cell"]
         for d in delete_files:
             try:
-                os.remove(self.output.lineEdit.text()+f"\\{d}")
+                os.remove(os.path.dirname(self.output.lineEdit.text())+f"\\{d}")
             except:
                 pass
         #Función para importar ficheros
@@ -540,6 +538,7 @@ class qannagnps():
             output_raster = fichero(outputname)
             warp = gdal.Warp(output_raster,input_raster,dstSRS=self.epsg)
             warp = None # Closes the files
+        print(self.epsg)
         #Ahora se ponen los datos espaciales en QGIS
         c = 0
         while True:
@@ -560,7 +559,11 @@ class qannagnps():
                 {'INPUT':fichero(input_file),
                 'OUTPUT':fichero(output),
                 'LAYER_NAME':'','DATASOURCE_OPTIONS':'','LAYER_OPTIONS':''})
-        copiar_archivo(f"cell_runoff_all_{c}.gpkg",f"cell_runoff_all_out_{c}.gpkg")
+        try:
+            copiar_archivo(f"cell_runoff_all_{c}.gpkg",f"cell_runoff_all_out_{c}.gpkg")
+        except:
+            iface.messageBar().pushMessage("Some error with CRS has ocurred: Please select another CRS for the project",level=Qgis.Warning, duration=10)
+            return
         if self.data_type == "Runoff":
             name_layer = "Runoff(mm)"
         elif self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
@@ -665,7 +668,7 @@ class qannagnps():
                 iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
                 self.error = True
                 return
-            df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
+            df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float)})
         else:
             dic_outputs = {"Subtotal":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Gully":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Pond":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Sheet & Rill":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Nitrogen":["AnnAGNPS_EV_Nitrogen_yield_(mass).csv","Subtotal N [kg]"],"Carbon":["AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv","Subtotal C [kg]"],"Phosphorus":["AnnAGNPS_EV_Phosphorus_yield_(mass).csv","Subtotal P [kg]"]}
             path = self.output.lineEdit.text()+f"\\{dic_outputs[self.data_type][0]}"
@@ -818,7 +821,7 @@ class qannagnps():
                 iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
                 self.error = True
                 return
-            df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
+            df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float)})
             df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
             #Aquí se filtran por celda y por fecha
             self.cell = self.output.run_cell.currentText()
@@ -833,9 +836,9 @@ class qannagnps():
             def dataframe_creation(path,subtotal_column, erosion = False, source = None):
                 df_raw = self.df_section_output(path,delete_second=False)
                 if erosion:
-                    df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[str(x) for x in df_raw["Cell ID"]],"Source":[str(x) for x in df_raw["Source"]],"Yield":[float(x) for x in df_raw["Subtotals [Mg]"]]})
+                    df = pd.DataFrame(data = {"Year":df_raw["Year"].astype(int),"Month":df_raw["Month"].astype(int),"Day":df_raw["Day"].astype(int),"Cell":df_raw["Cell ID"].astype(str),"Source":df_raw["Source"].astype(str),"Yield":df_raw["Subtotals [Mg]"].astype(float)})
                 else:
-                    df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[str(x) for x in df_raw["Cell ID"]],"Yield":[float(x) for x in df_raw[subtotal_column]]})
+                    df = pd.DataFrame(data = {"Year":df_raw["Year"].astype(int),"Month":df_raw["Month"].astype(int),"Day":df_raw["Day"].astype(int),"Cell":df_raw["Cell ID"].astype(str),"Yield":df_raw[subtotal_column].astype(float)})
                 #Se quitan las filas que no tengan un Cell ID como "Landscape" o "Watershed"
                 lista = []
                 for i in df.Cell:
@@ -946,16 +949,18 @@ class qannagnps():
             # Agregar etiquetas de valores encima de las barras en ax0
             for rect in bar0:
                 height = rect.get_height()
-                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                formatted_height = f'{height:,.2f}'  # Aquí se aplica el separador de miles usando f-string
+                ax0.annotate(formatted_height, xy=(rect.get_x() + rect.get_width() / 2, height),
                              xytext=(0, 3), textcoords="offset points",
-                             ha='center', va='bottom',weight = "bold",size = 9)
+                             ha='center', va='bottom', weight="bold", size=9)
 
             # Agregar etiquetas de valores encima de las barras en ax1
             for rect in bar1:
                 height = rect.get_height()
-                ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                formatted_height = f'{height:,.2f}'  # Aquí se aplica el separador de miles usando f-string
+                ax1.annotate(formatted_height, xy=(rect.get_x() + rect.get_width() / 2, height),
                              xytext=(0, 3), textcoords="offset points",
-                             ha='center', va='bottom',weight = "bold",size = 9)
+                             ha='center', va='bottom', weight="bold", size=9)
         else:
             #Se crea el gráfico
             plt.rcParams["figure.figsize"] = [10, 8]
@@ -973,6 +978,8 @@ class qannagnps():
                 ax0.set_ylabel(f"{self.data_type} yield (kg)",size = 15,family="arial",weight = "bold",color = "black")
             #Fuente del eje
             ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Cambiar límites de los ejes
+            ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.4)
             #Leyenda
             legend = fig.legend(bbox_to_anchor=(0.02,0.57,0.3,0.3),framealpha=0.7)
             legend.legendPatch.set_edgecolor("black")
@@ -981,9 +988,10 @@ class qannagnps():
             # Agregar etiquetas de valores encima de las barras en ax0
             for rect in bar0:
                 height = rect.get_height()
-                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                formatted_height = f'{height:,.2f}'  # Aquí se aplica el separador de miles usando f-string
+                ax0.annotate(formatted_height, xy=(rect.get_x() + rect.get_width() / 2, height),
                              xytext=(0, 3), textcoords="offset points",
-                             ha='center', va='bottom',weight = "bold",size = 9)
+                             ha='center', va='bottom', weight="bold", size=9)
         #Título del gráfico
         if self.cell != "All cells":
             titulo = f"Cell {self.cell}"
@@ -1087,12 +1095,15 @@ class qannagnps():
             legend.legendPatch.set_edgecolor("black")
             legend.legendPatch.set_facecolor("white")
             legend.legendPatch.set_linewidth(1)
+            #Cambiar límites de los ejes
+            ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.4)
             # Agregar etiquetas de valores encima de las barras en ax0
             for rect in bar0:
                 height = rect.get_height()
-                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                formatted_height = f'{height:,.2f}'  # Aquí se aplica el separador de miles usando f-string
+                ax0.annotate(formatted_height, xy=(rect.get_x() + rect.get_width() / 2, height),
                              xytext=(0, 3), textcoords="offset points",
-                             ha='center', va='bottom',weight = "bold",size = 12)
+                             ha='center', va='bottom', weight="bold", size=9)
             #Título del gráfico
             if self.cell != "All cells":
                 titulo = f"Cell {self.cell}"
@@ -1112,7 +1123,7 @@ class qannagnps():
     def output_season(self,data_type):
         #Método para que aparezca por estación de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
         #Se importan los datos
-        df = self.import_df(data_type)
+        df = self.import_df(self.data_type)
         if self.error:
             self.error = False
             return
@@ -1182,9 +1193,9 @@ class qannagnps():
                 titulo = "all cells"
             plt.title(f"Runoff and water inputs per season in {titulo}", y=1.05, fontsize=16)
             #Guardar gráfico
-            plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Season_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+            plt.savefig(self.output.lineEdit.text()+f"\\Season_{self.data_type}.png",transparent=False,bbox_inches = "tight",dpi=300)
             #Abrir el gráfico 
-            os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Season_runoff.png")
+            os.startfile(self.output.lineEdit.text()+f"\\Season_{self.data_type}.png")
         else:
             df_graph = pd.DataFrame({'Fecha': df_graph.index, 'Yield': df_graph.values})
             numeric_columns = df_graph.select_dtypes(include='number')
@@ -1211,12 +1222,15 @@ class qannagnps():
             legend.legendPatch.set_edgecolor("black")
             legend.legendPatch.set_facecolor("white")
             legend.legendPatch.set_linewidth(1)
+            #Cambiar límites de los ejes
+            ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.4)
             # Agregar etiquetas de valores encima de las barras en ax0
             for rect in bar0:
                 height = rect.get_height()
-                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                formatted_height = f'{height:,.2f}'  # Aquí se aplica el separador de miles usando f-string
+                ax0.annotate(formatted_height, xy=(rect.get_x() + rect.get_width() / 2, height),
                              xytext=(0, 3), textcoords="offset points",
-                             ha='center', va='bottom',weight = "bold",size = 12)
+                             ha='center', va='bottom', weight="bold", size=9)
             #Título del gráfico
             if self.cell != "All cells":
                 titulo = f"Cell {self.cell}"
@@ -1273,9 +1287,9 @@ class qannagnps():
                 titulo = "all cells"
             plt.suptitle(f"Top 10 days with the highest runoff in {titulo} ", y=0.75, fontsize=16)
             #Guardar gráfico
-            plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Top_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
+            plt.savefig(self.output.lineEdit.text()+"\\Top_runoff.png",transparent=False,bbox_inches = "tight",dpi=300)
             #Abrir el gráfico 
-            os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Top_runoff.png")
+            os.startfile(self.output.lineEdit.text()+"\\Top_runoff.png")
         else:
             if len(df_graph[df_graph>0])>10:
                 n_top_values = 10
@@ -1348,7 +1362,7 @@ class qannagnps():
             #Se crean los dibujos
             ax0.bar(df_graph.index, df_graph['Runoff'], width =6 ,color='tab:blue', alpha=1, label='Runoff')
             ax1.bar(df_graph.index, df_graph['RSS'], width =6 ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
-            ax2.plot(df_graph.index, acumulado_runoff ,color="green", linestyle='--', label='Accumulated runoff')
+            ax2.plot(np.array(df_graph.index), np.array(acumulado_runoff) ,color="green", linestyle='--', label='Accumulated runoff')
             #Labels de los ejes
             ax0.set_xlabel("Date",size = 15,family="arial",weight = "bold",color = "black")
             ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
@@ -1369,7 +1383,7 @@ class qannagnps():
             ax1.invert_yaxis()
             # Agregar una etiqueta en el último punto del acumulado
             ultimo_valor_acumulado = acumulado_runoff.iloc[-1]
-            ax2.annotate(f'{ultimo_valor_acumulado:.2f} mm',
+            ax2.annotate(f'{ultimo_valor_acumulado:,.2f} mm',
                          xy=(df_graph.index[-1], ultimo_valor_acumulado),
                          xytext=(-50, 10), textcoords='offset points',
                          fontsize=11, color='black', weight='bold')
@@ -1389,9 +1403,9 @@ class qannagnps():
                 titulo = "all cells"
             plt.title(f"Evolution of runoff and water inputs in {titulo}", y=1.05, fontsize=16)
             #Guardar gráfico
-            plt.savefig(self.output.lineEdit.text()+"\\INPUTS\\Runoff_evolution.png",transparent=False,bbox_inches = "tight",dpi=300)
+            plt.savefig(self.output.lineEdit.text()+"\\Runoff_evolution.png",transparent=False,bbox_inches = "tight",dpi=300)
             #Abrir el gráfico 
-            os.startfile(self.output.lineEdit.text()+"\\INPUTS\\Runoff_evolution.png")
+            os.startfile(self.output.lineEdit.text()+"\\Runoff_evolution.png")
         else:
             #Se crean los ejes
             plt.rcParams["figure.figsize"] = [10, 8]
@@ -1400,7 +1414,7 @@ class qannagnps():
             ax2 = ax0.twinx()
             #Se crean los dibujos
             ax0.bar(df_graph.index, df_graph, width =6 ,color='tab:blue', alpha=1, label=f'{self.data_type} yield ')
-            ax2.plot(df_graph.index, acumulado_runoff ,color="green", linestyle='--', label='Accumulated runoff')
+            ax2.plot(np.array(df_graph.index), np.array(acumulado_runoff) ,color="green", linestyle='--', label='Accumulated runoff')
              #Labels de los ejes
             ax0.set_xlabel("Date",size = 15,family="arial",weight = "bold",color = "black")
             if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
@@ -1418,12 +1432,12 @@ class qannagnps():
             # Agregar una etiqueta en el último punto del acumulado
             ultimo_valor_acumulado = acumulado_runoff.iloc[-1]
             if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
-                ax2.annotate(f'{ultimo_valor_acumulado:.2f} Mg',
+                ax2.annotate(f'{ultimo_valor_acumulado:,.2f} Mg',
                              xy=(df_graph.index[-1], ultimo_valor_acumulado),
                              xytext=(-50, 10), textcoords='offset points',
                              fontsize=11, color='black', weight='bold')
             else:
-                ax2.annotate(f'{ultimo_valor_acumulado:.2f} kg',
+                ax2.annotate(f'{ultimo_valor_acumulado:,.2f} kg',
                              xy=(df_graph.index[-1], ultimo_valor_acumulado),
                              xytext=(-50, 10), textcoords='offset points',
                              fontsize=11, color='black', weight='bold')
@@ -1451,38 +1465,6 @@ class qannagnps():
             plt.savefig(self.output.lineEdit.text()+f"\\Evolution_{self.data_type}.png",transparent=False,bbox_inches = "tight",dpi=300)
             #Abrir el gráfico 
             os.startfile(self.output.lineEdit.text()+f"\\Evolution_{self.data_type}.png")
-    
-    def updateLineEdit(self,slider_number,value):
-        # Actualizar el valor en el QLineEdit cuando cambie el valor del QSlider
-        slider_one = self.output.horizontalSlider
-        slider_two = self.output.horizontalSlider_2
-        orignal_width = 50
-        original_value = 0
-        or_second = slider_two.width()
-        value_second = 0
-        #Se crean las variables con las posiciones de los sliders
-        self.second_position = slider_two.x()+50-slider_two.value()
-        self.first_position_end = slider_one.x()+slider_one.value()+50
-        #Condiciones para mover los sliders
-        if slider_number==1:
-            slider_one.setFixedWidth((236-slider_two.value())-10)
-            
-            slider_two.setGeometry(10+slider_one.width()+100-slider_two.value(), 195, slider_two.width(), slider_two.height())
-            slider_two.setValue(100)
-            r'''print(1, self.first_position_end,slider_two.x())
-            if self.first_position_end >= slider_two.x():
-                self.second_position = slider_two.x()+50-slider_two.value()
-            else:
-                slider_one.setFixedWidth(50+value)
-                self.second_position = slider_two.x()+50-slider_two.value()
-        elif slider_number==2:
-            print(2,slider_two.x(),self.first_position_end)
-            if slider_two.x() <= self.first_position_end:
-                self.second_position = slider_two.x()+50-slider_two.value()
-            else:
-                slider_two.setGeometry(slider_two.x()-value, 190, slider_two.width(), slider_two.height())
-                slider_two.setFixedWidth(50+value)
-                self.second_position = slider_two.x()+50-slider_two.value()'''
                 
     def output_exist(self):
         #Método para que se diga si existe el output o no
@@ -1553,17 +1535,15 @@ class qannagnps():
             self.filtering = True
             df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
             self.filtering = False
-            df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[int(x) for x in df_raw["ID"]],"Runoff":[float(x) for x in df_raw["Depth"]],"RSS":[float(df_raw["Rainfall"].iloc[x]) +float(df_raw["Snowfall"].iloc[x])+float(df_raw["Snowmelt"].iloc[x]) for x in range(len(df_raw))]})
-            df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
             #Se ponen las celdas en el combobox
             #Primero se borran los elementos que puede haber en el combobox y luego se pone
             self.output.run_cell.clear()
-            cells = [str(x) for x in np.unique(df.Cell)]
+            cells = [str(x) for x in np.unique(df_raw.ID)]
             cells.insert(0,"All cells")
             self.output.run_cell.addItems(cells)
             #Se ponen las fechas
-            self.output.lineEdit_4.setText(f"{df.Fecha.min().day}/{df.Fecha.min().month}/{df.Fecha.min().year}")
-            self.output.lineEdit_5.setText(f"{df.Fecha.max().day}/{df.Fecha.max().month}/{df.Fecha.max().year}")
+            self.output.lineEdit_4.setText(f"{df_raw.Day.iloc[0]}/{df_raw.Month.iloc[0]}/{df_raw.Year.iloc[0]}")
+            self.output.lineEdit_5.setText(f"{df_raw.Day.iloc[-1]}/{df_raw.Month.iloc[-1]}/{df_raw.Year.iloc[-1]}")
             #Se cambia el next step
             self.filter_clicked = 1
             self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
@@ -1571,12 +1551,16 @@ class qannagnps():
             pass
 
         
-    def dem_output_file(self):
+    def dem_output_file(self,output_type):
         #Método para seleccionar la carpeta de 
         fname = QFileDialog.getExistingDirectory(self.output, "Select folder", "C/")
-        if fname[0]!="":
-            self.output.lineEdit.setText(fname)
-    
+        if output_type == "AnnAGNPS":
+            if fname[0]!="":
+                self.output.lineEdit.setText(fname)
+        elif output_type == "TopAGNPS":
+            if fname[0]!="":
+                self.output.lineEdit_2.setText(fname)
+                
     def change_color_outputs(self,button):
         #Método para cambiar el color de los labels que indican qué outpus se quiere mostrar
         button.setStyleSheet("background-color: #99ff99")
@@ -1638,11 +1622,9 @@ class qannagnps():
         self.dlg.usda_label.mousePressEvent  = self.url_usda
         self.output.usda_label.mousePressEvent  = self.url_usda
         #Símbolo plugin
-        put_image("images/logo.svg",self.dlg.plugin_label,200)
+        put_image("images/logo.svg",self.dlg.plugin_label,175)
         #Nombre 
         put_image("images/logo.png",self.dlg.label_7,200)
-        #AnnAGNPS
-        put_image("images/general.png",self.dlg.annagnps_label,500)
         #AnnAGNPS input
         input_icon = os.path.join(self.plugin_directory, "images/annagnps_input.svg")
         self.dlg.pb_ann.setIcon(QIcon(input_icon))
@@ -1657,8 +1639,11 @@ class qannagnps():
         icon = os.path.join(self.plugin_directory, "images/bar_graph.svg")
         for i in runoff:
             i.setIcon(QIcon(icon)) 
+        #Datos espaciales
         icon = os.path.join(self.plugin_directory, "images/spatial_graph.svg")
         self.output.spatial_run.setIcon(QIcon(icon))
+        for i in [self.output.pushButton_11,self.output.pushButton_13,self.output.pushButton_14,self.output.pushButton_19,self.output.pushButton_22,self.output.pushButton_20,self.output.pushButton_21,self.output.pushButton_23,self.output.pushButton_24,self.output.pushButton_25,self.output.pushButton_26,self.output.pushButton_27,self.output.pushButton_28]:
+            i.setIcon(QIcon(icon))
         
     def url_upna(self,event):
         #Método para abrir las páginas web de la upna
@@ -1678,16 +1663,6 @@ class qannagnps():
             dic[check].setText("-- Provided by TopAGNPS --")
         elif str(dic[check].text())=="-- Provided by TopAGNPS --":
             dic[check].setText("")
-          
-    def check_box(self):
-        if self.output.checkBox_43.isChecked():
-            general_outputs_lines = [self.output.checkBox_4,self.output.checkBox_8,self.output.checkBox_3,self.output.checkBox_9,self.output.checkBox_5,self.output.checkBox_10,self.output.checkBox_2,self.output.checkBox_7,self.output.checkBox_12,self.output.checkBox_11,self.output.checkBox_13,self.output.checkBox_14,self.output.checkBox_15]
-            for i in general_outputs_lines:
-                i.setChecked(True)
-        else:
-            general_outputs_lines = [self.output.checkBox_4,self.output.checkBox_8,self.output.checkBox_3,self.output.checkBox_9,self.output.checkBox_5,self.output.checkBox_10,self.output.checkBox_2,self.output.checkBox_7,self.output.checkBox_12,self.output.checkBox_11,self.output.checkBox_13,self.output.checkBox_14,self.output.checkBox_15]
-            for i in general_outputs_lines:
-                i.setChecked(False)
             
     def change_sensitivity_color(self,linea):
         if str(linea.text())!="":
@@ -1774,12 +1749,11 @@ class qannagnps():
                 mdt_directory, mdt_file = os.path.split(fichero_mdt)
                 self.mdt_directory = mdt_directory
                 self.direccion=mdt_directory
-                self.epsg = selectedLayer.crs().authid()   
+                self.epsg = QgsProject.instance().crs().authid()
                 self.files_directory()
                 #Poner el nombre de la carpeta en los outputs
                 self.output.lineEdit.setText(mdt_directory)
                 self.output.lineEdit_2.setText(mdt_directory)
-                self.output.lineEdit_3.setText(mdt_directory)
             except:
                 pass
         
@@ -1961,7 +1935,7 @@ class qannagnps():
         selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
         selectedLayer = layers[selectedLayerIndex].layer()
         fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
-        epsg = selectedLayer.crs().authid()
+        epsg = QgsProject.instance().crs().authid()
         self.epsg = epsg
         #Establecer el fichero de suelo escogido en el plugin
         selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
@@ -1994,6 +1968,9 @@ class qannagnps():
                 iface.messageBar().pushMessage("Error Input data", "Control file of TopAGNPS, TOPAGNPS.CSV, not found" ,level=Qgis.Warning, duration=10)
                 return
             topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
+            if type(topagnps_control_file["FILENAME"].iloc[0])!=str:
+                iface.messageBar().pushMessage("Error Input data", "Please select a correct FILENAME in TOPAGNPS.CSV" ,level=Qgis.Warning, duration=10)
+                return
             if topagnps_control_file["FILENAME"].iloc[0] != mdt_file:
                 processing.run("gdal:translate", 
                     {'INPUT':fichero(mdt_file),
@@ -2077,7 +2054,7 @@ class qannagnps():
                 #Reproyectar celdas al epsg del proyecto
                 processing.run("gdal:warpreproject", 
                     {'INPUT':fichero(fichero_cell),
-                    'SOURCE_CRS':None,'TARGET_CRS':QgsCoordinateReferenceSystem('EPSG:{}'.format(epsg)),
+                    'SOURCE_CRS':None,'TARGET_CRS':QgsCoordinateReferenceSystem('{}'.format(epsg)),
                     'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':None,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,
                     'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':fichero("cell_1{}.asc".format(numero))})
                 #Con esto se tiene el diccionario que te asigna para cada suelo/uso un valor numérico
@@ -2160,36 +2137,42 @@ class qannagnps():
                 suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
                 annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
-                #Se aplica el suelo al fichero de cárcavas efímeras
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
-                def create_layer():
-                    layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
-                    layer.updateFields()
-                    features = []
-                    for i in range(len(summary)):
-                        feature = QgsFeature()
-                        feature.setFields(layer.fields())
-                        x = summary.X.iloc[i]
-                        y = summary.Y.iloc[i]
-                        pt = QgsPointXY(x,y)
-                        geom = QgsGeometry.fromPointXY(pt)
-                        feature.setGeometry(geom)
-                        feature.setAttribute(0,summary.GULLY_ID.iloc[i])
-                        features.append(feature)
-                    layer.dataProvider().addFeatures(features)
-                    return layer
-                summary_layer = create_layer()
-                sampling = processing.run("native:rastersampling", 
-                    {'INPUT':summary_layer,
-                    'RASTERCOPY':fichero("suelo_ras.tif"),
-                    'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
-                capa = sampling["OUTPUT"]
-                dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
-                annagnps_eg_data = pd.read_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
-                suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
-                annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
-                annagnps_eg_data.to_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"), index=False, float_format='%.5f')
+                #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo AnnAGNPS_Ephemeral_Gully_Data_Section.csv
+                if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
+                    summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                    def create_layer():
+                        layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
+                        layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                        layer.updateFields()
+                        features = []
+                        for i in range(len(summary)):
+                            feature = QgsFeature()
+                            feature.setFields(layer.fields())
+                            x = summary.X.iloc[i]
+                            y = summary.Y.iloc[i]
+                            pt = QgsPointXY(x,y)
+                            geom = QgsGeometry.fromPointXY(pt)
+                            feature.setGeometry(geom)
+                            feature.setAttribute(0,summary.GULLY_ID.iloc[i])
+                            features.append(feature)
+                        layer.dataProvider().addFeatures(features)
+                        return layer
+                    summary_layer = create_layer()
+                    sampling = processing.run("native:rastersampling", 
+                        {'INPUT':summary_layer,
+                        'RASTERCOPY':fichero("suelo_ras.tif"),
+                        'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
+                    capa = sampling["OUTPUT"]
+                    dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
+                    
+                    annagnps_eg_data = pd.read_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
+                    suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
+                    try:
+                        annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
+                    except:
+                        iface.messageBar().pushMessage("Error soil map","The soil type layer may not cover the full extent of the watershed",level=Qgis.Warning, duration=10)
+                        return 
+                    annagnps_eg_data.to_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"), index=False, float_format='%.5f')
                 
             #Dar error si no se ha elegido ni capa de usos ni se ha puesto un uso único
             if str(self.dlg.lineEdit_2.text())=="":
@@ -2228,6 +2211,19 @@ class qannagnps():
                 annagnps_eg_data = pd.read_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
                 suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
                 annagnps_eg_data["Mgmt_Field_ID"]= [dic_conv[x] for x in suelos_eg]
+                #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
+                def float_to_str(column):
+                    lista = []
+                    for i in annagnps_eg_data[column]:
+                        try:
+                            lista.append(str(int(i)))
+                        except:
+                            lista.append("")
+                    annagnps_eg_data[column] = lista
+                #Primero para la columna de celdas
+                float_to_str("Cell_ID")
+                #Ahora para la columna de reaches
+                float_to_str("Reach_ID")
                 annagnps_eg_data.to_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"), index=False, float_format='%.5f')
                 
             #Si se ha puesto un suelo único entonces se añade a todas las celdas
@@ -2238,32 +2234,6 @@ class qannagnps():
             if str(self.dlg.lineEdit_2.text())!="":
                 annagnps_cell_data["Mgmt_Field_ID"]=str(self.dlg.lineEdit_2.text())
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
-            
-            #Esto se hace porque puede que una PEG esté al final del reach y tenga más área acumulada que las celdas adyacentes. También pasa con las celdas. 
-            annagnps_eg_data = pd.read_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
-            cell = pd.read_csv(fichero("AnnAGNPS_Cell_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
-            for i in range(len(annagnps_eg_data)):
-                area_celda = sum(cell[(cell.Cell_ID ==int(annagnps_eg_data.iloc[i].Gully_ID[1]+"2"))|(cell.Cell_ID ==int(annagnps_eg_data.iloc[i].Gully_ID[1]+"3"))].Cell_Area)
-                if annagnps_eg_data.iloc[i].Local_Drainage_Area > area_celda:
-                    annagnps_eg_data.iloc[i,5]=area_celda
-            for i in range(len(annagnps_eg_data)):
-                area_celda = sum(cell[cell.Cell_ID ==annagnps_eg_data.iloc[i].Cell_ID].Cell_Area)
-                if annagnps_eg_data.iloc[i].Drainage_Area_to_Mouth > area_celda:
-                    annagnps_eg_data.iloc[i,4]=area_celda
-            #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
-            def float_to_str(column):
-                lista = []
-                for i in annagnps_eg_data[column]:
-                    try:
-                        lista.append(str(int(i)))
-                    except:
-                        lista.append("")
-                annagnps_eg_data[column] = lista
-            #Primero para la columna de celdas
-            float_to_str("Cell_ID")
-            #Ahora para la columna de reaches
-            float_to_str("Reach_ID")
-            annagnps_eg_data.to_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"), index=False, float_format='%.5f')
             
             #Mensaje de éxito si se ha ejecutado TOPAGNPS con éxito si no se ha escogido ejecutar AnnAGNPS
             if not self.dlg.cbAnn.isChecked() and ((not self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 0)or (self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 1)):
@@ -2776,8 +2746,8 @@ class qannagnps():
         flow_p_watershed=int(self.crasfor.checkBox_22.isChecked())
         flow_p_elevation=int(self.crasfor.checkBox_30.isChecked())
         flow_p_elevation_drop=int(self.crasfor.checkBox_25.isChecked())
-        #Se obteiene el texto de un archivo rasfor (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
-        fichero = open(self.plugin_dir+"\Documentos\rasfor.inp","r+")
+        #Se obtiene el texto de un archivo rasfor (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
+        fichero = open(self.plugin_dir+r"\Documentos\rasfor.inp","r+")
         texto = fichero.read()
         fichero.close()
         #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
@@ -2804,8 +2774,8 @@ class qannagnps():
         compute_l= int(self.craspro.checkBox_4.isChecked())
         compute_f = int(self.craspro.checkBox_5.isChecked())
         elevation_b = str(self.craspro.lineEdit.text())
-        #Se obteiene el texto de un archivo raspro (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
-        fichero = open(self.plugin_dir+"\Documentos\raspro.inp","r+")
+        #Se obtiene el texto de un archivo raspro (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
+        fichero = open(self.plugin_dir+r"\Documentos\raspro.inp","r+")
         texto = fichero.read()
         fichero.close()
         #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
@@ -3065,209 +3035,245 @@ class qannagnps():
     def outputs(self):
         #Método para mostrar los resultados de la simulación
         self.output.show()
-        result = self.output.exec_()
-        #Cuando se ejecuta el boton de de OK entonces se ejecuta lo siguiente:
-        if result:
-            #Primero se pone condición para que se haya elegido el DEM
-            if hasattr(self,"direccion"):
-                pass
-            else:
-                iface.messageBar().pushMessage("Select a DEM", "To view the outputs first select the DEM that will be in the folder containing the results",level=Qgis.Warning, duration=10)
+    
+    def output_topagnps(self,output_type):
+        #Método para mostrar los outputs de TopAGNPS
+        #Se pone el epsg del proyecto
+        self.epsg = QgsProject.instance().crs().authid()
+        #Primero se pone condición para que se haya elegido el DEM
+        if self.output.lineEdit_2.text()=="":
+            iface.messageBar().pushMessage("Select a DEM", "To view the outputs first select the DEM that will be in the folder containing the results",level=Qgis.Warning, duration=10)
+            return
+        #Se pone una función para cambiar coordenadas y otra para la dirección de ficheros que será usada luego por varios
+        def change_coordinates(filename,outputname):
+            input_raster = gdal.Open(fichero(filename))
+            output_raster = fichero(outputname)
+            warp = gdal.Warp(output_raster,input_raster,dstSRS=self.epsg)
+            warp = None # Closes the files
+        def fichero(nombre):
+            return self.output.lineEdit_2.text()+"\\"+nombre
+     
+        #CELDAS RASTER
+        if output_type == "Cell_raster":
+            if not os.path.exists(fichero("AnnAGNPS_Cell_IDs.asc")):
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.Warning, duration=10)
                 return 
-            #Se pone una función para cambiar coordenadas y otra para la dirección de ficheros que será usada luego por varios
-            def change_coordinates(filename,outputname):
-                        input_raster = gdal.Open(fichero(filename))
-                        output_raster = fichero(outputname)
-                        warp = gdal.Warp(output_raster,input_raster,dstSRS=self.epsg)
-                        warp = None # Closes the files
-            def fichero(nombre):
-                    return self.direccion+"\\"+nombre
-                    
-            #CELDAS RASTER
-            if self.output.checkBox_4.isChecked():
-                change_coordinates("AnnAGNPS_Cell_IDs.asc","AnnAGNPS_Cell_IDs_EPSG.asc")
-                layer = QgsRasterLayer(fichero("AnnAGNPS_Cell_IDs_EPSG.asc"),"Cells_ras")
-                QgsProject.instance().addMapLayer(layer)
+            change_coordinates("AnnAGNPS_Cell_IDs.asc","AnnAGNPS_Cell_IDs_EPSG.asc")
+            layer = QgsRasterLayer(fichero("AnnAGNPS_Cell_IDs_EPSG.asc"),"Cells_ras")
+            QgsProject.instance().addMapLayer(layer)
                 
-            #CELDAS VECTORIAL
-            if self.output.checkBox_8.isChecked():
-                if not os.path.exists(fichero("cell.gpkg")):
-                    change_coordinates("AnnAGNPS_Cell_IDs.asc","cell_1.asc")
-                    processing.run("grass7:r.to.vect", {'input':fichero("cell_1.asc"),
-                        'type':2,'column':'value','-s':False,
-                        '-v':False,'-z':False,'-b':False,'-t':False,
-                        'output':fichero("cell.gpkg"),'GRASS_REGION_PARAMETER':None,
-                        'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
-                        'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
-                        'GRASS_VECTOR_EXPORT_NOCAT':False})
-                #Esta función es para crear una copia de archivo y que las columnas se añadan ahí
-                def copiar_archivo(input_file,output):
-                    processing.run("native:savefeatures", 
-                        {'INPUT':self.direccion+"\\"+input_file,
-                        'OUTPUT':self.direccion+"\\"+output,
-                        'LAYER_NAME':'','DATASOURCE_OPTIONS':'','LAYER_OPTIONS':''})
-                try:
-                    copiar_archivo("cell.gpkg","cell_out.gpkg")
-                except:
-                    iface.messageBar().pushMessage("Delete layers", "To add cell layer remove Cells_vec.",level=Qgis.Warning, duration=10)
-                    return
-                layer = QgsVectorLayer(fichero("cell_out.gpkg"),"Cells_vec")
-                #Borrar columnas que no son las que queremos
-                columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!="Cell_ID"]
-                field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
-                data_provider = layer.dataProvider()
-                layer.startEditing()
-                data_provider.deleteAttributes(field_index)
-                layer.updateFields()
-                layer.commitChanges()
-                #Cambiar el nombre de la columna value por Cell_ID
-                for field in layer.fields():
-                    if field.name() == 'value':
-                        with edit(layer):
-                            idx = layer.fields().indexFromName(field.name())
-                            layer.renameAttribute(idx, 'Cell_ID')
-                QgsProject.instance().addMapLayer(layer)
-                #Poner etiquetas
-                label_settings = QgsPalLayerSettings()
-                label_settings.enabled = True
-                label_settings.fieldName = "Cell_ID"
-                text_format = QgsTextFormat()
-                text_format.setFont(QFont("Arial", 12))
-                text_format.setSize(15)
-                label_settings.setFormat(text_format)
-                layer.setLabeling(QgsVectorLayerSimpleLabeling(label_settings))
-                layer.setLabelsEnabled(True)
-                layer.triggerRepaint()
+        #CELDAS VECTORIAL
+        elif output_type == "Cell_vectorial":
+            if not os.path.exists(fichero("AnnAGNPS_Cell_IDs.asc")):
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.Warning, duration=10)
+                return
+            if not os.path.exists(fichero("cell.gpkg")):
+                change_coordinates("AnnAGNPS_Cell_IDs.asc","cell_1.asc")
+                processing.run("grass7:r.to.vect", {'input':fichero("cell_1.asc"),
+                    'type':2,'column':'value','-s':False,
+                    '-v':False,'-z':False,'-b':False,'-t':False,
+                    'output':fichero("cell.gpkg"),'GRASS_REGION_PARAMETER':None,
+                    'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
+                    'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
+                    'GRASS_VECTOR_EXPORT_NOCAT':False})
+            #Esta función es para crear una copia de archivo y que las columnas se añadan ahí
+            def copiar_archivo(input_file,output):
+                processing.run("native:savefeatures", 
+                    {'INPUT':fichero(input_file),
+                    'OUTPUT':fichero(output),
+                    'LAYER_NAME':'','DATASOURCE_OPTIONS':'','LAYER_OPTIONS':''})
+            try:
+                copiar_archivo("cell.gpkg","cell_out.gpkg")
+            except:
+                iface.messageBar().pushMessage("Delete layers", "To add cell layer remove Cells_vec.",level=Qgis.Warning, duration=10)
+                return
+            layer = QgsVectorLayer(fichero("cell_out.gpkg"),"Cells_vec")
+            #Borrar columnas que no son las que queremos
+            columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!="Cell_ID"]
+            field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
+            data_provider = layer.dataProvider()
+            layer.startEditing()
+            data_provider.deleteAttributes(field_index)
+            layer.updateFields()
+            layer.commitChanges()
+            #Cambiar el nombre de la columna value por Cell_ID
+            for field in layer.fields():
+                if field.name() == 'value':
+                    with edit(layer):
+                        idx = layer.fields().indexFromName(field.name())
+                        layer.renameAttribute(idx, 'Cell_ID')
+            QgsProject.instance().addMapLayer(layer)
+            #Poner etiquetas
+            label_settings = QgsPalLayerSettings()
+            label_settings.enabled = True
+            label_settings.fieldName = "Cell_ID"
+            text_format = QgsTextFormat()
+            text_format.setFont(QFont("Arial", 12))
+            text_format.setSize(15)
+            label_settings.setFormat(text_format)
+            layer.setLabeling(QgsVectorLayerSimpleLabeling(label_settings))
+            layer.setLabelsEnabled(True)
+            layer.triggerRepaint()
+        
+        #DELIMITACIÓN DE LA CUENCA RASTER
+        elif output_type == "Boundary_raster":
+            if not os.path.exists(fichero("BOUND.ASC")):
+                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.Warning, duration=10)
+                return
+            change_coordinates("BOUND.ASC","BOUND_EPSG.ASC")
+            layer = QgsRasterLayer(fichero("BOUND_EPSG.ASC"),"Watershed_boundary_ras")
+            QgsProject.instance().addMapLayer(layer)
             
-            #DELIMITACIÓN DE LA CUENCA RASTER
-            if self.output.checkBox_3.isChecked():
+        #DELIMITACIÓN DE LA CUENCA VECTORIAL
+        elif output_type == "Boundary_vectorial":
+            if not os.path.exists(fichero("BOUND.ASC")):
+                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.Warning, duration=10)
+                return
+            if not os.path.exists(fichero("bound.gpkg")):
                 change_coordinates("BOUND.ASC","BOUND_EPSG.ASC")
-                layer = QgsRasterLayer(fichero("BOUND_EPSG.ASC"),"Watershed_boundary_ras")
-                QgsProject.instance().addMapLayer(layer)
+                processing.run("grass7:r.to.vect", {'input':fichero("BOUND_EPSG.ASC"),
+                    'type':2,'column':'value','-s':False,
+                    '-v':False,'-z':False,'-b':False,'-t':False,
+                    'output':fichero("bound.gpkg"),'GRASS_REGION_PARAMETER':None,
+                    'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
+                    'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
+                    'GRASS_VECTOR_EXPORT_NOCAT':False})
+            layer = QgsVectorLayer(fichero("bound.gpkg"),"Watershed_boundary_vec")
+            QgsProject.instance().addMapLayer(layer)
             
-            #DELIMITACIÓN DE LA CUENCA VECTORIAL
-            if self.output.checkBox_9.isChecked():
-                if not os.path.exists(fichero("bound.gpkg")):
-                    change_coordinates("BOUND.ASC","BOUND_EPSG.ASC")
-                    processing.run("grass7:r.to.vect", {'input':fichero("BOUND_EPSG.ASC"),
-                        'type':2,'column':'value','-s':False,
-                        '-v':False,'-z':False,'-b':False,'-t':False,
-                        'output':fichero("bound.gpkg"),'GRASS_REGION_PARAMETER':None,
-                        'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
-                        'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
-                        'GRASS_VECTOR_EXPORT_NOCAT':False})
-                layer = QgsVectorLayer(fichero("bound.gpkg"),"Watershed_boundary_vec")
-                QgsProject.instance().addMapLayer(layer)
-            
-            #REACHES RASTER
-            if self.output.checkBox_5.isChecked():
+        #REACHES RASTER
+        elif output_type == "Reaches_raster":
+            if not os.path.exists(fichero("AnnAGNPS_Reach_IDs.asc")):
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.Warning, duration=10)
+                return
+            change_coordinates("AnnAGNPS_Reach_IDs.asc","AnnAGNPS_Reach_IDs_EPSG.asc")
+            layer = QgsRasterLayer(fichero("AnnAGNPS_Reach_IDs_EPSG.asc"),"Reaches_ras")
+            QgsProject.instance().addMapLayer(layer)
+        
+        #REACHES VECTORIAL
+        elif output_type == "Reaches_vectorial":
+            if not os.path.exists(fichero("AnnAGNPS_Reach_IDs.asc")):
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.Warning, duration=10)
+                return
+            if not os.path.exists(fichero("reaches.gpkg")):
                 change_coordinates("AnnAGNPS_Reach_IDs.asc","AnnAGNPS_Reach_IDs_EPSG.asc")
-                layer = QgsRasterLayer(fichero("AnnAGNPS_Reach_IDs_EPSG.asc"),"Reaches_ras")
-                QgsProject.instance().addMapLayer(layer)
-            
-            #REACHES VECTORIAL
-            if self.output.checkBox_10.isChecked():
-                if not os.path.exists(fichero("reaches.gpkg")):
-                    change_coordinates("AnnAGNPS_Reach_IDs.asc","AnnAGNPS_Reach_IDs_EPSG.asc")
-                    processing.run("grass7:r.to.vect", {'input':fichero("AnnAGNPS_Reach_IDs_EPSG.asc"),
-                        'type':0,'column':'value','-s':False,
-                        '-v':False,'-z':False,'-b':False,'-t':False,
-                        'output':fichero("reaches.gpkg"),'GRASS_REGION_PARAMETER':None,
-                        'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
-                        'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
-                        'GRASS_VECTOR_EXPORT_NOCAT':False})
-                layer = QgsVectorLayer(fichero("reaches.gpkg"),"Reaches_vec")
-                #Borrar columnas que no son las que queremos
-                columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!="Reach_ID"]
-                field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
-                data_provider = layer.dataProvider()
-                layer.startEditing()
-                data_provider.deleteAttributes(field_index)
-                layer.updateFields()
-                layer.commitChanges()
-                #Cambiar el nombre de la columna value por Reach_ID
-                for field in layer.fields():
-                    if field.name() == 'value':
-                        with edit(layer):
-                            idx = layer.fields().indexFromName(field.name())
-                            layer.renameAttribute(idx, 'Reach_ID')
-                QgsProject.instance().addMapLayer(layer)
-                #Poner simbología categorizada
-                unique_values = list(set([x["Reach_ID"] for x in layer.getFeatures()]))
-                category_colors = {}
-                color_ramp = QgsStyle().defaultStyle().colorRamp('Spectral')
-                color_count = len(unique_values)
-                categories = []
-                line_width = 1 
-                for i, value in enumerate(unique_values):
-                    color = color_ramp.color(i / color_count)
-                    symbol = QgsSymbol.defaultSymbol(layer.geometryType())
-                    symbol.setColor(color)
-                    symbol.setWidth(line_width)  # Establecer el grosor de línea personalizado
-                    category = QgsRendererCategory(value, symbol, str(value))
-                    categories.append(category)
+                processing.run("grass7:r.to.vect", {'input':fichero("AnnAGNPS_Reach_IDs_EPSG.asc"),
+                    'type':0,'column':'value','-s':False,
+                    '-v':False,'-z':False,'-b':False,'-t':False,
+                    'output':fichero("reaches.gpkg"),'GRASS_REGION_PARAMETER':None,
+                    'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
+                    'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
+                    'GRASS_VECTOR_EXPORT_NOCAT':False})
+            layer = QgsVectorLayer(fichero("reaches.gpkg"),"Reaches_vec")
+            #Borrar columnas que no son las que queremos
+            columnas_borrar = [x.name() for x in layer.fields() if x.name()!="fid" and x.name()!="value" and x.name()!="Reach_ID"]
+            field_index = [layer.fields().indexFromName(x) for x in columnas_borrar]
+            data_provider = layer.dataProvider()
+            layer.startEditing()
+            data_provider.deleteAttributes(field_index)
+            layer.updateFields()
+            layer.commitChanges()
+            #Cambiar el nombre de la columna value por Reach_ID
+            for field in layer.fields():
+                if field.name() == 'value':
+                    with edit(layer):
+                        idx = layer.fields().indexFromName(field.name())
+                        layer.renameAttribute(idx, 'Reach_ID')
+            QgsProject.instance().addMapLayer(layer)
+            #Poner simbología categorizada
+            unique_values = list(set([x["Reach_ID"] for x in layer.getFeatures()]))
+            category_colors = {}
+            color_ramp = QgsStyle().defaultStyle().colorRamp('Spectral')
+            color_count = len(unique_values)
+            categories = []
+            line_width = 1 
+            for i, value in enumerate(unique_values):
+                color = color_ramp.color(i / color_count)
                 symbol = QgsSymbol.defaultSymbol(layer.geometryType())
-                symbol.setColor(QColor(200, 200, 200))  # Color gris para "Otros"
+                symbol.setColor(color)
                 symbol.setWidth(line_width)  # Establecer el grosor de línea personalizado
-                category = QgsRendererCategory("Otros", symbol, "Otros")
+                category = QgsRendererCategory(value, symbol, str(value))
                 categories.append(category)
-                renderer = QgsCategorizedSymbolRenderer("Reach_ID", categories)
-                layer.setRenderer(renderer)
-                layer.triggerRepaint()
+            symbol = QgsSymbol.defaultSymbol(layer.geometryType())
+            symbol.setColor(QColor(200, 200, 200))  # Color gris para "Otros"
+            symbol.setWidth(line_width)  # Establecer el grosor de línea personalizado
+            category = QgsRendererCategory("Otros", symbol, "Otros")
+            categories.append(category)
+            renderer = QgsCategorizedSymbolRenderer("Reach_ID", categories)
+            layer.setRenderer(renderer)
+            layer.triggerRepaint()
+        
+        #ACCUMULATED AREA
+        elif output_type == "Accumulated":
+            if not os.path.exists(fichero("UPAREA.asc")):
+                iface.messageBar().pushMessage("Output not found", "UPAREA.asc does not exist",level=Qgis.Warning, duration=10)
+                return
+            layer = QgsRasterLayer(fichero("UPAREA.asc"),"Accumulated_area")
+            QgsProject.instance().addMapLayer(layer)
+        
+        #TERRAIN SLOPE
+        elif output_type == "Terrain_slope":
+            if not os.path.exists(fichero("TSLOPE.ASC")):
+                iface.messageBar().pushMessage("Output not found", "TSLOPE.ASC does not exist",level=Qgis.Warning, duration=10)
+                return
+            layer = QgsRasterLayer(fichero("TSLOPE.ASC"),"Terrain_slope")
+            QgsProject.instance().addMapLayer(layer)
+        
+        #HYDRAULIC SLOPE
+        elif output_type == "Hydraulic":
+            if not os.path.exists(fichero("HSLOPE.ASC")):
+                iface.messageBar().pushMessage("Output not found", "HSLOPE.ASC does not exist",level=Qgis.Warning, duration=10)
+                return
+            layer = QgsRasterLayer(fichero("HSLOPE.ASC"),"Hydraulic_slope")
+            QgsProject.instance().addMapLayer(layer)
 
-            #ACCUMULATED AREA
-            if self.output.checkBox_2.isChecked():
-                layer = QgsRasterLayer(fichero("UPAREA.asc"),"Accumulated_area")
-                QgsProject.instance().addMapLayer(layer)
-            
-            #TERRAIN SLOPE
-            if self.output.checkBox_7.isChecked():
-                layer = QgsRasterLayer(fichero("TSLOPE.ASC"),"Terrain_slope")
-                QgsProject.instance().addMapLayer(layer)
-            
-            #HYDRAULIC SLOPE
-            if self.output.checkBox_12.isChecked():
-                layer = QgsRasterLayer(fichero("HSLOPE.ASC"),"Hydraulic_slope")
-                QgsProject.instance().addMapLayer(layer)
-            
-            #TERRAIN ASPECT
-            if self.output.checkBox_11.isChecked():
-                layer = QgsRasterLayer(fichero("TASPEC.ASC"),"Terrain_aspect")
-                QgsProject.instance().addMapLayer(layer)
-            
-            #RUSLE LS FACTOR
-            if self.output.checkBox_13.isChecked():
-                layer = QgsRasterLayer(fichero("AgFlow_LS_Factor.asc"),"RUSLE_LS_factor")
-                QgsProject.instance().addMapLayer(layer)
-            
-            #CELL LONGEST FLOW PATH RASTER
-            if self.output.checkBox_14.isChecked():
-                layer = QgsRasterLayer(fichero("AgFlow_Cell_Longest_Flow_Path.asc"),"Cell_longest_flow_raster")
-                QgsProject.instance().addMapLayer(layer)
-  
-            #CELL LONGEST FLOW PATH VECTORIAL
-            if self.output.checkBox_15.isChecked():
-                if not os.path.exists(fichero("longpath.gpkg")):
-                    change_coordinates("AgFlow_Cell_Longest_Flow_Path.asc","AgFlow_Cell_Longest_Flow_Path_epsg.asc")
-                    processing.run("grass7:r.to.vect", {'input':fichero("AgFlow_Cell_Longest_Flow_Path_epsg.asc"),
-                        'type':0,'column':'value','-s':False,
-                        '-v':False,'-z':False,'-b':False,'-t':False,
-                        'output':fichero("longpath.gpkg"),'GRASS_REGION_PARAMETER':None,
-                        'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
-                        'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
-                        'GRASS_VECTOR_EXPORT_NOCAT':False})
-                layer = QgsVectorLayer(fichero("longpath.gpkg"),"Cell_longest_flow_raster_vec")
-                QgsProject.instance().addMapLayer(layer)
-                #Cambio de formato de la capa
-                symbol = QgsLineSymbol()
-                symbol.setWidth(1)
-                symbol.setColor(QColor.fromRgb(255, 0, 0))
-                renderer = QgsSingleSymbolRenderer(symbol)
-                layer.setRenderer(renderer)
-                layer.triggerRepaint()
-           
-                #MENSAJE DE ÉXITO
-                self.iface.messageBar().pushMessage("Success", "Succes in data display ",level=Qgis.Success, duration=5)
+        #TERRAIN ASPECT
+        elif output_type == "Terrain_aspect":
+            if not os.path.exists(fichero("TASPEC.ASC")):
+                iface.messageBar().pushMessage("Output not found", "TASPEC.ASC does not exist",level=Qgis.Warning, duration=10)
+                return
+            layer = QgsRasterLayer(fichero("TASPEC.ASC"),"Terrain_aspect")
+            QgsProject.instance().addMapLayer(layer)
+        
+        #RUSLE LS FACTOR
+        elif output_type == "RUSLE":
+            if not os.path.exists(fichero("AgFlow_LS_Factor.asc")):
+                iface.messageBar().pushMessage("Output not found", "AgFlow_LS_Factor.asc does not exist",level=Qgis.Warning, duration=10)
+                return
+            layer = QgsRasterLayer(fichero("AgFlow_LS_Factor.asc"),"RUSLE_LS_factor")
+            QgsProject.instance().addMapLayer(layer)
+        
+        #CELL LONGEST FLOW PATH RASTER
+        elif output_type == "Longest_raster":
+            if not os.path.exists(fichero("AgFlow_Cell_Longest_Flow_Path.asc")):
+                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.Warning, duration=10)
+                return
+            layer = QgsRasterLayer(fichero("AgFlow_Cell_Longest_Flow_Path.asc"),"Cell_longest_flow_raster")
+            QgsProject.instance().addMapLayer(layer)
+
+        #CELL LONGEST FLOW PATH VECTORIAL
+        elif output_type == "Longest_vectorial":
+            if not os.path.exists(fichero("AgFlow_Cell_Longest_Flow_Path.asc")):
+                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.Warning, duration=10)
+                return
+            if not os.path.exists(fichero("longpath.gpkg")):
+                change_coordinates("AgFlow_Cell_Longest_Flow_Path.asc","AgFlow_Cell_Longest_Flow_Path_epsg.asc")
+                processing.run("grass7:r.to.vect", {'input':fichero("AgFlow_Cell_Longest_Flow_Path_epsg.asc"),
+                    'type':0,'column':'value','-s':False,
+                    '-v':False,'-z':False,'-b':False,'-t':False,
+                    'output':fichero("longpath.gpkg"),'GRASS_REGION_PARAMETER':None,
+                    'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
+                    'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
+                    'GRASS_VECTOR_EXPORT_NOCAT':False})
+            layer = QgsVectorLayer(fichero("longpath.gpkg"),"Cell_longest_flow_raster_vec")
+            QgsProject.instance().addMapLayer(layer)
+            #Cambio de formato de la capa
+            symbol = QgsLineSymbol()
+            symbol.setWidth(1)
+            symbol.setColor(QColor.fromRgb(255, 0, 0))
+            renderer = QgsSingleSymbolRenderer(symbol)
+            layer.setRenderer(renderer)
+            layer.triggerRepaint()
 
     def files_directory(self):
         #Método para añadir la dirección de la carpeta del mdt a la interfaz de los inputs de AnnAGNPS

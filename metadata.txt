@@ -6,7 +6,7 @@
 name=QAnnAGNPS
 qgisMinimumVersion=3.0
 description=This plugin integrates the AnnAGNPS model into QGIS
-version=0.1
+version=1.0
 author=Iñigo Barberena Ruiz
 email=inigo.barberena@unavarra.es
 
