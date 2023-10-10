@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="/plugins/ephemeral_gully" >
+    <qresource prefix="/plugins/qannagnps" >
         <file>images/logo.svg</file>
 	<file>images/outputs.svg</file>
     </qresource>

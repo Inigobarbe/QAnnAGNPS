@@ -100,7 +100,7 @@ class qannagnps():
         locale_path = os.path.join(
             self.plugin_dir,
             'i18n',
-            'EphemeralGully_{}.qm'.format(locale))
+            'QAnnAGNPS_{}.qm'.format(locale))
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()
@@ -109,7 +109,7 @@ class qannagnps():
 
         # Declare instance attributes
         self.actions = []
-        self.menu = self.tr(u'&Ephemeral Gully model')
+        self.menu = self.tr(u'&QAnnAGNPS')
 
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
@@ -182,7 +182,7 @@ class qannagnps():
         self.documentation = DocumentationDialog()
         
         #Boton principal
-        icon_path = ':/plugins/ephemeral_gully/images/logo.svg'
+        icon_path = ':/plugins/qannagnps/images/logo.svg'
         icon_size = QSize(100, 100)
 
         icon = QIcon(icon_path)
@@ -195,12 +195,14 @@ class qannagnps():
     parent=self.iface.mainWindow())
        
         #Boton para mostrar outputs
-        icon_path = ':/plugins/ephemeral_gully/images/outputs.svg'
+        icon_path = ':/plugins/qannagnps/images/outputs.svg'
         self.add_action(icon_path,text=self.tr(u'Outputs'),callback=self.outputs,parent=self.iface.mainWindow())
         
         # will be set False in run()
         #self.first_start = True
-             
+        #Se pone el nombre de los diálogos
+        self.dlg.setWindowTitle("QAnnAGNPS Simulation")
+        self.output.setWindowTitle("QAnnAGNPS Data Visualization") 
         #Poner el nombre de las columnas al elegir la capa de suelos y usos
         self.dlg.cbSoil.currentIndexChanged.connect(self.cambios_suelo)
         self.dlg.cbMan.currentIndexChanged.connect(self.cambios_manejo)
@@ -532,13 +534,16 @@ class qannagnps():
         #Función para importar ficheros
         def fichero(fich):
             return os.path.dirname(self.output.lineEdit.text())+f"\\{fich}"
+        #Si no está el archivo AnnAGNPS_Cell_IDs.asc, entonces dar error
+        if not path.exists(fichero("AnnAGNPS_Cell_IDs.asc")):
+            iface.messageBar().pushMessage(f"AnnAGNPS_Cell_IDs.asc not found: AnnAGNPS_Cell_IDs.asc file must be in {os.path.dirname(self.output.lineEdit.text())}",level=Qgis.Warning, duration=10)
+            return
         #Función para cambiar de coordenadas
         def change_coordinates(filename,outputname):
             input_raster = gdal.Open(fichero(filename))
             output_raster = fichero(outputname)
             warp = gdal.Warp(output_raster,input_raster,dstSRS=self.epsg)
             warp = None # Closes the files
-        print(self.epsg)
         #Ahora se ponen los datos espaciales en QGIS
         c = 0
         while True:
@@ -1266,7 +1271,7 @@ class qannagnps():
             else:
                 n_top_values = len(df_graph[df_graph['Runoff']>0])
             top_runoff = df_graph['Runoff'].nlargest(n_top_values) 
-            top_runoff_dates = df_graph.index[df_graph['Runoff'].isin(top_runoff)]
+            top_runoff_dates = top_runoff.index
             table_data = {'Date': top_runoff_dates, 'Runoff (mm)': round(top_runoff,2)}
             table_df = pd.DataFrame(table_data)
             #Se crea el grafico
@@ -1296,7 +1301,7 @@ class qannagnps():
             else:
                 n_top_values = len(df_graph[df_graph>0])
             top_runoff = df_graph.nlargest(n_top_values) 
-            top_runoff_dates = df_graph.index[df_graph.isin(top_runoff)]
+            top_runoff_dates = top_runoff.index
             if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
                 table_data = {'Date': top_runoff_dates, f'{self.data_type} erosion yield (Mg)': round(top_runoff,2)}
             elif self.data_type == "Subtotal":
@@ -1554,12 +1559,15 @@ class qannagnps():
     def dem_output_file(self,output_type):
         #Método para seleccionar la carpeta de 
         fname = QFileDialog.getExistingDirectory(self.output, "Select folder", "C/")
-        if output_type == "AnnAGNPS":
-            if fname[0]!="":
-                self.output.lineEdit.setText(fname)
-        elif output_type == "TopAGNPS":
-            if fname[0]!="":
-                self.output.lineEdit_2.setText(fname)
+        try:#este try es porque si cierras el diálogo de la carpeta para buscar archivos da error
+            if output_type == "AnnAGNPS":
+                if fname[0]!="":
+                    self.output.lineEdit.setText(fname)
+            elif output_type == "TopAGNPS":
+                if fname[0]!="":
+                    self.output.lineEdit_2.setText(fname)
+        except:
+            pass
                 
     def change_color_outputs(self,button):
         #Método para cambiar el color de los labels que indican qué outpus se quiere mostrar
@@ -1856,7 +1864,7 @@ class qannagnps():
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions: 
             self.iface.removePluginVectorMenu(
-                self.tr(u'&Ephemeral Gully model'),
+                self.tr(u'&QAnnAGNPS'),
                 action)
             self.iface.removeToolBarIcon(action)
 
@@ -2134,7 +2142,11 @@ class qannagnps():
                     iface.messageBar().pushMessage("Error with soil layer","There isn't any soil information to use",level=Qgis.Warning, duration=10)
                     return
                 #Se aplica el suelo al fichero de cells
-                suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
+                try:
+                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
+                except:
+                    iface.messageBar().pushMessage("Error with soil layer","Soil layer has to be saved in the same folder as the DEM. Also the DEM and the soil layer have to overlap.",level=Qgis.Warning, duration=20)
+                    return
                 annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo AnnAGNPS_Ephemeral_Gully_Data_Section.csv
@@ -2179,7 +2191,11 @@ class qannagnps():
                 if self.dlg.cbMan.currentIndex()==0:
                         iface.messageBar().pushMessage("Error with soil management","There isn't any management information to use",level=Qgis.Warning, duration=10)
                         return 
-                manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
+                try:
+                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
+                except:
+                    iface.messageBar().pushMessage("Error with soil use layer","Soil use layer has to be saved in the same folder as the DEM. Also the DEM and the soil use layer have to overlap.",level=Qgis.Warning, duration=20)
+                    return
                 annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el uso al fichero de cárcavas efímeras

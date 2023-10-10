@@ -10,7 +10,7 @@ version=1.0
 author=Iñigo Barberena Ruiz
 email=inigo.barberena@unavarra.es
 
-about=This plugin facilitates the use of AnnAGNPS in the execution and in the visualization of the results. In addition, the extra functionality of a global Sobol sensitivity analysis has been added. Although it is intended to use AnnAGNPS as a whole in a more user-friendly way, the plugin has given great emphasis to the ephemeral gullies module. 
+about=This plugin facilitates the use of AnnAGNPS in the execution and in the visualization of the results.
 
 tracker=https://github.com/Inigobarbe/QGIS-AnnAGNPS/issues
 repository=https://github.com/Inigobarbe/QGIS-AnnAGNPS
@@ -23,7 +23,7 @@ hasProcessingProvider=no
 # changelog=
 
 # Tags are comma separated with spaces allowed
-tags=python, AnnAGNPS, modelation, soil erosion, ephemeral gully
+tags=python, AnnAGNPS, modelation, soil erosion
 
 homepage=https://github.com/Inigobarbe/QGIS-AnnAGNPS
 category=Modulation
