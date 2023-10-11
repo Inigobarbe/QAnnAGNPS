@@ -55,6 +55,7 @@ import matplotlib.dates as mdates
 import statistics
 from functools import partial
 import itertools
+from matplotlib.ticker import FuncFormatter
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -983,6 +984,10 @@ class qannagnps():
                 ax0.set_ylabel(f"{self.data_type} yield (kg)",size = 15,family="arial",weight = "bold",color = "black")
             #Fuente del eje
             ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Separador de miles de eje y 
+            def format_with_commas(x, pos):
+                return f'{x:,.0f}'
+            ax0.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
             #Cambiar límites de los ejes
             ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.4)
             #Leyenda
@@ -1095,6 +1100,10 @@ class qannagnps():
                 ax0.set_ylabel(f"{self.data_type} yield (kg)",size = 15,family="arial",weight = "bold",color = "black")
             #Fuente del eje
             ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Separador de miles de eje y 
+            def format_with_commas(x, pos):
+                return f'{x:,.0f}'
+            ax0.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
             #Leyenda
             legend = fig.legend(bbox_to_anchor=(0.02,0.57,0.3,0.3),framealpha=0.7)
             legend.legendPatch.set_edgecolor("black")
@@ -1222,6 +1231,10 @@ class qannagnps():
                 ax0.set_ylabel(f"{self.data_type} yield (kg)",size = 15,family="arial",weight = "bold",color = "black")
             #Fuente del eje
             ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Separador de miles de eje y 
+            def format_with_commas(x, pos):
+                return f'{x:,.0f}'
+            ax0.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
             #Leyenda
             legend = fig.legend(bbox_to_anchor=(0.02,0.57,0.3,0.3),framealpha=0.7)
             legend.legendPatch.set_edgecolor("black")
@@ -1314,6 +1327,7 @@ class qannagnps():
             fig, ax = plt.subplots()
             # Ajustar el formato de las fechas en el DataFrame
             table_df['Date'] = table_df['Date'].dt.strftime('%Y-%m-%d')
+            table_df[f"{self.data_type} yield (kg)"] = table_df[f"{self.data_type} yield (kg)"].apply(lambda x: f'{x:,.2f}')
             try:
                 table = ax.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center', colColours=['#f5f5f5'] * len(table_df.columns))
             except:
@@ -1434,6 +1448,11 @@ class qannagnps():
             #Fuente del eje
             ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
             ax2.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Separador de miles de eje y 
+            def format_with_commas(x, pos):
+                return f'{x:,.0f}'
+            ax0.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
+            ax2.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
             # Agregar una etiqueta en el último punto del acumulado
             ultimo_valor_acumulado = acumulado_runoff.iloc[-1]
             if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
