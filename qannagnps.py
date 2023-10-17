@@ -674,7 +674,7 @@ class qannagnps():
                 iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
                 self.error = True
                 return
-            df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float)})
+            df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
         else:
             dic_outputs = {"Subtotal":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Gully":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Pond":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Sheet & Rill":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Nitrogen":["AnnAGNPS_EV_Nitrogen_yield_(mass).csv","Subtotal N [kg]"],"Carbon":["AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv","Subtotal C [kg]"],"Phosphorus":["AnnAGNPS_EV_Phosphorus_yield_(mass).csv","Subtotal P [kg]"]}
             path = self.output.lineEdit.text()+f"\\{dic_outputs[self.data_type][0]}"
@@ -827,7 +827,7 @@ class qannagnps():
                 iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
                 self.error = True
                 return
-            df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float)})
+            df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
             df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
             #Aquí se filtran por celda y por fecha
             self.cell = self.output.run_cell.currentText()
@@ -934,11 +934,11 @@ class qannagnps():
             ax1 = ax0.twinx()
             #Se crean los dibujos
             bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
-            bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+            bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt + Irrigation')
             #Labels de los ejes
             ax0.set_xlabel("Month",size = 15,family="arial",weight = "bold",color = "black")
             ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
-            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt + Irrigation (mm)",size = 15,family="arial",weight = "bold",color = "black")
             #Cambiar límites de los ejes
             ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
             ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
@@ -948,7 +948,7 @@ class qannagnps():
             #Invertir eje
             ax1.invert_yaxis()
             #Leyenda
-            legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+            legend = fig.legend(bbox_to_anchor=(0.19,0.57,0.3,0.3),framealpha=0.7)
             legend.legendPatch.set_edgecolor("black")
             legend.legendPatch.set_facecolor("white")
             legend.legendPatch.set_linewidth(1)
@@ -1043,11 +1043,11 @@ class qannagnps():
             ax1 = ax0.twinx()
             #Se crean los dibujos
             bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
-            bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+            bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt + Irrigation')
             #Labels de los ejes
             ax0.set_xlabel("Year",size = 15,family="arial",weight = "bold",color = "black")
             ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
-            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt + Irrigation (mm)",size = 15,family="arial",weight = "bold",color = "black")
             #Cambiar límites de los ejes
             ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
             ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
@@ -1057,7 +1057,7 @@ class qannagnps():
             #Invertir eje
             ax1.invert_yaxis()
             #Leyenda
-            legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+            legend = fig.legend(bbox_to_anchor=(0.19,0.57,0.3,0.3),framealpha=0.7)
             legend.legendPatch.set_edgecolor("black")
             legend.legendPatch.set_facecolor("white")
             legend.legendPatch.set_linewidth(1)
@@ -1169,11 +1169,11 @@ class qannagnps():
             ax1 = ax0.twinx()
             #Se crean los dibujos
             bar0 = ax0.bar(df_graph.index, df_graph['Runoff'] ,color='tab:blue', alpha=1, label='Runoff')
-            bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+            bar1=ax1.bar(df_graph.index, df_graph['RSS'] ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt + Irrigation')
             #Labels de los ejes
             ax0.set_xlabel("Season",size = 15,family="arial",weight = "bold",color = "black")
             ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
-            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt + Irrigation (mm)",size = 15,family="arial",weight = "bold",color = "black")
             #Cambiar límites de los ejes
             ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.98)
             ax1.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1]*1.98)
@@ -1183,7 +1183,7 @@ class qannagnps():
             #Invertir eje
             ax1.invert_yaxis()
             #Leyenda
-            legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+            legend = fig.legend(bbox_to_anchor=(0.19,0.57,0.3,0.3),framealpha=0.7)
             legend.legendPatch.set_edgecolor("black")
             legend.legendPatch.set_facecolor("white")
             legend.legendPatch.set_linewidth(1)
@@ -1380,12 +1380,12 @@ class qannagnps():
             ax2 = ax0.twinx()
             #Se crean los dibujos
             ax0.bar(df_graph.index, df_graph['Runoff'], width =6 ,color='tab:blue', alpha=1, label='Runoff')
-            ax1.bar(df_graph.index, df_graph['RSS'], width =6 ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt')
+            ax1.bar(df_graph.index, df_graph['RSS'], width =6 ,color='tab:red', alpha=0.8, label='Rainfall + Snowfall + Snowmelt + Irrigation')
             ax2.plot(np.array(df_graph.index), np.array(acumulado_runoff) ,color="green", linestyle='--', label='Accumulated runoff')
             #Labels de los ejes
             ax0.set_xlabel("Date",size = 15,family="arial",weight = "bold",color = "black")
             ax0.set_ylabel("Runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
-            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt (mm)",size = 15,family="arial",weight = "bold",color = "black")
+            ax1.set_ylabel("Rainfall + Snowfall + Snowmelt + Irrigation (mm)",size = 15,family="arial",weight = "bold",color = "black")
             ax2.set_ylabel("Accumulated runoff (mm)",size = 15,family="arial",weight = "bold",color = "black")
             #Cambiar límites de los ejes
             ax0.set_ylim(ax0.get_ylim()[0],ax0.get_ylim()[1]*1.85)
@@ -1411,7 +1411,7 @@ class qannagnps():
             ax0.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
             ax0.xaxis.set_minor_locator(mdates.MonthLocator())
             #Leyenda
-            legend = fig.legend(bbox_to_anchor=(0.11,0.57,0.3,0.3),framealpha=0.7)
+            legend = fig.legend(bbox_to_anchor=(0.19,0.57,0.3,0.3),framealpha=0.7)
             legend.legendPatch.set_edgecolor("black")
             legend.legendPatch.set_facecolor("white")
             legend.legendPatch.set_linewidth(1)
