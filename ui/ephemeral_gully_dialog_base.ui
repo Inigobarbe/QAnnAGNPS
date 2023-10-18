@@ -263,7 +263,7 @@ QPushButton:hover {
      </widget>
      <widget class="QWidget" name="tab_2">
       <attribute name="title">
-       <string>TopAGNPS</string>
+       <string>Preprocessing</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_10">
        <item row="0" column="0">
@@ -981,7 +981,7 @@ QCheckBox::indicator:unchecked {
      </widget>
      <widget class="QWidget" name="tab_3">
       <attribute name="title">
-       <string>AnnAGNPS</string>
+       <string>Processing</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_7">
        <item row="0" column="0">

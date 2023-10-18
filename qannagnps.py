@@ -460,7 +460,6 @@ class qannagnps():
         
         #Poner las celdas y las fechas para los filtros
         self.output.filter_run.clicked.connect(self.identify_cells_dates)
-        self.filtering = False
         
         #Añadir "All cells" a los comboboxes de los outputs
         self.output.run_cell.addItems(["All cells"])
@@ -480,6 +479,9 @@ class qannagnps():
         
         #Variable para decir si hay error cuando se importan luego los dataframes
         self.error = False
+        
+        #Variable para decir si se se ha elegido una carpeta correcta 
+        self.file_exist = False
         
         #Función para los outputs de TopAGNPS
         dic = {self.output.pushButton_11:"Cell_raster",self.output.pushButton_13:"Cell_vectorial",self.output.pushButton_14:"Boundary_raster",self.output.pushButton_19:"Boundary_vectorial",self.output.pushButton_22:"Reaches_raster",self.output.pushButton_20:"Reaches_vectorial",self.output.pushButton_21:"Accumulated",self.output.pushButton_23:"Terrain_slope",self.output.pushButton_24:"Hydraulic",self.output.pushButton_25:"Terrain_aspect",self.output.pushButton_26:"RUSLE",self.output.pushButton_27:"Longest_raster",self.output.pushButton_28:"Longest_vectorial"}
@@ -517,6 +519,9 @@ class qannagnps():
     
     def spatial_output(self):
         #Método para poner los outputs espaciales
+        #Si no se ha elegido la carpeta correcta entonces que pare el código
+        if not self.file_exist:
+            return
         #Primero se carga el dataframe
         df = self.import_df_spatial()
         if self.error:
@@ -671,7 +676,7 @@ class qannagnps():
             try:
                 df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
             except:
-                iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
                 self.error = True
                 return
             df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
@@ -681,7 +686,7 @@ class qannagnps():
             try:
                 df_raw = self.df_section_output(path,delete_second=False)
             except:
-                iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
                 self.error = True
                 return
             if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
@@ -824,7 +829,7 @@ class qannagnps():
             try:
                 df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
             except:
-                iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
                 self.error = True
                 return
             df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
@@ -877,7 +882,7 @@ class qannagnps():
                 try:
                     df = dataframe_creation(path,column_name,erosion = True, source = self.data_type)
                 except:
-                    iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
                     self.error = True
                     return
             if self.data_type == "Nitrogen":
@@ -886,7 +891,7 @@ class qannagnps():
                 try:
                     df = dataframe_creation(path,column_name)
                 except:
-                    iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
                     self.error = True
                     return
             if self.data_type == "Carbon":
@@ -895,7 +900,7 @@ class qannagnps():
                 try:
                     df = dataframe_creation(path,column_name)
                 except:
-                    iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
                     self.error = True
                     return
             if self.data_type == "Phosphorus":
@@ -904,13 +909,16 @@ class qannagnps():
                 try:
                     df = dataframe_creation(path,column_name)
                 except:
-                    iface.messageBar().pushMessage("Please select a correct folder",level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
                     self.error = True
                     return
         return df
     
     def output_month(self):
         #Método para que aparezca por mes de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Si no se ha elegido la carpeta correcta entonces que pare el código
+        if not self.file_exist:
+            return
         #Se importan los datos
         df = self.import_df(self.data_type)
         if self.error:
@@ -1020,6 +1028,9 @@ class qannagnps():
         
     def output_year(self,data_type):
         #Método para que por año de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Si no se ha elegido la carpeta correcta entonces que pare el código
+        if not self.file_exist:
+            return
         #Se importan los datos
         df = self.import_df(self.data_type)
         if self.error:
@@ -1136,6 +1147,9 @@ class qannagnps():
 
     def output_season(self,data_type):
         #Método para que aparezca por estación de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Si no se ha elegido la carpeta correcta entonces que pare el código
+        if not self.file_exist:
+            return
         #Se importan los datos
         df = self.import_df(self.data_type)
         if self.error:
@@ -1267,6 +1281,9 @@ class qannagnps():
         
     def output_top(self,data_type):
         #Método para que aparezca el top 10 días de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Si no se ha elegido la carpeta correcta entonces que pare el código
+        if not self.file_exist:
+            return
         #Se importan los datos
         df = self.import_df(self.data_type)
         if self.error:
@@ -1356,6 +1373,9 @@ class qannagnps():
         
     def output_evolution(self,data_type):
         #Método para que aparezca la evolución de lo que se esté pidiendo (escorrentía, erosión o nutrientes)
+        #Si no se ha elegido la carpeta correcta entonces que pare el código
+        if not self.file_exist:
+            return
         #Se importan los datos
         df = self.import_df(self.data_type)
         if self.error:
@@ -1503,7 +1523,8 @@ class qannagnps():
                     self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
                 else:
                     self.output.label_9.setText("NEXT STEP: click on 'Add cells and dates' button.")
-            
+                self.file_exist = True
+                
             else:
                 #Se cambia el icono
                 path_icon = os.path.join(self.plugin_directory, "images/no_file.svg")
@@ -1512,6 +1533,7 @@ class qannagnps():
                     self.output.label_9.setText(f"NEXT STEP: the folder you have selected does not contain the {file} file.It is necessary to make a execution where the {column} column of the {input_file} file is set to T.")
                 else:
                     self.output.label_9.setText(f"NEXT STEP: select the folder in which {file} is located.")
+                self.file_exist = False
         #Se ponen las condiciones
         if self.data_type == "Runoff":
             function_output_exist("AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv","Insitu_Soil_Moisture_Daily","OUTPUT OPTIONS DATA - SIM")
@@ -1526,7 +1548,7 @@ class qannagnps():
         
     def df_section_output(self,fichero,delete_second =False):
         #Método que se utiliza para obtener el dataframe de los resultados para crear los gráficos
-        if self.data_type == "Runoff" or self.filtering:
+        if self.data_type == "Runoff":
             first_column = "Gregorian"
         else:
             first_column = "Month"
@@ -1552,27 +1574,37 @@ class qannagnps():
                
     def identify_cells_dates(self):
         #Método para poner celdas y fechas que contiene el archivo
-        try: #Este try es para que no de error si se le da al botón de filtros cuando no existe el archivo
-            #Se obtienen los datos ordenados
+        #try: #Este try es para que no de error si se le da al botón de filtros cuando no existe el archivo
+        #Se obtienen los datos ordenados
+        if self.data_type=="Runoff":
             path = self.output.lineEdit.text()+"\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
-            #Se importan los datos
-            self.filtering = True
-            df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
-            self.filtering = False
-            #Se ponen las celdas en el combobox
-            #Primero se borran los elementos que puede haber en el combobox y luego se pone
-            self.output.run_cell.clear()
+        if self.data_type == "Subtotal" or self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+            path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Sediment_yield_(mass).csv"
+        if self.data_type=="Nitrogen":
+            path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Nitrogen_yield_(mass).csv"
+        if self.data_type=="Carbon":
+            path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv"
+        if self.data_type=="Phosphorus":
+            path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Phosphorus_yield_(mass).csv"
+        #Se importan los datos
+        df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
+        #Se ponen las celdas en el combobox
+        #Primero se borran los elementos que puede haber en el combobox y luego se pone
+        self.output.run_cell.clear()
+        if self.data_type=="Runoff":
             cells = [str(x) for x in np.unique(df_raw.ID)]
-            cells.insert(0,"All cells")
-            self.output.run_cell.addItems(cells)
-            #Se ponen las fechas
-            self.output.lineEdit_4.setText(f"{df_raw.Day.iloc[0]}/{df_raw.Month.iloc[0]}/{df_raw.Year.iloc[0]}")
-            self.output.lineEdit_5.setText(f"{df_raw.Day.iloc[-1]}/{df_raw.Month.iloc[-1]}/{df_raw.Year.iloc[-1]}")
-            #Se cambia el next step
-            self.filter_clicked = 1
-            self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
-        except:
-            pass
+        else:
+            cells = [str(x) for x in np.unique(df_raw["Cell ID"])]
+        cells.insert(0,"All cells")
+        self.output.run_cell.addItems(cells)
+        #Se ponen las fechas
+        self.output.lineEdit_4.setText(f"{df_raw.Day.iloc[0]}/{df_raw.Month.iloc[0]}/{df_raw.Year.iloc[0]}")
+        self.output.lineEdit_5.setText(f"{df_raw.Day.iloc[-1]}/{df_raw.Month.iloc[-1]}/{df_raw.Year.iloc[-1]}")
+        #Se cambia el next step
+        self.filter_clicked = 1
+        self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
+        '''except:
+            pass'''
 
         
     def dem_output_file(self,output_type):
