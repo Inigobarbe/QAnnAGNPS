@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>TopAGNPS control file</string>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: #87CEEB;</string>

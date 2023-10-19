@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>AgFlow control file</string>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: #87CEEB;</string>
@@ -124,6 +124,14 @@
              <bold>true</bold>
             </font>
            </property>
+           <property name="styleSheet">
+            <string notr="true">QCheckBox::hover{color:white}
+
+QCheckBox::indicator:unchecked {
+    background-color: white;
+	border: 1px solid black
+}</string>
+           </property>
            <property name="text">
             <string>Use Existing LS-factor File</string>
            </property>
@@ -136,6 +144,14 @@
              <weight>75</weight>
              <bold>true</bold>
             </font>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">QCheckBox::hover{color:white}
+
+QCheckBox::indicator:unchecked {
+    background-color: white;
+	border: 1px solid black
+}</string>
            </property>
            <property name="text">
             <string>Write LS-factor File</string>
@@ -150,6 +166,14 @@
              <bold>true</bold>
             </font>
            </property>
+           <property name="styleSheet">
+            <string notr="true">QCheckBox::hover{color:white}
+
+QCheckBox::indicator:unchecked {
+    background-color: white;
+	border: 1px solid black
+}</string>
+           </property>
            <property name="text">
             <string>Create New Subwatershed Grid File (subwta.arc)</string>
            </property>
@@ -162,6 +186,14 @@
              <weight>75</weight>
              <bold>true</bold>
             </font>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">QCheckBox::hover{color:white}
+
+QCheckBox::indicator:unchecked {
+    background-color: white;
+	border: 1px solid black
+}</string>
            </property>
            <property name="text">
             <string>Create New Subwatershed Grid File (subwta.dat)</string>
@@ -176,6 +208,14 @@
              <bold>true</bold>
             </font>
            </property>
+           <property name="styleSheet">
+            <string notr="true">QCheckBox::hover{color:white}
+
+QCheckBox::indicator:unchecked {
+    background-color: white;
+	border: 1px solid black
+}</string>
+           </property>
            <property name="text">
             <string>Use File for Temporary Storage Rather than Internal Arrays</string>
            </property>
@@ -188,6 +228,14 @@
              <weight>75</weight>
              <bold>true</bold>
             </font>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">QCheckBox::hover{color:white}
+
+QCheckBox::indicator:unchecked {
+    background-color: white;
+	border: 1px solid black
+}</string>
            </property>
            <property name="text">
             <string>Reassign Subareas</string>

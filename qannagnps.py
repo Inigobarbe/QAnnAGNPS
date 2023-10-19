@@ -59,7 +59,6 @@ from matplotlib.ticker import FuncFormatter
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
-from .ui.mapDialog import MapDialog
 from .ui.coordinate_dialog import Coordinate
 from .ui.coordinate_capture_dockwidget import CoordinateCaptureDockWidget
 
@@ -176,7 +175,6 @@ class qannagnps():
         self.craspro = ControlRasproDialog()
         self.dednm = DEDNMDialog()
         self.agflow = AgflowDialog()
-        self.dlgmap = MapDialog()
         self.overwrite = OverwriteDialog()
         self.output = OutputDialog()
         self.existing = ExistingDialog()
@@ -201,9 +199,6 @@ class qannagnps():
         
         # will be set False in run()
         #self.first_start = True
-        #Se pone el nombre de los diálogos
-        self.dlg.setWindowTitle("QAnnAGNPS Simulation")
-        self.output.setWindowTitle("QAnnAGNPS Data Visualization") 
         #Poner el nombre de las columnas al elegir la capa de suelos y usos
         self.dlg.cbSoil.currentIndexChanged.connect(self.cambios_suelo)
         self.dlg.cbMan.currentIndexChanged.connect(self.cambios_manejo)
@@ -832,7 +827,7 @@ class qannagnps():
                 iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
                 self.error = True
                 return
-            df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
+            df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"Drainage":df_raw["Drainage"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
             df['Fecha'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
             #Aquí se filtran por celda y por fecha
             self.cell = self.output.run_cell.currentText()
@@ -926,7 +921,14 @@ class qannagnps():
             return
         #Primero se crean los datos necesarios
         if self.data_type == "Runoff":
-            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+            #Esto se hace porque la escorrentía de la cuenca es la media ponderada con el área de las escorrentías de las celdas
+            df['Runoff_Ponderado'] = df['Runoff'] * df['Drainage']
+            df['RSS_Ponderado'] = df['RSS'] * df['Drainage']
+            result = df.groupby('Fecha').agg({'Runoff_Ponderado': 'sum', 'Drainage': 'sum', 'RSS_Ponderado': 'sum'}).reset_index()
+            result['Runoff'] = result['Runoff_Ponderado'] / result['Drainage']
+            result['RSS'] = result['RSS_Ponderado'] / result['Drainage']
+            df_graph = result[['Fecha', 'Runoff', 'RSS']]
+            df_graph.set_index('Fecha', inplace=True)
             df_graph = df_graph.resample('M').sum()
             df_graph = df_graph.groupby(df_graph.index.month).sum()
         else:
@@ -1038,7 +1040,14 @@ class qannagnps():
             return
         #Primero se crean los datos necesarios
         if self.data_type == "Runoff":
-            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+            #Esto se hace porque la escorrentía de la cuenca es la media ponderada con el área de las escorrentías de las celdas
+            df['Runoff_Ponderado'] = df['Runoff'] * df['Drainage']
+            df['RSS_Ponderado'] = df['RSS'] * df['Drainage']
+            result = df.groupby('Fecha').agg({'Runoff_Ponderado': 'sum', 'Drainage': 'sum', 'RSS_Ponderado': 'sum'}).reset_index()
+            result['Runoff'] = result['Runoff_Ponderado'] / result['Drainage']
+            result['RSS'] = result['RSS_Ponderado'] / result['Drainage']
+            df_graph = result[['Fecha', 'Runoff', 'RSS']]
+            df_graph.set_index('Fecha', inplace=True)
             df_graph = df_graph.resample('Y').sum()
             df_graph = df_graph.groupby(df_graph.index.year).sum()
         else:
@@ -1157,7 +1166,14 @@ class qannagnps():
             return
         #Primero se crean los datos necesarios
         if self.data_type == "Runoff":
-            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+            #Esto se hace porque la escorrentía de la cuenca es la media ponderada con el área de las escorrentías de las celdas
+            df['Runoff_Ponderado'] = df['Runoff'] * df['Drainage']
+            df['RSS_Ponderado'] = df['RSS'] * df['Drainage']
+            result = df.groupby('Fecha').agg({'Runoff_Ponderado': 'sum', 'Drainage': 'sum', 'RSS_Ponderado': 'sum'}).reset_index()
+            result['Runoff'] = result['Runoff_Ponderado'] / result['Drainage']
+            result['RSS'] = result['RSS_Ponderado'] / result['Drainage']
+            df_graph = result[['Fecha', 'Runoff', 'RSS']]
+            df_graph.set_index('Fecha', inplace=True)
         else:
             df_graph = df.groupby(df.index).sum(numeric_only=True)
         #Función para saber la estación
@@ -1291,7 +1307,14 @@ class qannagnps():
             return
         #Se crean los dataframes dependiendo de si se ha filtrado la celda
         if self.data_type == "Runoff":
-            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+            #Esto se hace porque la escorrentía de la cuenca es la media ponderada con el área de las escorrentías de las celdas
+            df['Runoff_Ponderado'] = df['Runoff'] * df['Drainage']
+            df['RSS_Ponderado'] = df['RSS'] * df['Drainage']
+            result = df.groupby('Fecha').agg({'Runoff_Ponderado': 'sum', 'Drainage': 'sum', 'RSS_Ponderado': 'sum'}).reset_index()
+            result['Runoff'] = result['Runoff_Ponderado'] / result['Drainage']
+            result['RSS'] = result['RSS_Ponderado'] / result['Drainage']
+            df_graph = result[['Fecha', 'Runoff', 'RSS']]
+            df_graph.set_index('Fecha', inplace=True)
         else:
             df_graph = df.groupby(df.index).sum(numeric_only=True)
         #Se calculan los datos
@@ -1384,7 +1407,14 @@ class qannagnps():
         #SE CREA DE EVOLUCIÓN GRÁFICO
         #Se crean los dataframes dependiendo de si se ha filtrado la celda
         if self.data_type == "Runoff":
-            df_graph = df.groupby('Fecha').mean(numeric_only=True)[["Runoff", "RSS"]]
+            #Esto se hace porque la escorrentía de la cuenca es la media ponderada con el área de las escorrentías de las celdas
+            df['Runoff_Ponderado'] = df['Runoff'] * df['Drainage']
+            df['RSS_Ponderado'] = df['RSS'] * df['Drainage']
+            result = df.groupby('Fecha').agg({'Runoff_Ponderado': 'sum', 'Drainage': 'sum', 'RSS_Ponderado': 'sum'}).reset_index()
+            result['Runoff'] = result['Runoff_Ponderado'] / result['Drainage']
+            result['RSS'] = result['RSS_Ponderado'] / result['Drainage']
+            df_graph = result[['Fecha', 'Runoff', 'RSS']]
+            df_graph.set_index('Fecha', inplace=True)
             acumulado_runoff = df_graph['Runoff'].cumsum()
         else:
             df_graph = df.groupby(df.index).sum(numeric_only=True)
@@ -1574,37 +1604,37 @@ class qannagnps():
                
     def identify_cells_dates(self):
         #Método para poner celdas y fechas que contiene el archivo
-        #try: #Este try es para que no de error si se le da al botón de filtros cuando no existe el archivo
-        #Se obtienen los datos ordenados
-        if self.data_type=="Runoff":
-            path = self.output.lineEdit.text()+"\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
-        if self.data_type == "Subtotal" or self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
-            path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Sediment_yield_(mass).csv"
-        if self.data_type=="Nitrogen":
-            path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Nitrogen_yield_(mass).csv"
-        if self.data_type=="Carbon":
-            path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv"
-        if self.data_type=="Phosphorus":
-            path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Phosphorus_yield_(mass).csv"
-        #Se importan los datos
-        df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
-        #Se ponen las celdas en el combobox
-        #Primero se borran los elementos que puede haber en el combobox y luego se pone
-        self.output.run_cell.clear()
-        if self.data_type=="Runoff":
-            cells = [str(x) for x in np.unique(df_raw.ID)]
-        else:
-            cells = [str(x) for x in np.unique(df_raw["Cell ID"])]
-        cells.insert(0,"All cells")
-        self.output.run_cell.addItems(cells)
-        #Se ponen las fechas
-        self.output.lineEdit_4.setText(f"{df_raw.Day.iloc[0]}/{df_raw.Month.iloc[0]}/{df_raw.Year.iloc[0]}")
-        self.output.lineEdit_5.setText(f"{df_raw.Day.iloc[-1]}/{df_raw.Month.iloc[-1]}/{df_raw.Year.iloc[-1]}")
-        #Se cambia el next step
-        self.filter_clicked = 1
-        self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
-        '''except:
-            pass'''
+        try: #Este try es para que no de error si se le da al botón de filtros cuando no existe el archivo
+            #Se obtienen los datos ordenados
+            if self.data_type=="Runoff":
+                path = self.output.lineEdit.text()+"\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
+            if self.data_type == "Subtotal" or self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill":
+                path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Sediment_yield_(mass).csv"
+            if self.data_type=="Nitrogen":
+                path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Nitrogen_yield_(mass).csv"
+            if self.data_type=="Carbon":
+                path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv"
+            if self.data_type=="Phosphorus":
+                path = self.output.lineEdit.text()+"\\AnnAGNPS_EV_Phosphorus_yield_(mass).csv"
+            #Se importan los datos
+            df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
+            #Se ponen las celdas en el combobox
+            #Primero se borran los elementos que puede haber en el combobox y luego se pone
+            self.output.run_cell.clear()
+            if self.data_type=="Runoff":
+                cells = [str(x) for x in np.unique(df_raw.ID)]
+            else:
+                cells = [str(x) for x in np.unique(df_raw["Cell ID"])]
+            cells.insert(0,"All cells")
+            self.output.run_cell.addItems(cells)
+            #Se ponen las fechas
+            self.output.lineEdit_4.setText(f"{df_raw.Day.iloc[0]}/{df_raw.Month.iloc[0]}/{df_raw.Year.iloc[0]}")
+            self.output.lineEdit_5.setText(f"{df_raw.Day.iloc[-1]}/{df_raw.Month.iloc[-1]}/{df_raw.Year.iloc[-1]}")
+            #Se cambia el next step
+            self.filter_clicked = 1
+            self.output.label_9.setText("NEXT STEP: select cells and period of time you want to study. Then select the outputs you want to show.")
+        except:
+            pass
 
         
     def dem_output_file(self,output_type):

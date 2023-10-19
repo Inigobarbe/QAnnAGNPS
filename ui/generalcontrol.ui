@@ -7,11 +7,11 @@
     <x>0</x>
     <y>0</y>
     <width>180</width>
-    <height>146</height>
+    <height>157</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Control files</string>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: #87CEEB;</string>
@@ -29,7 +29,7 @@
       <string notr="true">background-color: #becbd1;</string>
      </property>
      <property name="text">
-      <string>TOPAGNPS</string>
+      <string>TopAGNPS</string>
      </property>
     </widget>
    </item>

@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Ephemeral Gully model</string>
+   <string>QAnnAGNPS Simulation</string>
   </property>
   <property name="styleSheet">
    <string notr="true">/* Background color for main window*/
@@ -279,7 +279,7 @@ QPushButton:hover {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>479</width>
+            <width>474</width>
             <height>538</height>
            </rect>
           </property>
@@ -997,8 +997,8 @@ QCheckBox::indicator:unchecked {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>496</width>
-            <height>365</height>
+            <width>469</width>
+            <height>242</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_3">

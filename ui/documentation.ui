@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Documentation</string>
   </property>
   <property name="styleSheet">
    <string notr="true"/>
@@ -820,7 +820,7 @@ Blank defaults to 1.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>662</width>
                 <height>2318</height>
                </rect>
               </property>
@@ -2632,7 +2632,7 @@ entered value for cell tc is used in lieu of any value in this field.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>781</width>
+                <width>629</width>
                 <height>2018</height>
                </rect>
               </property>
@@ -3759,7 +3759,7 @@ gully.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>691</width>
                 <height>3518</height>
                </rect>
               </property>
@@ -6423,7 +6423,7 @@ in the AnnAGNPS ID data section)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>587</width>
                 <height>1318</height>
                </rect>
               </property>
@@ -7721,7 +7721,7 @@ hectare]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>639</width>
                 <height>1018</height>
                </rect>
               </property>
@@ -8646,7 +8646,7 @@ and entered as a single pond for simulation convenience.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>622</width>
                 <height>1018</height>
                </rect>
               </property>
@@ -9349,7 +9349,7 @@ m</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>584</width>
                 <height>818</height>
                </rect>
               </property>
@@ -10207,7 +10207,7 @@ Source.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>781</width>
+                <width>638</width>
                 <height>1518</height>
                </rect>
               </property>
@@ -11423,7 +11423,7 @@ len-horz
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>676</width>
                 <height>536</height>
                </rect>
               </property>
@@ -12085,8 +12085,8 @@ RiceWQ.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>798</width>
-                <height>517</height>
+                <width>538</width>
+                <height>257</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_41">
@@ -12434,7 +12434,7 @@ reported in applicable verification output files)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>616</width>
                 <height>918</height>
                </rect>
               </property>
@@ -13118,8 +13118,8 @@ rate coefficient for nitrate-N at 20 oC (Blank defaults to 0.15)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>478</width>
+                <height>119</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_44">
@@ -13305,8 +13305,8 @@ match a valid cell id in the CELL DATA section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>521</width>
+                <height>119</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_45">
@@ -13487,8 +13487,8 @@ Must match a valid feedlot id in the FEEDLOT DATA section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>557</width>
+                <height>119</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_46">
@@ -13665,8 +13665,8 @@ output; Must match a valid feedlot id in the FEEDLOT DATA section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>540</width>
+                <height>132</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_47">
@@ -13844,8 +13844,8 @@ section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>574</width>
+                <height>132</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_48">
@@ -14023,8 +14023,8 @@ section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>526</width>
+                <height>132</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_49">
@@ -14202,8 +14202,8 @@ IMPOUNDMENT DATA section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>558</width>
+                <height>132</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_50">
@@ -14381,8 +14381,8 @@ DATA section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>501</width>
+                <height>119</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_51">
@@ -14559,8 +14559,8 @@ Must match a valid reach id in the REACH DATA section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>526</width>
+                <height>119</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_52">
@@ -14751,7 +14751,7 @@ Must match a valid wetland id in the WETLAND DATA section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>625</width>
                 <height>1704</height>
                </rect>
               </property>
@@ -16833,7 +16833,7 @@ blank if release rate is entered.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>591</width>
                 <height>724</height>
                </rect>
               </property>
@@ -17269,7 +17269,7 @@ A blank defaults to 3.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>679</width>
                 <height>1513</height>
                </rect>
               </property>
@@ -18560,8 +18560,8 @@ unit
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>589</width>
+                <height>314</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_114">
@@ -18922,7 +18922,7 @@ hectare]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>607</width>
                 <height>518</height>
                </rect>
               </property>
@@ -19527,8 +19527,8 @@ in the AnnAGNPS ID data section)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>590</width>
+                <height>314</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_116">
@@ -19886,8 +19886,8 @@ data sectio.n)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>463</width>
+                <height>282</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_117">
@@ -20291,7 +20291,7 @@ Phosphorus. Blank defaults to 0.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>624</width>
                 <height>818</height>
                </rect>
               </property>
@@ -20983,7 +20983,7 @@ defaults to 0.0.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>615</width>
                 <height>1018</height>
                </rect>
               </property>
@@ -21571,7 +21571,7 @@ Exponent field must also be blank.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>615</width>
                 <height>1818</height>
                </rect>
               </property>
@@ -22560,7 +22560,7 @@ yield]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>671</width>
                 <height>1018</height>
                </rect>
               </property>
@@ -23225,7 +23225,7 @@ len-horz
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>653</width>
                 <height>1318</height>
                </rect>
               </property>
@@ -24000,7 +24000,7 @@ Must be blank for other than effect code 4.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>690</width>
                 <height>2018</height>
                </rect>
               </property>
@@ -25013,7 +25013,7 @@ The maximum allowable number of pesticide ids for any event is 5.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>690</width>
                 <height>923</height>
                </rect>
               </property>
@@ -25813,8 +25813,8 @@ hectare]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>584</width>
+                <height>401</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_125">
@@ -26316,7 +26316,7 @@ hectare]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>634</width>
                 <height>618</height>
                </rect>
               </property>
@@ -26869,8 +26869,8 @@ defaults to 1.0</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>578</width>
+                <height>293</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_127">
@@ -27152,7 +27152,7 @@ days.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>678</width>
                 <height>818</height>
                </rect>
               </property>
@@ -27863,8 +27863,8 @@ the downstream end of the reach.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>592</width>
+                <height>249</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_129">
@@ -28217,7 +28217,7 @@ Group ”D”</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>628</width>
                 <height>1018</height>
                </rect>
               </property>
@@ -28926,7 +28926,7 @@ mass-H2O
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>630</width>
                 <height>2018</height>
                </rect>
               </property>
@@ -30246,8 +30246,8 @@ Conditions ID” in the “Global IDs, Factors, and Flags Data” section.</stri
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>570</width>
+                <height>222</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_132">
@@ -30511,8 +30511,8 @@ Strip Crop ID. Blank defaults to 1.0.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>583</width>
+                <height>242</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_133">
@@ -30838,7 +30838,7 @@ day]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>709</width>
                 <height>2518</height>
                </rect>
               </property>
@@ -32181,7 +32181,7 @@ less)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>632</width>
                 <height>1018</height>
                </rect>
               </property>
@@ -32971,8 +32971,8 @@ ha-hr]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>631</width>
+                <height>131</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_211">
@@ -33144,8 +33144,8 @@ the SIMULATION PERIOD DATA section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>301</width>
+                <height>105</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_212">
@@ -33312,8 +33312,8 @@ Field Header
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>294</width>
+                <height>105</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_213">
@@ -33497,8 +33497,8 @@ Field Header
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>634</width>
+                <height>296</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_250">
@@ -33844,8 +33844,8 @@ Acceptable codes are:
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>551</width>
+                <height>230</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_251">
@@ -34099,7 +34099,7 @@ initial warning minimum defined within AnnAGNPS.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>670</width>
                 <height>5018</height>
                </rect>
               </property>
@@ -36743,8 +36743,8 @@ yyyy</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>620</width>
+                <height>191</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_253">
@@ -37001,7 +37001,7 @@ mass-soil
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>629</width>
                 <height>4018</height>
                </rect>
               </property>
@@ -38639,8 +38639,8 @@ source for each runoff event. Any real-number smaller than this
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>638</width>
+                <height>427</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_255">
@@ -39084,7 +39084,7 @@ AMC-II used to determine the daily RCN. Blank defaults to 0.50.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>619</width>
                 <height>1318</height>
                </rect>
               </property>
@@ -39809,7 +39809,7 @@ hectare-hr]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>652</width>
                 <height>1318</height>
                </rect>
               </property>
@@ -40581,8 +40581,8 @@ hectare]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>585</width>
+                <height>165</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_258">
@@ -40831,7 +40831,7 @@ erosion file to use as input..</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>607</width>
                 <height>1718</height>
                </rect>
               </property>
@@ -42425,7 +42425,7 @@ default is false. 1 [lbs/ac] = 1.120848 [kg/ha]</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>665</width>
                 <height>2518</height>
                </rect>
               </property>
@@ -45288,7 +45288,7 @@ reaches</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>624</width>
                 <height>1918</height>
                </rect>
               </property>
@@ -47527,7 +47527,7 @@ AnnAGNPS_DPP_Weather.dpp</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>647</width>
                 <height>1718</height>
                </rect>
               </property>
@@ -49266,7 +49266,7 @@ the DPP 01 record.)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>632</width>
                 <height>1718</height>
                </rect>
               </property>
@@ -50914,7 +50914,7 @@ the DPP 01 record.)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>526</width>
                 <height>1718</height>
                </rect>
               </property>
@@ -52561,7 +52561,7 @@ the DPP 01 record.)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>526</width>
                 <height>1718</height>
                </rect>
               </property>
@@ -54253,8 +54253,8 @@ the DPP 01 record.)</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>796</width>
-                <height>515</height>
+                <width>484</width>
+                <height>166</height>
                </rect>
               </property>
               <layout class="QGridLayout" name="gridLayout_248">
@@ -54590,7 +54590,7 @@ Blank defaults to true; “T”.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>779</width>
+                <width>627</width>
                 <height>1018</height>
                </rect>
               </property>
