@@ -26,7 +26,7 @@
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>0</y>
+        <y>-55</y>
         <width>1518</width>
         <height>918</height>
        </rect>
@@ -134,7 +134,7 @@
                  </font>
                 </property>
                 <property name="text">
-                 <string>Path exists</string>
+                 <string>Check if path exists</string>
                 </property>
                </widget>
               </item>
@@ -186,7 +186,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>Cell *</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#000000;&quot;&gt;Cell &lt;/span&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -287,7 +287,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>Reach*</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Reach &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -994,7 +994,7 @@ QCheckBox::indicator:unchecked {
                       </font>
                      </property>
                      <property name="text">
-                      <string>Management field*</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Management field &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -1007,7 +1007,7 @@ QCheckBox::indicator:unchecked {
                       </font>
                      </property>
                      <property name="text">
-                      <string>Soil layers*</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Soil layers &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -1020,7 +1020,7 @@ QCheckBox::indicator:unchecked {
                       </font>
                      </property>
                      <property name="text">
-                      <string>Soil*</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Soil &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -1253,7 +1253,7 @@ Pond Schedule</string>
                       </font>
                      </property>
                      <property name="text">
-                      <string>Management operation*</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Management operation &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -1525,7 +1525,7 @@ QCheckBox::indicator:unchecked {
                       </font>
                      </property>
                      <property name="text">
-                      <string>Management schedule*</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Management schedule &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -1693,7 +1693,7 @@ QCheckBox::indicator:unchecked {
                       </font>
                      </property>
                      <property name="text">
-                      <string>Runoff curve*</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Runoff curve &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -1884,7 +1884,7 @@ QCheckBox::indicator:unchecked {
                       </font>
                      </property>
                      <property name="text">
-                      <string>* Required by AnnAGNPS</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;* Required by AnnAGNPS&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -2427,7 +2427,7 @@ QCheckBox::indicator:unchecked {
                       </font>
                      </property>
                      <property name="text">
-                      <string>Simulation Period*</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Simulation Period &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -2523,7 +2523,7 @@ QCheckBox::indicator:unchecked {
                       </font>
                      </property>
                      <property name="text">
-                      <string>AnnAGNPS ID*</string>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;AnnAGNPS ID &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
