@@ -81,7 +81,7 @@ from .ui.documentation_dialog import DocumentationDialog
 # Initialize Qt resources from file resources.py
 from .resources import *
 # Import the code for the dialog
-from .ui.ephemeral_gully_dialog import EphemeralGullyDialog
+from .ui.dialog_base import Dialog_Base
 import os.path
 import webbrowser
 #from .Coordinate_capturer import PrintClickedPoint
@@ -162,7 +162,7 @@ class qannagnps():
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
         '''Esto se ejecuta cuando se actualiza el complemento. Me imagino que también en más ocasiones'''
         #Crear variables para hacer referencia a los distintos dialogos
-        self.dlg  = EphemeralGullyDialog()
+        self.dlg  = Dialog_Base()
         self.inputs = InputsDialog()
         self.cgeneral = ControlGeneralDialog()
         self.ctopagnps = ControlTOPAGNPSDialog()
@@ -955,6 +955,11 @@ class qannagnps():
             #Fuente del eje
             ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
             ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Separador de miles de eje y 
+            def format_with_commas(x, pos):
+                return f'{x:,.0f}'
+            ax0.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
+            ax1.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
             #Invertir eje
             ax1.invert_yaxis()
             #Leyenda
@@ -1074,6 +1079,11 @@ class qannagnps():
             #Fuente del eje
             ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
             ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Separador de miles de eje y 
+            def format_with_commas(x, pos):
+                return f'{x:,.0f}'
+            ax0.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
+            ax1.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
             #Invertir eje
             ax1.invert_yaxis()
             #Leyenda
@@ -1084,14 +1094,14 @@ class qannagnps():
             # Agregar etiquetas de valores encima de las barras en ax0
             for rect in bar0:
                 height = rect.get_height()
-                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                ax0.annotate(f'{height:,.2f}', 
+                             xy=(rect.get_x() + rect.get_width() / 2, height),
                              xytext=(0, 3), textcoords="offset points",
-                             ha='center', va='bottom',weight = "bold",size = 12)
-
+                             ha='center', va='bottom',weight = "bold",size = 12)            
             # Agregar etiquetas de valores encima de las barras en ax1
             for rect in bar1:
                 height = rect.get_height()
-                ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                ax1.annotate(f'{height:,.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
                              xytext=(0, 3), textcoords="offset points",
                              ha='center', va='bottom',weight = "bold",size = 12)
             #Título del gráfico
@@ -1210,6 +1220,11 @@ class qannagnps():
             #Fuente del eje
             ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
             ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Separador de miles de eje y 
+            def format_with_commas(x, pos):
+                return f'{x:,.0f}'
+            ax0.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
+            ax1.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
             #Invertir eje
             ax1.invert_yaxis()
             #Leyenda
@@ -1220,14 +1235,14 @@ class qannagnps():
             # Agregar etiquetas de valores encima de las barras en ax0
             for rect in bar0:
                 height = rect.get_height()
-                ax0.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                ax0.annotate(f'{height:,.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
                              xytext=(0, 3), textcoords="offset points",
                              ha='center', va='bottom',weight = "bold",size = 12)
 
             # Agregar etiquetas de valores encima de las barras en ax1
             for rect in bar1:
                 height = rect.get_height()
-                ax1.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                ax1.annotate(f'{height:,.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
                              xytext=(0, 3), textcoords="offset points",
                              ha='center', va='bottom',weight = "bold",size = 12)
             #Título del gráfico
@@ -1445,6 +1460,12 @@ class qannagnps():
             ax0.tick_params(axis = "both",colors = "black",labelsize = 11)
             ax1.tick_params(axis = "both",colors = "black",labelsize = 11)
             ax2.tick_params(axis = "both",colors = "black",labelsize = 11)
+            #Separador de miles de eje y 
+            def format_with_commas(x, pos):
+                return f'{x:,.0f}'
+            ax0.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
+            ax1.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
+            ax2.yaxis.set_major_formatter(FuncFormatter(format_with_commas))
             #Mover eje a la derecha
             ax2.spines['right'].set_position(('outward', 80))
             ax2.spines["right"].set_color("black")
@@ -1960,7 +1981,7 @@ class qannagnps():
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
             self.first_start = False
-            self.dlg = EphemeralGullyDialog()
+            self.dlg = Dialog_Base()
         # Fetch the currently loaded layers
         layers = QgsProject.instance().layerTreeRoot().children()
         self.layers = layers
@@ -2021,25 +2042,28 @@ class qannagnps():
         layers = QgsProject.instance().layerTreeRoot().children()
         
         #Establecer directorio de DEM y EPSG del proyecto
-        selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
-        selectedLayer = layers[selectedLayerIndex].layer()
-        fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
-        epsg = QgsProject.instance().crs().authid()
-        self.epsg = epsg
-        #Establecer el fichero de suelo escogido en el plugin
-        selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
-        selectedLayer = layers[selectedLayerIndex].layer()
-        fichero_soil =  selectedLayer.dataProvider().dataSourceUri()
-        soil_directory, fichero_soil = os.path.split(fichero_soil)
-        #Establecer el fichero de manejo escogido en el plugin
-        selectedLayerIndex = self.dlg.cbMan.currentIndex()-1
-        selectedLayer = layers[selectedLayerIndex].layer()
-        fichero_manag =  selectedLayer.dataProvider().dataSourceUri()
-        manag_directory, fichero_manag = os.path.split(fichero_manag)
-        #Se cambia de directorio al mismo en el que se encuentra el mdt y se establece el directorio donde están los ejecutables
-        mdt_directory, mdt_file = os.path.split(fichero_mdt)
-        executable_directory  = self.plugin_dir+"\\Executables"
-        os.chdir(mdt_directory)
+        #Solo se hace una vez. Es decir, si elijo outlet solo se elige en la primera ronda. Sino el selected layer puede cambiar de DEM a los reaches y da error después.
+        if not self.dlg.checkBox_2.isChecked() or (self.dlg.checkBox_2.isChecked() and not self.segunda_ronda):
+            selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
+            selectedLayer = layers[selectedLayerIndex].layer()
+            fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
+            epsg = QgsProject.instance().crs().authid()
+            self.epsg = epsg
+            #Establecer el fichero de suelo escogido en el plugin
+            selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
+            selectedLayer = layers[selectedLayerIndex].layer()
+            fichero_soil =  selectedLayer.dataProvider().dataSourceUri()
+            soil_directory, self.fichero_soil = os.path.split(fichero_soil)
+            #Establecer el fichero de manejo escogido en el plugin
+            selectedLayerIndex = self.dlg.cbMan.currentIndex()-1
+            selectedLayer = layers[selectedLayerIndex].layer()
+            fichero_manag =  selectedLayer.dataProvider().dataSourceUri()
+            manag_directory, self.fichero_manag = os.path.split(fichero_manag)
+            #Se cambia de directorio al mismo en el que se encuentra el mdt y se establece el directorio donde están los ejecutables
+            self.mdt_directory, self.mdt_file = os.path.split(fichero_mdt)
+            self.executable_directory  = self.plugin_dir+"\\Executables"
+            os.chdir(self.mdt_directory)
+        
         #EJECUCIÓN DE TOPAGNPS
         if self.dlg.cbTop.isChecked():
             #Si el input output_global Glbl_All_V3_sim no se pone en T no se obtiene el archivo que se necesita para calcular la erosión por cárcavas efímeras (AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv) y por lo tanto no se puede hacer el análisis de sensibilidad
@@ -2050,7 +2074,7 @@ class qannagnps():
                 file_glbl = str(self.inputs.l_53.text()) + "/" + str(self.inputs.l_63.text())
             #Función para que se le diga el nombre del archivo y te devuelva la dirección completa
             def fichero(nombre):
-                return mdt_directory+"\\"+nombre
+                return self.mdt_directory+"\\"+nombre
             
             #Si el mdt elegido en el plugin es distinto al que sale en TOPAGNPS.csv entonces cambiar el nombre del de TOPAGNPS.csv al elegido por en el plugin
             if not os.path.exists(self.direccion+"\\TOPAGNPS.CSV"):
@@ -2060,22 +2084,28 @@ class qannagnps():
             if type(topagnps_control_file["FILENAME"].iloc[0])!=str:
                 iface.messageBar().pushMessage("Error Input data", "Please select a correct FILENAME in TOPAGNPS.CSV" ,level=Qgis.Warning, duration=10)
                 return
-            if topagnps_control_file["FILENAME"].iloc[0] != mdt_file:
+            if topagnps_control_file["FILENAME"].iloc[0] != self.mdt_file:
                 processing.run("gdal:translate", 
-                    {'INPUT':fichero(mdt_file),
-                    'TARGET_CRS':epsg,'NODATA':None,'COPY_SUBDATASETS':False,
+                    {'INPUT':fichero(self.mdt_file),
+                    'TARGET_CRS':self.epsg,'NODATA':None,'COPY_SUBDATASETS':False,
                     'OPTIONS':'','EXTRA':'','DATA_TYPE':0,'OUTPUT':topagnps_control_file["FILENAME"].iloc[0]})
+            
+            #Si se ha elegido poner coordenadas automáticamente entonces hay que hacer que TopAGNPS haga sólo DEM elevation preprocessing and full network generation
+            if self.dlg.checkBox_2.isChecked() and not self.segunda_ronda:
+                topagnps_control_file = pd.read_csv(fichero("TOPAGNPS.csv"),encoding = "ISO-8859-1",delimiter=",")
+                topagnps_control_file["DEMPROC"].iloc[0] = 2
+                topagnps_control_file.to_csv(fichero("TOPAGNPS.csv"), index=False, float_format='%.5f')
             
             #EJECUCIÓN DE TOPAGNPS            
             def main():
-                f = open(executable_directory+"\\"+"EjecutarTopagnps.bat","w+")
-                linea_uno = "CD {}".format(mdt_directory)
-                linea_dos = r"CALL {}\TopAGNPS_v6.00.a.020_release_64-bit.exe".format(executable_directory)
+                f = open(self.executable_directory+"\\"+"EjecutarTopagnps.bat","w+")
+                linea_uno = "CD {}".format(self.mdt_directory)
+                linea_dos = r"CALL {}\TopAGNPS_v6.00.a.020_release_64-bit.exe".format(self.executable_directory)
                 f.write("{} \n".format(linea_uno))
                 f.write("{} \n".format(linea_dos))
                 f.close()
             main()
-            subprocess.call(executable_directory+"\\"+"EjecutarTopagnps.bat")
+            subprocess.call(self.executable_directory+"\\"+"EjecutarTopagnps.bat")
             
             #Cuando se eligen coordenadas automáticamente con el plugin primero se ejecuta Topagnps y da error (se ejecuta la primera para poner el reaches en QGIS) osea que no queremos que python salte si hay error en la primera ronda. Queremos que salte python cuando hay error y si se ha seleccionado que no se elige automaticamente. O sino cuando hay error y se ha elegido automáticamente pero la segunda ejecución de Topagnps da error. 
             if os.path.isfile("TOPAGNPS_err.CSV") and os.path.getsize("TOPAGNPS_err.CSV")>0 and (not self.dlg.checkBox_2.isChecked() or self.segunda_ronda):
@@ -2094,15 +2124,24 @@ class qannagnps():
             def change_coordinates(filename,outputname):
                         input_raster = gdal.Open(fichero(filename))
                         output_raster = fichero(outputname)
-                        warp = gdal.Warp(output_raster,input_raster,dstSRS=epsg)
+                        warp = gdal.Warp(output_raster,input_raster,dstSRS=self.epsg)
                         warp = None # Closes the files
             #Esto es para cambiar las coordenadas del outlet en TOPAGNPS.csv. Para ello se tiene que estar en primera ronda y se tiene que haber elegido la opción de escoger el outlet automáticamente. 
             if self.dlg.checkBox_2.isChecked() and not self.segunda_ronda:
                 if self.ejecucion_condicion == 0:
-                    change_coordinates("AnnAGNPS_Reach_IDs.asc","AnnAGNPS_Reach_IDs_epsg.asc")
-                    layer = QgsRasterLayer(fichero("AnnAGNPS_Reach_IDs_epsg.asc"),"reaches")
+                    change_coordinates("NETFUL.asc","NETFUL_epsg.asc")
+                    layer = QgsRasterLayer(fichero("NETFUL_epsg.asc"),"reaches")
                     QgsProject.instance().addMapLayer(layer)
+                    #Esto es para que se desactiven el resto de las capas y se pueda ver la capa reaches
+                    root = QgsProject.instance().layerTreeRoot()
+                    for child in root.children():
+                        if child.name() != "reaches":
+                            child.setItemVisibilityChecked(False)
+                    iface.mapCanvas().refresh()
+
+                    #Se ejecuta el método para las coordenadas
                     self.set_coordinates()
+                    return
             self.segunda_ronda = False
             #VALORES DEL TAMAÑO DE PIXEL
             layer = QgsRasterLayer(topagnps_control_file["FILENAME"].iloc[0],"dednm")
@@ -2138,12 +2177,12 @@ class qannagnps():
                 #Pasar de shp a gpkg
                 processing.run("native:reprojectlayer", 
                     {'INPUT':fichero(fichero_suelo),
-                    'TARGET_CRS':QgsCoordinateReferenceSystem(epsg),
+                    'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
                     'OPERATION':'+proj=noop','OUTPUT':fichero("suelos{}.gpkg".format(numero))})
                 #Reproyectar celdas al epsg del proyecto
                 processing.run("gdal:warpreproject", 
                     {'INPUT':fichero(fichero_cell),
-                    'SOURCE_CRS':None,'TARGET_CRS':QgsCoordinateReferenceSystem('{}'.format(epsg)),
+                    'SOURCE_CRS':None,'TARGET_CRS':QgsCoordinateReferenceSystem('{}'.format(self.epsg)),
                     'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':None,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,
                     'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':fichero("cell_1{}.asc".format(numero))})
                 #Con esto se tiene el diccionario que te asigna para cada suelo/uso un valor numérico
@@ -2224,7 +2263,7 @@ class qannagnps():
                     return
                 #Se aplica el suelo al fichero de cells
                 try:
-                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
+                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
                 except:
                     iface.messageBar().pushMessage("Error with soil layer","Soil layer has to be saved in the same folder as the DEM. Also the DEM and the soil layer have to overlap.",level=Qgis.Warning, duration=20)
                     return
@@ -2273,7 +2312,7 @@ class qannagnps():
                         iface.messageBar().pushMessage("Error with soil management","There isn't any management information to use",level=Qgis.Warning, duration=10)
                         return 
                 try:
-                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
+                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
                 except:
                     iface.messageBar().pushMessage("Error with soil use layer","Soil use layer has to be saved in the same folder as the DEM. Also the DEM and the soil use layer have to overlap.",level=Qgis.Warning, duration=20)
                     return
@@ -2343,7 +2382,7 @@ class qannagnps():
         if (self.dlg.cbAnn.isChecked() and not self.segunda_ronda and (self.ejecucion_condicion==1 or not self.dlg.checkBox_2.isChecked())):
             #CREACIÓN DE LA CARPETA QUE CONTENDRÁ LOS INPUTS DE ANNAGNPS
             directory = "INPUTS"
-            parent_dir = mdt_directory
+            parent_dir = self.mdt_directory
             path_file = os.path.join(parent_dir, directory)
             mode = 0o666
             try:
@@ -2353,7 +2392,7 @@ class qannagnps():
 
             #CREACIÓN DE LAS SUBCARPETAS EN DONDE SE ORGANIZARÁN LOS INPUTS
             carpetas = ["simulation","general","watershed","climate"]
-            parent_dir = mdt_directory +"\\" + directory
+            parent_dir = self.mdt_directory +"\\" + directory
             try:
                 for c in carpetas: 
                     path_file = os.path.join(parent_dir, c)
@@ -2452,7 +2491,7 @@ class qannagnps():
                 if os.path.isabs(file_name):
                     return os.path.dirname(file_name)+"/"+ directory + "/" +direct+"/"+os.path.basename(file_name)
                 else:
-                    return mdt_directory+"/"+ directory + "/" + direct + "/" +file_name
+                    return self.mdt_directory+"/"+ directory + "/" + direct + "/" +file_name
             
             #Listas de los nombres de archivos para cada tipo de input. Se elminan aquellos que no han sido escogidos ("")
             #Clima
@@ -2576,24 +2615,24 @@ class qannagnps():
             data_section = [list(master_dict)[x] for x in range(len(master_dict)) if master_dict[list(master_dict)[x]] !=""]
             file_name = [fichero_master(master_dict[x]) for x in data_section]
             master = pd.DataFrame(data = {"Data Section ID":data_section,"File Name":file_name})
-            master.to_csv(mdt_directory + "\\" +directory + "\\" + "annagnps_master.csv", encoding='utf-8', index=False)
+            master.to_csv(self.mdt_directory + "\\" +directory + "\\" + "annagnps_master.csv", encoding='utf-8', index=False)
             
             #MOVER EL EJECUTABLE DE ANNAGNPS Y EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS 
-            shutil.copyfile(executable_directory + "\\" +"AnnAGNPS.fil" ,mdt_directory + "\\"+directory+ "\\" +"AnnAGNPS.fil")
+            shutil.copyfile(self.executable_directory + "\\" +"AnnAGNPS.fil" ,self.mdt_directory + "\\"+directory+ "\\" +"AnnAGNPS.fil")
 
             #EJECUCIÓN DE ANNAGNPS
-            os.chdir(mdt_directory+"\\"+directory)
+            os.chdir(self.mdt_directory+"\\"+directory)
             def execute_bat():
                def main():
-                   f = open(executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
-                   linea_uno = "CD {}".format(mdt_directory+"\\"+directory)
-                   linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(executable_directory)
+                   f = open(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
+                   linea_uno = "CD {}".format(self.mdt_directory+"\\"+directory)
+                   linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
                    f.write("{} \n".format(linea_uno))
                    f.write("{} \n".format(linea_dos))
                    f.close()
                main()
             execute_bat()
-            subprocess.call(executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
+            subprocess.call(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
             
             #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
             time.sleep(1)
@@ -2619,10 +2658,10 @@ class qannagnps():
             
             #EJECUCIÓN DEL OUTPUT_TABLES
             time.sleep(1)
-            shutil.copyfile(executable_directory + "\\" +"STEAD.fil" ,mdt_directory + "\\"+directory + "\\" +"STEAD.fil")
-            os.chdir(mdt_directory+"\\"+directory)
-            subprocess.Popen(executable_directory + "\\" +"STEAD.exe")
-            os.chdir(mdt_directory)
+            shutil.copyfile(self.executable_directory + "\\" +"STEAD.fil" ,self.mdt_directory + "\\"+directory + "\\" +"STEAD.fil")
+            os.chdir(self.mdt_directory+"\\"+directory)
+            subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe")
+            os.chdir(self.mdt_directory)
             
             #MENSAJE DE ÉXITO
             self.iface.messageBar().pushMessage("Success", "Succes in execution ",level=Qgis.Success, duration=5)
@@ -2689,6 +2728,7 @@ class qannagnps():
         topagnps_control_file = pd.read_csv(fichero("TOPAGNPS.csv"),encoding = "ISO-8859-1",delimiter=",")
         topagnps_control_file["FORMAT"].iloc[0] = 0
         topagnps_control_file["OUTFORMAT"].iloc[0] = 1
+        topagnps_control_file["DEMPROC"].iloc[0] = 0
         topagnps_control_file["OUTROW"].iloc[0] =coordenada_puntos.split(",")[1]
         topagnps_control_file["OUTCOL"].iloc[0] = coordenada_puntos.split(",")[0]
         topagnps_control_file.to_csv(fichero("TOPAGNPS.csv"), index=False, float_format='%.5f')
@@ -2698,6 +2738,7 @@ class qannagnps():
         
         #Después de haber clicado en la coordenada ejecutar de nuevo esta vez sin pedir coordenadas
         self.ejecucion_completa()
+        
         
         #Lo que sigue aquí lo he hecho porque no sé como hacer para que se desactive la función de update y siga pidiendo coordenadas. Creo que esto lo puse porque aunque se ejecutaba todo bien, el cursor seguía en formato de pedir coordenadas, y creo que si clicabas se volvia a ejecutar otra vez. 
         class PrintClickedPoint(QgsMapToolEmitPoint):
