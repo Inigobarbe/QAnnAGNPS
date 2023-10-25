@@ -1382,7 +1382,7 @@ class qannagnps():
             fig, ax = plt.subplots()
             # Ajustar el formato de las fechas en el DataFrame
             table_df['Date'] = table_df['Date'].dt.strftime('%Y-%m-%d')
-            table_df[f"{self.data_type} yield (kg)"] = table_df[f"{self.data_type} yield (kg)"].apply(lambda x: f'{x:,.2f}')
+            table_df.iloc[:,1] = table_df.iloc[:,1].apply(lambda x: f'{x:,.2f}')
             try:
                 table = ax.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center', colColours=['#f5f5f5'] * len(table_df.columns))
             except:
@@ -1646,6 +1646,12 @@ class qannagnps():
                 cells = [str(x) for x in np.unique(df_raw.ID)]
             else:
                 cells = [str(x) for x in np.unique(df_raw["Cell ID"])]
+            #Esto es para quitar estos elementos que a veces están en erosión y en nutrientes
+            for i in ["Bed & Bank","Landscape","Watershed"]:
+                try:
+                    cells.remove(i)
+                except:
+                    pass
             cells.insert(0,"All cells")
             self.output.run_cell.addItems(cells)
             #Se ponen las fechas
