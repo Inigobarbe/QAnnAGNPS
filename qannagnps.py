@@ -445,6 +445,8 @@ class qannagnps():
         #Poner icono de búsqueda en los outputs
         self.output.pushButton_12.setIcon(QIcon(self.icon_path_search))
         self.output.pushButton_9.setIcon(QIcon(self.icon_path_search))
+        self.output.pushButton_29.setIcon(QIcon(self.icon_path_search))
+        self.output.pushButton_40.setIcon(QIcon(self.icon_path_search))
         
         #Seleccionar archivo DEM en los outputs
         self.output.pushButton_12.clicked.connect(lambda _,b = "AnnAGNPS":self.dem_output_file(b))
@@ -482,6 +484,10 @@ class qannagnps():
         dic = {self.output.pushButton_11:"Cell_raster",self.output.pushButton_13:"Cell_vectorial",self.output.pushButton_14:"Boundary_raster",self.output.pushButton_19:"Boundary_vectorial",self.output.pushButton_22:"Reaches_raster",self.output.pushButton_20:"Reaches_vectorial",self.output.pushButton_21:"Accumulated",self.output.pushButton_23:"Terrain_slope",self.output.pushButton_24:"Hydraulic",self.output.pushButton_25:"Terrain_aspect",self.output.pushButton_26:"RUSLE",self.output.pushButton_27:"Longest_raster",self.output.pushButton_28:"Longest_vectorial"}
         for i in dic.keys():
             i.clicked.connect(lambda _,b = dic[i]:self.output_topagnps(b))
+        
+        #Añadir las distribuciones posibles en el análisis de sensibilidad. También el cambio de parámetros de distribución. 
+        self.dlg.comboBox_4.addItems(["Uniform","Triangular","Normal","Lognormal"])
+        self.dlg.comboBox_5.addItems(["Uniform","Triangular","Normal","Lognormal"])
         
     def general_output(self):
         #Método para añadir los outputs generales al diálogo
@@ -1332,7 +1338,7 @@ class qannagnps():
             df_graph.set_index('Fecha', inplace=True)
         else:
             df_graph = df.groupby(df.index).sum(numeric_only=True)
-        #Se calculan los datos
+        #Se calculan los datos       
         if self.data_type == "Runoff":
             if len(df_graph[df_graph['Runoff']>0])>10:
                 n_top_values = 10
@@ -1382,7 +1388,7 @@ class qannagnps():
             fig, ax = plt.subplots()
             # Ajustar el formato de las fechas en el DataFrame
             table_df['Date'] = table_df['Date'].dt.strftime('%Y-%m-%d')
-            table_df[f"{self.data_type} yield (kg)"] = table_df[f"{self.data_type} yield (kg)"].apply(lambda x: f'{x:,.2f}')
+            table_df.iloc[:,1] = table_df.iloc[:,1].apply(lambda x: f'{x:,.2f}')
             try:
                 table = ax.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center', colColours=['#f5f5f5'] * len(table_df.columns))
             except:
@@ -1646,6 +1652,12 @@ class qannagnps():
                 cells = [str(x) for x in np.unique(df_raw.ID)]
             else:
                 cells = [str(x) for x in np.unique(df_raw["Cell ID"])]
+            #En erosión y nutrientes hay que quitar algunos de estos elementos de la lista
+            for i in ["Bed & Bank","Landscape","Watershed"]:
+                try:
+                    cells.remove(i)
+                except:
+                    pass
             cells.insert(0,"All cells")
             self.output.run_cell.addItems(cells)
             #Se ponen las fechas
@@ -1744,16 +1756,20 @@ class qannagnps():
         #Documentation
         documentation_icon = os.path.join(self.plugin_directory, "images/documentation.svg")
         self.inputs.pb_doc.setIcon(QIcon(documentation_icon))
+        #Delete previous simulation data
+        documentation_icon = os.path.join(self.plugin_directory, "images/delete_previous.svg")
+        self.dlg.delete_2.setIcon(QIcon(documentation_icon))
         #Runoff output
-        runoff = [self.output.pushButton,self.output.pushButton_15,self.output.pushButton_16,self.output.pushButton_17,self.output.pushButton_18]
+        runoff = [self.output.pushButton,self.output.pushButton_15,self.output.pushButton_16,self.output.pushButton_17,self.output.pushButton_18,self.output.pushButton_37,self.output.pushButton_36,self.output.pushButton_41,self.output.pushButton_38,self.output.pushButton_35,self.output.pushButton_43,self.output.pushButton_39]
         icon = os.path.join(self.plugin_directory, "images/bar_graph.svg")
         for i in runoff:
             i.setIcon(QIcon(icon)) 
         #Datos espaciales
         icon = os.path.join(self.plugin_directory, "images/spatial_graph.svg")
         self.output.spatial_run.setIcon(QIcon(icon))
-        for i in [self.output.pushButton_11,self.output.pushButton_13,self.output.pushButton_14,self.output.pushButton_19,self.output.pushButton_22,self.output.pushButton_20,self.output.pushButton_21,self.output.pushButton_23,self.output.pushButton_24,self.output.pushButton_25,self.output.pushButton_26,self.output.pushButton_27,self.output.pushButton_28]:
+        for i in [self.output.pushButton_11,self.output.pushButton_13,self.output.pushButton_14,self.output.pushButton_19,self.output.pushButton_22,self.output.pushButton_20,self.output.pushButton_21,self.output.pushButton_23,self.output.pushButton_24,self.output.pushButton_25,self.output.pushButton_26,self.output.pushButton_27,self.output.pushButton_28,self.output.pushButton_30,self.output.pushButton_31,self.output.pushButton_32,self.output.pushButton_33,self.output.pushButton_34]:
             i.setIcon(QIcon(icon))
+
         
     def url_upna(self,event):
         #Método para abrir las páginas web de la upna
