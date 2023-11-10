@@ -26,7 +26,7 @@
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>-55</y>
+        <y>0</y>
         <width>1518</width>
         <height>918</height>
        </rect>
@@ -90,6 +90,12 @@
              <layout class="QHBoxLayout" name="horizontalLayout_4">
               <item>
                <widget class="QLabel" name="label_81">
+                <property name="minimumSize">
+                 <size>
+                  <width>137</width>
+                  <height>0</height>
+                 </size>
+                </property>
                 <property name="font">
                  <font>
                   <weight>75</weight>
@@ -127,6 +133,12 @@
              <layout class="QHBoxLayout" name="horizontalLayout_5">
               <item>
                <widget class="QLabel" name="label_82">
+                <property name="minimumSize">
+                 <size>
+                  <width>137</width>
+                  <height>0</height>
+                 </size>
+                </property>
                 <property name="font">
                  <font>
                   <weight>75</weight>
@@ -168,6 +180,12 @@
              <layout class="QHBoxLayout" name="horizontalLayout">
               <item>
                <widget class="QFrame" name="frame_2">
+                <property name="minimumSize">
+                 <size>
+                  <width>726</width>
+                  <height>0</height>
+                 </size>
+                </property>
                 <property name="frameShape">
                  <enum>QFrame::StyledPanel</enum>
                 </property>
@@ -177,8 +195,77 @@
                 <layout class="QGridLayout" name="gridLayout_6">
                  <item row="0" column="0">
                   <layout class="QGridLayout" name="gridLayout">
+                   <item row="12" column="3">
+                    <widget class="QPushButton" name="w11">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="12" column="2">
+                    <widget class="QLineEdit" name="l_12"/>
+                   </item>
+                   <item row="9" column="6">
+                    <widget class="QLabel" name="label_23">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Wetlands</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="9">
+                    <widget class="QPushButton" name="w36">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="2">
+                    <widget class="QLineEdit" name="l_9"/>
+                   </item>
+                   <item row="13" column="2">
+                    <widget class="QLineEdit" name="l_13"/>
+                   </item>
+                   <item row="6" column="4">
+                    <widget class="QPushButton" name="w26">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="11" column="4">
+                    <widget class="QPushButton" name="w31">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="10">
+                    <widget class="QPushButton" name="wt18">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
                    <item row="3" column="1">
                     <widget class="QLabel" name="label_2">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -187,6 +274,13 @@
                      </property>
                      <property name="text">
                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#000000;&quot;&gt;Cell &lt;/span&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="9">
+                    <widget class="QPushButton" name="w34">
+                     <property name="text">
+                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -203,8 +297,46 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="8">
-                    <widget class="QPushButton" name="w34">
+                   <item row="5" column="6">
+                    <widget class="QLabel" name="label_19">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Ephemeral Gullies</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="12" column="1">
+                    <widget class="QLabel" name="label_11">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Watershed</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="4">
+                    <widget class="QPushButton" name="w27">
                      <property name="text">
                       <string/>
                      </property>
@@ -217,8 +349,8 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="4">
-                    <widget class="QPushButton" name="w27">
+                   <item row="7" column="10">
+                    <widget class="QPushButton" name="wt19">
                      <property name="text">
                       <string/>
                      </property>
@@ -227,7 +359,7 @@
                    <item row="7" column="2">
                     <widget class="QLineEdit" name="l_7"/>
                    </item>
-                   <item row="2" column="8">
+                   <item row="2" column="9">
                     <widget class="QPushButton" name="w35">
                      <property name="text">
                       <string/>
@@ -236,6 +368,12 @@
                    </item>
                    <item row="13" column="1">
                     <widget class="QLabel" name="label_12">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -244,6 +382,20 @@
                      </property>
                      <property name="text">
                       <string>Wetland</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="10">
+                    <widget class="QPushButton" name="wt20">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="8">
+                    <widget class="QPushButton" name="w19">
+                     <property name="text">
+                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -264,8 +416,8 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="7">
-                    <widget class="QPushButton" name="w19">
+                   <item row="8" column="9">
+                    <widget class="QPushButton" name="w41">
                      <property name="text">
                       <string/>
                      </property>
@@ -278,8 +430,21 @@
                      </property>
                     </widget>
                    </item>
+                   <item row="9" column="10">
+                    <widget class="QPushButton" name="wt21">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
                    <item row="10" column="1">
                     <widget class="QLabel" name="label_8">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -291,25 +456,21 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="8" column="8">
-                    <widget class="QPushButton" name="w41">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="9" column="8">
+                   <item row="9" column="9">
                     <widget class="QPushButton" name="w42">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="8" column="6">
-                    <widget class="QLineEdit" name="l_21"/>
-                   </item>
-                   <item row="3" column="5">
+                   <item row="3" column="6">
                     <widget class="QLabel" name="label_17">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -324,12 +485,8 @@
                    <item row="5" column="2">
                     <widget class="QLineEdit" name="l_5"/>
                    </item>
-                   <item row="2" column="7">
-                    <widget class="QPushButton" name="w14">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
+                   <item row="8" column="7">
+                    <widget class="QLineEdit" name="l_21"/>
                    </item>
                    <item row="5" column="4">
                     <widget class="QPushButton" name="w25">
@@ -338,8 +495,21 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="4" column="5">
+                   <item row="2" column="8">
+                    <widget class="QPushButton" name="w14">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="6">
                     <widget class="QLabel" name="label_18">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -351,6 +521,20 @@
                      </property>
                     </widget>
                    </item>
+                   <item row="8" column="8">
+                    <widget class="QPushButton" name="w20">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="8">
+                    <widget class="QPushButton" name="w13">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
                    <item row="11" column="3">
                     <widget class="QPushButton" name="w10">
                      <property name="text">
@@ -358,35 +542,17 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="8" column="7">
-                    <widget class="QPushButton" name="w20">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="6" column="6">
+                   <item row="6" column="7">
                     <widget class="QLineEdit" name="l_19"/>
                    </item>
-                   <item row="1" column="7">
-                    <widget class="QPushButton" name="w13">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="9" column="3">
-                    <widget class="QPushButton" name="w8">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="12" column="2">
-                    <widget class="QLineEdit" name="l_12"/>
-                   </item>
-                   <item row="2" column="5">
+                   <item row="2" column="6">
                     <widget class="QLabel" name="label_16">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -398,8 +564,52 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="9" column="5">
-                    <widget class="QLabel" name="label_23">
+                   <item row="9" column="3">
+                    <widget class="QPushButton" name="w8">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="2">
+                    <widget class="QLineEdit" name="l_1">
+                     <property name="styleSheet">
+                      <string notr="true">background-color: white;</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="4">
+                    <widget class="QPushButton" name="w28">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="2">
+                    <widget class="QLineEdit" name="l_2">
+                     <property name="styleSheet">
+                      <string notr="true"/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="7">
+                    <widget class="QLineEdit" name="l_16"/>
+                   </item>
+                   <item row="13" column="4">
+                    <widget class="QPushButton" name="w33">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="11" column="1">
+                    <widget class="QLabel" name="label_10">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -407,26 +617,33 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>Wetlands</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="12" column="3">
-                    <widget class="QPushButton" name="w11">
-                     <property name="text">
-                      <string/>
+                      <string>Rice</string>
                      </property>
                     </widget>
                    </item>
                    <item row="3" column="8">
-                    <widget class="QPushButton" name="w36">
+                    <widget class="QPushButton" name="w15">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="4">
-                    <widget class="QPushButton" name="w26">
+                   <item row="0" column="6">
+                    <widget class="QLabel" name="label_15">
+                     <property name="font">
+                      <font>
+                       <pointsize>11</pointsize>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Output Sources</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="3">
+                    <widget class="QPushButton" name="w2">
                      <property name="text">
                       <string/>
                      </property>
@@ -439,35 +656,14 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="13" column="2">
-                    <widget class="QLineEdit" name="l_13"/>
-                   </item>
-                   <item row="9" column="2">
-                    <widget class="QLineEdit" name="l_9"/>
-                   </item>
-                   <item row="11" column="4">
-                    <widget class="QPushButton" name="w31">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="10" column="3">
-                    <widget class="QPushButton" name="w9">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="3" column="3">
-                    <widget class="QPushButton" name="w2">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="1" column="5">
+                   <item row="1" column="6">
                     <widget class="QLabel" name="label_13">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -479,21 +675,24 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="5">
-                    <widget class="QLabel" name="label_20">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
+                   <item row="10" column="3">
+                    <widget class="QPushButton" name="w9">
                      <property name="text">
-                      <string>Impoundments</string>
+                      <string/>
                      </property>
                     </widget>
                    </item>
+                   <item row="6" column="2">
+                    <widget class="QLineEdit" name="l_6"/>
+                   </item>
                    <item row="6" column="1">
                     <widget class="QLabel" name="label_6">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -505,25 +704,12 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="2">
-                    <widget class="QLineEdit" name="l_6"/>
-                   </item>
                    <item row="4" column="4">
                     <widget class="QPushButton" name="w24">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
-                   </item>
-                   <item row="12" column="4">
-                    <widget class="QPushButton" name="w32">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="8" column="2">
-                    <widget class="QLineEdit" name="l_8"/>
                    </item>
                    <item row="8" column="3">
                     <widget class="QPushButton" name="w7">
@@ -532,8 +718,24 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="12" column="1">
-                    <widget class="QLabel" name="label_11">
+                   <item row="8" column="2">
+                    <widget class="QLineEdit" name="l_8"/>
+                   </item>
+                   <item row="12" column="4">
+                    <widget class="QPushButton" name="w32">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="6">
+                    <widget class="QLabel" name="label_20">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -541,45 +743,51 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>Watershed</string>
+                      <string>Impoundments</string>
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="5">
-                    <widget class="QLabel" name="label_19">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="label_80">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="0">
+                    <widget class="QCheckBox" name="checkBox_2">
+                     <property name="styleSheet">
+                      <string notr="true">QCheckBox::hover{color:white}
+
+QCheckBox::indicator:unchecked {
+    background-color: white;
+	border: 1px solid black
+}
+</string>
                      </property>
                      <property name="text">
-                      <string>Ephemeral Gullies</string>
+                      <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="3" colspan="2">
-                    <widget class="QPushButton" name="change_w">
-                     <property name="text">
-                      <string>Change</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="14" column="1">
-                    <widget class="QPushButton" name="clear_w">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
+                   <item row="3" column="0">
+                    <widget class="QCheckBox" name="checkBox">
+                     <property name="styleSheet">
+                      <string notr="true">QCheckBox::hover{color:white}
+
+QCheckBox::indicator:unchecked {
+    background-color: white;
+	border: 1px solid black
+}
+</string>
                      </property>
                      <property name="text">
-                      <string>Clear selection</string>
+                      <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="8">
-                    <widget class="QPushButton" name="w38">
+                   <item row="6" column="8">
+                    <widget class="QPushButton" name="w18">
                      <property name="text">
                       <string/>
                      </property>
@@ -588,10 +796,29 @@
                    <item row="10" column="2">
                     <widget class="QLineEdit" name="l_10"/>
                    </item>
-                   <item row="6" column="7">
-                    <widget class="QPushButton" name="w18">
+                   <item row="5" column="9">
+                    <widget class="QPushButton" name="w38">
                      <property name="text">
                       <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="14" column="1">
+                    <widget class="QPushButton" name="clear_w">
+                     <property name="maximumSize">
+                      <size>
+                       <width>100</width>
+                       <height>16777215</height>
+                      </size>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Clear selection</string>
                      </property>
                     </widget>
                    </item>
@@ -618,8 +845,8 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="6">
-                    <widget class="QLineEdit" name="l_20"/>
+                   <item row="5" column="7">
+                    <widget class="QLineEdit" name="l_18"/>
                    </item>
                    <item row="2" column="4">
                     <widget class="QPushButton" name="w22">
@@ -628,11 +855,32 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="6">
-                    <widget class="QLineEdit" name="l_18"/>
-                   </item>
-                   <item row="4" column="7">
+                   <item row="4" column="8">
                     <widget class="QPushButton" name="w16">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="7">
+                    <widget class="QLineEdit" name="l_20"/>
+                   </item>
+                   <item row="9" column="4">
+                    <widget class="QPushButton" name="w29">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="8">
+                    <widget class="QPushButton" name="w21">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="4">
+                    <widget class="QPushButton" name="w23">
                      <property name="text">
                       <string/>
                      </property>
@@ -640,6 +888,12 @@
                    </item>
                    <item row="7" column="1">
                     <widget class="QLabel" name="label_14">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -651,29 +905,20 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="3" column="4">
-                    <widget class="QPushButton" name="w23">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
+                   <item row="1" column="7">
+                    <widget class="QLineEdit" name="l_14"/>
                    </item>
-                   <item row="9" column="4">
-                    <widget class="QPushButton" name="w29">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
+                   <item row="2" column="7">
+                    <widget class="QLineEdit" name="l_15"/>
                    </item>
-                   <item row="9" column="7">
-                    <widget class="QPushButton" name="w21">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="8" column="5">
+                   <item row="8" column="6">
                     <widget class="QLabel" name="label_22">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -685,14 +930,14 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="6">
-                    <widget class="QLineEdit" name="l_14"/>
-                   </item>
-                   <item row="2" column="6">
-                    <widget class="QLineEdit" name="l_15"/>
-                   </item>
                    <item row="4" column="1">
                     <widget class="QLabel" name="label_4">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -701,6 +946,13 @@
                      </property>
                      <property name="text">
                       <string>Classic Gully</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="9">
+                    <widget class="QPushButton" name="w37">
+                     <property name="text">
+                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -718,15 +970,17 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="4" column="8">
-                    <widget class="QPushButton" name="w37">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
+                   <item row="4" column="2">
+                    <widget class="QLineEdit" name="l_4"/>
                    </item>
                    <item row="8" column="1">
                     <widget class="QLabel" name="label_7">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -738,76 +992,18 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="8" column="4">
-                    <widget class="QPushButton" name="w28">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="4" column="2">
-                    <widget class="QLineEdit" name="l_4"/>
-                   </item>
-                   <item row="1" column="2">
-                    <widget class="QLineEdit" name="l_1">
-                     <property name="styleSheet">
-                      <string notr="true">background-color: white;</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="3" column="6">
-                    <widget class="QLineEdit" name="l_16"/>
-                   </item>
-                   <item row="13" column="4">
-                    <widget class="QPushButton" name="w33">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="2" column="2">
-                    <widget class="QLineEdit" name="l_2">
-                     <property name="styleSheet">
-                      <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="3" column="7">
-                    <widget class="QPushButton" name="w15">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="11" column="1">
-                    <widget class="QLabel" name="label_10">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Rice</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="0" column="5">
-                    <widget class="QLabel" name="label_15">
-                     <property name="font">
-                      <font>
-                       <pointsize>11</pointsize>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Output Sources</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="5" column="7">
+                   <item row="5" column="8">
                     <widget class="QPushButton" name="w17">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="7">
+                    <widget class="QLineEdit" name="l_22"/>
+                   </item>
+                   <item row="4" column="3">
+                    <widget class="QPushButton" name="w3">
                      <property name="text">
                       <string/>
                      </property>
@@ -815,6 +1011,12 @@
                    </item>
                    <item row="9" column="1">
                     <widget class="QLabel" name="label_9">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -826,18 +1028,8 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="9" column="6">
-                    <widget class="QLineEdit" name="l_22"/>
-                   </item>
-                   <item row="4" column="3">
-                    <widget class="QPushButton" name="w3">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="6" column="8">
-                    <widget class="QPushButton" name="w39">
+                   <item row="7" column="9">
+                    <widget class="QPushButton" name="w40">
                      <property name="text">
                       <string/>
                      </property>
@@ -850,31 +1042,21 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="8">
-                    <widget class="QPushButton" name="w40">
+                   <item row="6" column="9">
+                    <widget class="QPushButton" name="w39">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="1">
-                    <widget class="QLabel" name="label_5">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Ephemeral Gully</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="4" column="6">
-                    <widget class="QLineEdit" name="l_17"/>
-                   </item>
-                   <item row="7" column="5">
+                   <item row="7" column="6">
                     <widget class="QLabel" name="label_21">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -886,44 +1068,27 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="0" column="0">
-                    <widget class="QLabel" name="label_80">
+                   <item row="5" column="1">
+                    <widget class="QLabel" name="label_5">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
                      <property name="text">
-                      <string/>
+                      <string>Ephemeral Gully</string>
                      </property>
                     </widget>
                    </item>
-                   <item row="3" column="0">
-                    <widget class="QCheckBox" name="checkBox">
-                     <property name="styleSheet">
-                      <string notr="true">QCheckBox::hover{color:white}
-
-QCheckBox::indicator:unchecked {
-    background-color: white;
-	border: 1px solid black
-}
-</string>
-                     </property>
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="5" column="0">
-                    <widget class="QCheckBox" name="checkBox_2">
-                     <property name="styleSheet">
-                      <string notr="true">QCheckBox::hover{color:white}
-
-QCheckBox::indicator:unchecked {
-    background-color: white;
-	border: 1px solid black
-}
-</string>
-                     </property>
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
+                   <item row="4" column="7">
+                    <widget class="QLineEdit" name="l_17"/>
                    </item>
                    <item row="10" column="0">
                     <widget class="QCheckBox" name="checkBox_3">
@@ -938,6 +1103,132 @@ QCheckBox::indicator:unchecked {
                      </property>
                      <property name="text">
                       <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="5">
+                    <widget class="QPushButton" name="wt1">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="10">
+                    <widget class="QPushButton" name="wt13">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="10">
+                    <widget class="QPushButton" name="wt14">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="10">
+                    <widget class="QPushButton" name="wt15">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="5">
+                    <widget class="QPushButton" name="wt4">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="5">
+                    <widget class="QPushButton" name="wt5">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="5">
+                    <widget class="QPushButton" name="wt6">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="5">
+                    <widget class="QPushButton" name="wt7">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="5">
+                    <widget class="QPushButton" name="wt8">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="10" column="5">
+                    <widget class="QPushButton" name="wt9">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="11" column="5">
+                    <widget class="QPushButton" name="wt10">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="12" column="5">
+                    <widget class="QPushButton" name="wt11">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="13" column="5">
+                    <widget class="QPushButton" name="wt12">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="5">
+                    <widget class="QPushButton" name="wt2">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="5">
+                    <widget class="QPushButton" name="wt3">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="10">
+                    <widget class="QPushButton" name="wt16">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="10">
+                    <widget class="QPushButton" name="wt17">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="3" colspan="3">
+                    <widget class="QPushButton" name="change_w">
+                     <property name="text">
+                      <string>Change</string>
                      </property>
                     </widget>
                    </item>
@@ -957,10 +1248,112 @@ QCheckBox::indicator:unchecked {
                 <layout class="QGridLayout" name="gridLayout_7">
                  <item row="0" column="0">
                   <layout class="QGridLayout" name="gridLayout_2">
-                   <item row="4" column="6">
-                    <widget class="QLineEdit" name="l_39">
+                   <item row="4" column="10">
+                    <widget class="QPushButton" name="gt16">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="4">
+                    <widget class="QPushButton" name="gt4">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="4">
+                    <widget class="QPushButton" name="gt2">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="4">
+                    <widget class="QPushButton" name="gt3">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="4">
+                    <widget class="QPushButton" name="gt1">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="4">
+                    <widget class="QPushButton" name="gt5">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="7">
+                    <widget class="QLineEdit" name="l_36">
                      <property name="styleSheet">
                       <string notr="true"/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="9">
+                    <widget class="QPushButton" name="g37">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="0">
+                    <widget class="QLabel" name="label_32">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Fertilizer application</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="2">
+                    <widget class="QPushButton" name="g7">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="11" column="9">
+                    <widget class="QPushButton" name="g46">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="0">
+                    <widget class="QLabel" name="label_34">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Geology</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="6">
+                    <widget class="QLabel" name="label_48">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Pesticide Reference</string>
                      </property>
                     </widget>
                    </item>
@@ -971,17 +1364,17 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="4" column="8">
+                   <item row="4" column="9">
                     <widget class="QPushButton" name="g39">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="3">
-                    <widget class="QPushButton" name="g27">
-                     <property name="text">
-                      <string/>
+                   <item row="4" column="7">
+                    <widget class="QLineEdit" name="l_39">
+                     <property name="styleSheet">
+                      <string notr="true"/>
                      </property>
                     </widget>
                    </item>
@@ -998,7 +1391,7 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="9" column="5">
+                   <item row="9" column="6">
                     <widget class="QLabel" name="label_46">
                      <property name="font">
                       <font>
@@ -1011,7 +1404,14 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="8" column="5">
+                   <item row="5" column="3">
+                    <widget class="QPushButton" name="g27">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="6">
                     <widget class="QLabel" name="label_43">
                      <property name="font">
                       <font>
@@ -1024,7 +1424,7 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="3" column="5">
+                   <item row="3" column="6">
                     <widget class="QLabel" name="label_41">
                      <property name="font">
                       <font>
@@ -1051,29 +1451,29 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="10" column="8">
-                    <widget class="QPushButton" name="g45">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="2" column="7">
+                   <item row="2" column="8">
                     <widget class="QPushButton" name="g14">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="7">
+                   <item row="1" column="8">
                     <widget class="QPushButton" name="g13">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="3" column="7">
-                    <widget class="QPushButton" name="g15">
+                   <item row="10" column="9">
+                    <widget class="QPushButton" name="g45">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="8">
+                    <widget class="QPushButton" name="g20">
                      <property name="text">
                       <string/>
                      </property>
@@ -1086,22 +1486,8 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="8" column="7">
-                    <widget class="QPushButton" name="g20">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="11" column="7">
-                    <widget class="QPushButton" name="g23">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="9" column="3">
-                    <widget class="QPushButton" name="g31">
+                   <item row="3" column="8">
+                    <widget class="QPushButton" name="g15">
                      <property name="text">
                       <string/>
                      </property>
@@ -1114,8 +1500,22 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
+                   <item row="11" column="8">
+                    <widget class="QPushButton" name="g23">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
                    <item row="2" column="2">
                     <widget class="QPushButton" name="g1">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="3">
+                    <widget class="QPushButton" name="g31">
                      <property name="text">
                       <string/>
                      </property>
@@ -1135,77 +1535,10 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="10" column="6">
+                   <item row="10" column="7">
                     <widget class="QLineEdit" name="l_45">
                      <property name="styleSheet">
                       <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="7" column="0">
-                    <widget class="QLabel" name="label_32">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Fertilizer application</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="1" column="6">
-                    <widget class="QLineEdit" name="l_36">
-                     <property name="styleSheet">
-                      <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="2" column="8">
-                    <widget class="QPushButton" name="g37">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="4" column="5">
-                    <widget class="QLabel" name="label_48">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Pesticide Reference</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="9" column="0">
-                    <widget class="QLabel" name="label_34">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Geology</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="8" column="2">
-                    <widget class="QPushButton" name="g7">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="11" column="8">
-                    <widget class="QPushButton" name="g46">
-                     <property name="text">
-                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -1224,6 +1557,13 @@ Pond Schedule</string>
                      </property>
                     </widget>
                    </item>
+                   <item row="7" column="2">
+                    <widget class="QPushButton" name="g6">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
                    <item row="4" column="0">
                     <widget class="QLabel" name="label_29">
                      <property name="font">
@@ -1237,10 +1577,29 @@ Pond Schedule</string>
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="2">
-                    <widget class="QPushButton" name="g6">
+                   <item row="2" column="6">
+                    <widget class="QLabel" name="label_40">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
                      <property name="text">
-                      <string/>
+                      <string>Non-crop</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="10" column="6">
+                    <widget class="QLabel" name="label_49">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Strip crop</string>
                      </property>
                     </widget>
                    </item>
@@ -1257,40 +1616,7 @@ Pond Schedule</string>
                      </property>
                     </widget>
                    </item>
-                   <item row="10" column="5">
-                    <widget class="QLabel" name="label_49">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Strip crop</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="2" column="5">
-                    <widget class="QLabel" name="label_40">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Non-crop</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="6" column="1">
-                    <widget class="QLineEdit" name="l_28">
-                     <property name="styleSheet">
-                      <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="2" column="6">
+                   <item row="2" column="7">
                     <widget class="QLineEdit" name="l_37">
                      <property name="styleSheet">
                       <string notr="true"/>
@@ -1304,7 +1630,7 @@ Pond Schedule</string>
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="5">
+                   <item row="5" column="6">
                     <widget class="QLabel" name="label_42">
                      <property name="font">
                       <font>
@@ -1317,7 +1643,14 @@ Pond Schedule</string>
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="4">
+                   <item row="6" column="1">
+                    <widget class="QLineEdit" name="l_28">
+                     <property name="styleSheet">
+                      <string notr="true"/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="5">
                     <widget class="QCheckBox" name="checkBox_4">
                      <property name="styleSheet">
                       <string notr="true">QCheckBox::hover{color:white}
@@ -1347,15 +1680,8 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="7">
+                   <item row="7" column="8">
                     <widget class="QPushButton" name="g19">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="6" column="8">
-                    <widget class="QPushButton" name="g41">
                      <property name="text">
                       <string/>
                      </property>
@@ -1368,10 +1694,31 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
+                   <item row="6" column="9">
+                    <widget class="QPushButton" name="g41">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
                    <item row="1" column="1">
                     <widget class="QLineEdit" name="l_23">
                      <property name="styleSheet">
                       <string notr="true">background-color:white;</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="7">
+                    <widget class="QLineEdit" name="l_40">
+                     <property name="styleSheet">
+                      <string notr="true"/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="7">
+                    <widget class="QLineEdit" name="l_44">
+                     <property name="styleSheet">
+                      <string notr="true"/>
                      </property>
                     </widget>
                    </item>
@@ -1399,20 +1746,6 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="9" column="6">
-                    <widget class="QLineEdit" name="l_44">
-                     <property name="styleSheet">
-                      <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="5" column="6">
-                    <widget class="QLineEdit" name="l_40">
-                     <property name="styleSheet">
-                      <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
                    <item row="7" column="3">
                     <widget class="QPushButton" name="g29">
                      <property name="text">
@@ -1420,7 +1753,7 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="8">
+                   <item row="1" column="9">
                     <widget class="QPushButton" name="g36">
                      <property name="text">
                       <string/>
@@ -1429,6 +1762,13 @@ QCheckBox::indicator:unchecked {
                    </item>
                    <item row="9" column="2">
                     <widget class="QPushButton" name="g8">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="8">
+                    <widget class="QPushButton" name="g21">
                      <property name="text">
                       <string/>
                      </property>
@@ -1447,7 +1787,7 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="4" column="7">
+                   <item row="4" column="8">
                     <widget class="QPushButton" name="g16">
                      <property name="text">
                       <string/>
@@ -1461,21 +1801,14 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="9" column="7">
-                    <widget class="QPushButton" name="g21">
+                   <item row="5" column="9">
+                    <widget class="QPushButton" name="g40">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="1">
-                    <widget class="QLineEdit" name="l_27">
-                     <property name="styleSheet">
-                      <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="11" column="6">
+                   <item row="11" column="7">
                     <widget class="QLineEdit" name="l_46">
                      <property name="styleSheet">
                       <string notr="true"/>
@@ -1495,17 +1828,10 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="8">
-                    <widget class="QPushButton" name="g40">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="3" column="8">
-                    <widget class="QPushButton" name="g38">
-                     <property name="text">
-                      <string/>
+                   <item row="5" column="1">
+                    <widget class="QLineEdit" name="l_27">
+                     <property name="styleSheet">
+                      <string notr="true"/>
                      </property>
                     </widget>
                    </item>
@@ -1516,7 +1842,7 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="5">
+                   <item row="1" column="6">
                     <widget class="QLabel" name="label_39">
                      <property name="font">
                       <font>
@@ -1526,6 +1852,20 @@ QCheckBox::indicator:unchecked {
                      </property>
                      <property name="text">
                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Management schedule &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="9">
+                    <widget class="QPushButton" name="g38">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="9">
+                    <widget class="QPushButton" name="g43">
+                     <property name="text">
+                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -1542,22 +1882,8 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="8">
+                   <item row="7" column="9">
                     <widget class="QPushButton" name="g42">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="8" column="8">
-                    <widget class="QPushButton" name="g43">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="5" column="7">
-                    <widget class="QPushButton" name="g17">
                      <property name="text">
                       <string/>
                      </property>
@@ -1576,13 +1902,6 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="8" column="6">
-                    <widget class="QLineEdit" name="l_43">
-                     <property name="styleSheet">
-                      <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
                    <item row="8" column="3">
                     <widget class="QPushButton" name="g30">
                      <property name="text">
@@ -1590,14 +1909,21 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="6">
-                    <widget class="QLineEdit" name="l_42">
+                   <item row="8" column="7">
+                    <widget class="QLineEdit" name="l_43">
                      <property name="styleSheet">
                       <string notr="true"/>
                      </property>
                     </widget>
                    </item>
-                   <item row="11" column="5">
+                   <item row="5" column="8">
+                    <widget class="QPushButton" name="g17">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="11" column="6">
                     <widget class="QLabel" name="label_47">
                      <property name="font">
                       <font>
@@ -1623,6 +1949,27 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
+                   <item row="7" column="7">
+                    <widget class="QLineEdit" name="l_42">
+                     <property name="styleSheet">
+                      <string notr="true"/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <widget class="QLineEdit" name="l_26">
+                     <property name="styleSheet">
+                      <string notr="true"/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="10" column="1">
+                    <widget class="QLineEdit" name="l_32">
+                     <property name="styleSheet">
+                      <string notr="true"/>
+                     </property>
+                    </widget>
+                   </item>
                    <item row="6" column="0">
                     <widget class="QLabel" name="label_31">
                      <property name="font">
@@ -1636,43 +1983,14 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="2" colspan="2">
-                    <widget class="QPushButton" name="change_g">
-                     <property name="text">
-                      <string>Change</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="10" column="1">
-                    <widget class="QLineEdit" name="l_32">
-                     <property name="styleSheet">
-                      <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="4" column="1">
-                    <widget class="QLineEdit" name="l_26">
-                     <property name="styleSheet">
-                      <string notr="true"/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="10" column="7">
-                    <widget class="QPushButton" name="g22">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="12" column="2">
-                    <widget class="QPushButton" name="g11">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
                    <item row="14" column="0">
                     <widget class="QPushButton" name="clear_g">
+                     <property name="maximumSize">
+                      <size>
+                       <width>100</width>
+                       <height>16777215</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -1684,20 +2002,28 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="5">
-                    <widget class="QLabel" name="label_45">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
+                   <item row="12" column="2">
+                    <widget class="QPushButton" name="g11">
                      <property name="text">
-                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Runoff curve &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="6">
+                   <item row="10" column="8">
+                    <widget class="QPushButton" name="g22">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="11" column="2">
+                    <widget class="QPushButton" name="g10">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="7">
                     <widget class="QLineEdit" name="l_41">
                      <property name="styleSheet">
                       <string notr="true"/>
@@ -1711,10 +2037,16 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="11" column="2">
-                    <widget class="QPushButton" name="g10">
+                   <item row="7" column="6">
+                    <widget class="QLabel" name="label_45">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
                      <property name="text">
-                      <string/>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Runoff curve &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -1732,7 +2064,7 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="5">
+                   <item row="6" column="6">
                     <widget class="QLabel" name="label_44">
                      <property name="font">
                       <font>
@@ -1745,10 +2077,10 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="13" column="1">
-                    <widget class="QLineEdit" name="l_35">
-                     <property name="styleSheet">
-                      <string notr="true"/>
+                   <item row="12" column="3">
+                    <widget class="QPushButton" name="g34">
+                     <property name="text">
+                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -1765,29 +2097,15 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="12" column="3">
-                    <widget class="QPushButton" name="g34">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="6" column="2">
-                    <widget class="QPushButton" name="g5">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="3" column="6">
-                    <widget class="QLineEdit" name="l_38">
+                   <item row="13" column="1">
+                    <widget class="QLineEdit" name="l_35">
                      <property name="styleSheet">
                       <string notr="true"/>
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="7">
-                    <widget class="QPushButton" name="g18">
+                   <item row="6" column="2">
+                    <widget class="QPushButton" name="g5">
                      <property name="text">
                       <string/>
                      </property>
@@ -1800,7 +2118,21 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="9" column="8">
+                   <item row="3" column="7">
+                    <widget class="QLineEdit" name="l_38">
+                     <property name="styleSheet">
+                      <string notr="true"/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="8">
+                    <widget class="QPushButton" name="g18">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="9">
                     <widget class="QPushButton" name="g44">
                      <property name="text">
                       <string/>
@@ -1811,6 +2143,132 @@ QCheckBox::indicator:unchecked {
                     <widget class="QLineEdit" name="l_30">
                      <property name="styleSheet">
                       <string notr="true"/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="10">
+                    <widget class="QPushButton" name="gt13">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="10">
+                    <widget class="QPushButton" name="gt14">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="10">
+                    <widget class="QPushButton" name="gt15">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="4">
+                    <widget class="QPushButton" name="gt6">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="4">
+                    <widget class="QPushButton" name="gt7">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="4">
+                    <widget class="QPushButton" name="gt8">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="10" column="4">
+                    <widget class="QPushButton" name="gt9">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="11" column="4">
+                    <widget class="QPushButton" name="gt10">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="12" column="4">
+                    <widget class="QPushButton" name="gt11">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="13" column="4">
+                    <widget class="QPushButton" name="gt12">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="10">
+                    <widget class="QPushButton" name="gt17">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="10">
+                    <widget class="QPushButton" name="gt18">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="10">
+                    <widget class="QPushButton" name="gt19">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="10">
+                    <widget class="QPushButton" name="gt20">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="10">
+                    <widget class="QPushButton" name="gt21">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="10" column="10">
+                    <widget class="QPushButton" name="gt22">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="11" column="10">
+                    <widget class="QPushButton" name="gt23">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="2" colspan="3">
+                    <widget class="QPushButton" name="change_g">
+                     <property name="text">
+                      <string>Change</string>
                      </property>
                     </widget>
                    </item>
@@ -1825,6 +2283,12 @@ QCheckBox::indicator:unchecked {
              <layout class="QHBoxLayout" name="horizontalLayout_3">
               <item>
                <widget class="QFrame" name="frame_4">
+                <property name="minimumSize">
+                 <size>
+                  <width>726</width>
+                  <height>0</height>
+                 </size>
+                </property>
                 <property name="frameShape">
                  <enum>QFrame::StyledPanel</enum>
                 </property>
@@ -1834,6 +2298,46 @@ QCheckBox::indicator:unchecked {
                 <layout class="QGridLayout" name="gridLayout_8">
                  <item row="0" column="0">
                   <layout class="QGridLayout" name="gridLayout_3">
+                   <item row="1" column="6">
+                    <widget class="QLabel" name="label_56">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Storm Type RFD</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="5">
+                    <widget class="QPushButton" name="ct1">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="5">
+                    <widget class="QPushButton" name="ct2">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="5">
+                    <widget class="QPushButton" name="ct3">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
                    <item row="7" column="0">
                     <spacer name="verticalSpacer">
                      <property name="orientation">
@@ -1861,10 +2365,24 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="7">
+                   <item row="2" column="8">
                     <widget class="QPushButton" name="c5">
                      <property name="text">
                       <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="1">
+                    <widget class="QLabel" name="label_79">
+                     <property name="font">
+                      <font>
+                       <pointsize>7</pointsize>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;* Required by AnnAGNPS&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
@@ -1875,21 +2393,14 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="1">
-                    <widget class="QLabel" name="label_79">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;* Required by AnnAGNPS&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                     </property>
-                    </widget>
-                   </item>
                    <item row="4" column="1">
                     <widget class="QLabel" name="label_51">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -1908,15 +2419,14 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="7">
-                    <widget class="QPushButton" name="c4">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="2" column="5">
+                   <item row="2" column="6">
                     <widget class="QLabel" name="label_55">
+                     <property name="minimumSize">
+                      <size>
+                       <width>110</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -1928,8 +2438,8 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="3" column="3">
-                    <widget class="QPushButton" name="c2">
+                   <item row="1" column="8">
+                    <widget class="QPushButton" name="c4">
                      <property name="text">
                       <string/>
                      </property>
@@ -1952,15 +2462,19 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="8">
-                    <widget class="QPushButton" name="c10">
+                   <item row="3" column="3">
+                    <widget class="QPushButton" name="c2">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="6">
-                    <widget class="QLineEdit" name="l_51"/>
+                   <item row="2" column="9">
+                    <widget class="QPushButton" name="c10">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
                    </item>
                    <item row="4" column="3">
                     <widget class="QPushButton" name="c3">
@@ -1969,11 +2483,17 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="6">
+                   <item row="2" column="7">
                     <widget class="QLineEdit" name="l_52"/>
                    </item>
                    <item row="3" column="1">
                     <widget class="QLabel" name="label_53">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -1985,8 +2505,17 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
+                   <item row="1" column="7">
+                    <widget class="QLineEdit" name="l_51"/>
+                   </item>
                    <item row="5" column="1">
                     <widget class="QPushButton" name="clear_c">
+                     <property name="maximumSize">
+                      <size>
+                       <width>100</width>
+                       <height>16777215</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -1998,28 +2527,14 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="5">
-                    <widget class="QLabel" name="label_56">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Storm Type RFD</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="1" column="3" colspan="2">
-                    <widget class="QPushButton" name="change_c">
-                     <property name="text">
-                      <string>Change</string>
-                     </property>
-                    </widget>
-                   </item>
                    <item row="2" column="1">
                     <widget class="QLabel" name="label_54">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -2033,6 +2548,12 @@ QCheckBox::indicator:unchecked {
                    </item>
                    <item row="1" column="1">
                     <widget class="QLabel" name="label_52">
+                     <property name="minimumSize">
+                      <size>
+                       <width>130</width>
+                       <height>0</height>
+                      </size>
+                     </property>
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -2044,13 +2565,7 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="4" column="2">
-                    <widget class="QLineEdit" name="l_50"/>
-                   </item>
-                   <item row="2" column="2">
-                    <widget class="QLineEdit" name="l_48"/>
-                   </item>
-                   <item row="1" column="8">
+                   <item row="1" column="9">
                     <widget class="QPushButton" name="c9">
                      <property name="text">
                       <string/>
@@ -2060,10 +2575,37 @@ QCheckBox::indicator:unchecked {
                    <item row="3" column="2">
                     <widget class="QLineEdit" name="l_49"/>
                    </item>
+                   <item row="4" column="2">
+                    <widget class="QLineEdit" name="l_50"/>
+                   </item>
+                   <item row="2" column="2">
+                    <widget class="QLineEdit" name="l_48"/>
+                   </item>
                    <item row="3" column="4">
                     <widget class="QPushButton" name="c7">
                      <property name="text">
                       <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="10">
+                    <widget class="QPushButton" name="ct4">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="10">
+                    <widget class="QPushButton" name="ct5">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="3" colspan="3">
+                    <widget class="QPushButton" name="change_c">
+                     <property name="text">
+                      <string>Change</string>
                      </property>
                     </widget>
                    </item>
@@ -2083,17 +2625,137 @@ QCheckBox::indicator:unchecked {
                 <layout class="QGridLayout" name="gridLayout_9">
                  <item row="0" column="0">
                   <layout class="QGridLayout" name="gridLayout_4">
-                   <item row="5" column="7">
-                    <widget class="QPushButton" name="s32">
+                   <item row="2" column="4">
+                    <widget class="QPushButton" name="st1">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="9" column="3">
-                    <widget class="QPushButton" name="s26">
+                   <item row="3" column="4">
+                    <widget class="QPushButton" name="st2">
                      <property name="text">
                       <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="4">
+                    <widget class="QPushButton" name="st3">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="4">
+                    <widget class="QPushButton" name="st4">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="4">
+                    <widget class="QPushButton" name="st5">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="10" column="4">
+                    <widget class="QPushButton" name="st9">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="4">
+                    <widget class="QPushButton" name="st8">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="1">
+                    <widget class="QLineEdit" name="l_58"/>
+                   </item>
+                   <item row="8" column="2">
+                    <widget class="QPushButton" name="s7">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="5">
+                    <widget class="QLabel" name="label_77">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>CSV</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="1">
+                    <widget class="QLineEdit" name="l_61"/>
+                   </item>
+                   <item row="9" column="5">
+                    <widget class="QLabel" name="label_69">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Min/Max</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="3">
+                    <widget class="QPushButton" name="s24">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="12" column="0">
+                    <spacer name="verticalSpacer_2">
+                     <property name="orientation">
+                      <enum>Qt::Vertical</enum>
+                     </property>
+                     <property name="sizeHint" stdset="0">
+                      <size>
+                       <width>20</width>
+                       <height>40</height>
+                      </size>
+                     </property>
+                    </spacer>
+                   </item>
+                   <item row="4" column="7">
+                    <widget class="QPushButton" name="s13">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="11" column="0">
+                    <widget class="QPushButton" name="clear_s">
+                     <property name="maximumSize">
+                      <size>
+                       <width>100</width>
+                       <height>16777215</height>
+                      </size>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Clear selection</string>
                      </property>
                     </widget>
                    </item>
@@ -2101,6 +2763,13 @@ QCheckBox::indicator:unchecked {
                     <widget class="QLineEdit" name="l_53">
                      <property name="styleSheet">
                       <string notr="true">background-color: white;</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="3">
+                    <widget class="QPushButton" name="s26">
+                     <property name="text">
+                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -2117,16 +2786,10 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="4">
-                    <widget class="QLabel" name="label_70">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
+                   <item row="5" column="8">
+                    <widget class="QPushButton" name="s32">
                      <property name="text">
-                      <string>Simulation</string>
+                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -2144,14 +2807,8 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="1">
-                    <widget class="QLineEdit" name="l_57"/>
-                   </item>
-                   <item row="8" column="1">
-                    <widget class="QLineEdit" name="l_60"/>
-                   </item>
-                   <item row="3" column="4">
-                    <widget class="QLabel" name="label_73">
+                   <item row="5" column="5">
+                    <widget class="QLabel" name="label_70">
                      <property name="font">
                       <font>
                        <weight>75</weight>
@@ -2159,11 +2816,11 @@ QCheckBox::indicator:unchecked {
                       </font>
                      </property>
                      <property name="text">
-                      <string>Data Preparation</string>
+                      <string>Simulation</string>
                      </property>
                     </widget>
                    </item>
-                   <item row="4" column="4">
+                   <item row="4" column="5">
                     <widget class="QLabel" name="label_74">
                      <property name="font">
                       <font>
@@ -2176,8 +2833,31 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="5">
-                    <widget class="QLineEdit" name="l_63"/>
+                   <item row="5" column="1">
+                    <widget class="QLineEdit" name="l_57"/>
+                   </item>
+                   <item row="7" column="4">
+                    <widget class="QPushButton" name="st6">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="1">
+                    <widget class="QLineEdit" name="l_60"/>
+                   </item>
+                   <item row="3" column="5">
+                    <widget class="QLabel" name="label_73">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Data Preparation</string>
+                     </property>
+                    </widget>
                    </item>
                    <item row="7" column="0">
                     <widget class="QLabel" name="label_67">
@@ -2192,21 +2872,31 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="7">
+                   <item row="1" column="6">
+                    <widget class="QLineEdit" name="l_63"/>
+                   </item>
+                   <item row="2" column="8">
                     <widget class="QPushButton" name="s29">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="2">
-                    <widget class="QPushButton" name="s1">
+                   <item row="7" column="7">
+                    <widget class="QPushButton" name="s16">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="4">
+                   <item row="4" column="2">
+                    <widget class="QPushButton" name="s3">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="5">
                     <widget class="QLabel" name="label_75">
                      <property name="font">
                       <font>
@@ -2219,15 +2909,8 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="6">
-                    <widget class="QPushButton" name="s16">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="4" column="2">
-                    <widget class="QPushButton" name="s3">
+                   <item row="2" column="2">
+                    <widget class="QPushButton" name="s1">
                      <property name="text">
                       <string/>
                      </property>
@@ -2246,17 +2929,17 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="4" column="1">
-                    <widget class="QLineEdit" name="l_56"/>
-                   </item>
-                   <item row="9" column="6">
+                   <item row="9" column="7">
                     <widget class="QPushButton" name="s18">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="7">
+                   <item row="4" column="1">
+                    <widget class="QLineEdit" name="l_56"/>
+                   </item>
+                   <item row="7" column="8">
                     <widget class="QPushButton" name="s34">
                      <property name="text">
                       <string/>
@@ -2276,7 +2959,7 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="0" column="4">
+                   <item row="0" column="5">
                     <widget class="QLabel" name="label_72">
                      <property name="font">
                       <font>
@@ -2290,6 +2973,9 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
+                   <item row="7" column="1">
+                    <widget class="QLineEdit" name="l_59"/>
+                   </item>
                    <item row="3" column="0">
                     <widget class="QLabel" name="label_58">
                      <property name="font">
@@ -2300,16 +2986,6 @@ QCheckBox::indicator:unchecked {
                      </property>
                      <property name="text">
                       <string>Global Error and Warning Limits</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="7" column="1">
-                    <widget class="QLineEdit" name="l_59"/>
-                   </item>
-                   <item row="8" column="7">
-                    <widget class="QPushButton" name="s35">
-                     <property name="text">
-                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -2330,7 +3006,24 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="4" column="5">
+                   <item row="8" column="8">
+                    <widget class="QPushButton" name="s35">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="6">
+                    <widget class="QLineEdit" name="l_68"/>
+                   </item>
+                   <item row="9" column="2">
+                    <widget class="QPushButton" name="s8">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="6">
                     <widget class="QLineEdit" name="l_66"/>
                    </item>
                    <item row="2" column="3">
@@ -2340,45 +3033,21 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="9" column="2">
-                    <widget class="QPushButton" name="s8">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="6" column="5">
-                    <widget class="QLineEdit" name="l_68"/>
-                   </item>
-                   <item row="1" column="6">
-                    <widget class="QPushButton" name="s10">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="9" column="5">
+                   <item row="9" column="6">
                     <widget class="QLineEdit" name="l_71"/>
                    </item>
-                   <item row="2" column="6">
+                   <item row="2" column="7">
                     <widget class="QPushButton" name="s11">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="5">
+                   <item row="5" column="6">
                     <widget class="QLineEdit" name="l_67"/>
                    </item>
-                   <item row="4" column="7">
-                    <widget class="QPushButton" name="s31">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="3" column="6">
-                    <widget class="QPushButton" name="s12">
+                   <item row="1" column="7">
+                    <widget class="QPushButton" name="s10">
                      <property name="text">
                       <string/>
                      </property>
@@ -2391,7 +3060,21 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="4">
+                   <item row="3" column="7">
+                    <widget class="QPushButton" name="s12">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="8">
+                    <widget class="QPushButton" name="s31">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="5">
                     <widget class="QLabel" name="label_68">
                      <property name="font">
                       <font>
@@ -2411,8 +3094,31 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="7">
+                   <item row="1" column="8">
                     <widget class="QPushButton" name="s28">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <widget class="QLineEdit" name="l_54"/>
+                   </item>
+                   <item row="8" column="5">
+                    <widget class="QLabel" name="label_76">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>Text Files - TBL</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="2">
+                    <widget class="QPushButton" name="s4">
                      <property name="text">
                       <string/>
                      </property>
@@ -2431,28 +3137,8 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="2">
-                    <widget class="QPushButton" name="s4">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="2" column="1">
-                    <widget class="QLineEdit" name="l_54"/>
-                   </item>
-                   <item row="8" column="4">
-                    <widget class="QLabel" name="label_76">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Text Files - TBL</string>
-                     </property>
-                    </widget>
+                   <item row="3" column="6">
+                    <widget class="QLineEdit" name="l_65"/>
                    </item>
                    <item row="3" column="3">
                     <widget class="QPushButton" name="s20">
@@ -2468,14 +3154,8 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="8" column="5">
+                   <item row="8" column="6">
                     <widget class="QLineEdit" name="l_70"/>
-                   </item>
-                   <item row="3" column="5">
-                    <widget class="QLineEdit" name="l_65"/>
-                   </item>
-                   <item row="3" column="1">
-                    <widget class="QLineEdit" name="l_55"/>
                    </item>
                    <item row="8" column="3">
                     <widget class="QPushButton" name="s25">
@@ -2484,17 +3164,13 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="5">
+                   <item row="7" column="6">
                     <widget class="QLineEdit" name="l_69"/>
                    </item>
-                   <item row="6" column="6">
-                    <widget class="QPushButton" name="s15">
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
+                   <item row="3" column="1">
+                    <widget class="QLineEdit" name="l_55"/>
                    </item>
-                   <item row="9" column="7">
+                   <item row="9" column="8">
                     <widget class="QPushButton" name="s36">
                      <property name="text">
                       <string/>
@@ -2514,21 +3190,8 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="0">
-                    <widget class="QLabel" name="label_61">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;AnnAGNPS ID &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="3" column="7">
-                    <widget class="QPushButton" name="s30">
+                   <item row="6" column="7">
+                    <widget class="QPushButton" name="s15">
                      <property name="text">
                       <string/>
                      </property>
@@ -2547,22 +3210,28 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="7">
+                   <item row="6" column="8">
                     <widget class="QPushButton" name="s33">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="6" column="2">
-                    <widget class="QPushButton" name="s5">
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="label_61">
+                     <property name="font">
+                      <font>
+                       <weight>75</weight>
+                       <bold>true</bold>
+                      </font>
+                     </property>
                      <property name="text">
-                      <string/>
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;AnnAGNPS ID &lt;span style=&quot; color:#ffffff;&quot;&gt;*&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                      </property>
                     </widget>
                    </item>
-                   <item row="5" column="6">
-                    <widget class="QPushButton" name="s14">
+                   <item row="3" column="8">
+                    <widget class="QPushButton" name="s30">
                      <property name="text">
                       <string/>
                      </property>
@@ -2578,7 +3247,31 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="4">
+                   <item row="5" column="7">
+                    <widget class="QPushButton" name="s14">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="2">
+                    <widget class="QPushButton" name="s5">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="6">
+                    <widget class="QLineEdit" name="l_64"/>
+                   </item>
+                   <item row="8" column="7">
+                    <widget class="QPushButton" name="s17">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="5">
                     <widget class="QLabel" name="label_71">
                      <property name="font">
                       <font>
@@ -2591,11 +3284,15 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="5">
-                    <widget class="QLineEdit" name="l_64"/>
+                   <item row="8" column="4">
+                    <widget class="QPushButton" name="st7">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
                    </item>
-                   <item row="8" column="6">
-                    <widget class="QPushButton" name="s17">
+                   <item row="10" column="3">
+                    <widget class="QPushButton" name="s27">
                      <property name="text">
                       <string/>
                      </property>
@@ -2614,96 +3311,73 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item row="10" column="3">
-                    <widget class="QPushButton" name="s27">
+                   <item row="1" column="9">
+                    <widget class="QPushButton" name="st10">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="8" column="2">
-                    <widget class="QPushButton" name="s7">
+                   <item row="2" column="9">
+                    <widget class="QPushButton" name="st11">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="4">
-                    <widget class="QLabel" name="label_77">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>CSV</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="9" column="1">
-                    <widget class="QLineEdit" name="l_61"/>
-                   </item>
-                   <item row="6" column="1">
-                    <widget class="QLineEdit" name="l_58"/>
-                   </item>
-                   <item row="4" column="6">
-                    <widget class="QPushButton" name="s13">
+                   <item row="3" column="9">
+                    <widget class="QPushButton" name="st12">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="7" column="3">
-                    <widget class="QPushButton" name="s24">
+                   <item row="4" column="9">
+                    <widget class="QPushButton" name="st13">
                      <property name="text">
                       <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="9" column="4">
-                    <widget class="QLabel" name="label_69">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
+                   <item row="5" column="9">
+                    <widget class="QPushButton" name="st14">
                      <property name="text">
-                      <string>Min/Max</string>
+                      <string/>
                      </property>
                     </widget>
                    </item>
-                   <item row="12" column="0">
-                    <spacer name="verticalSpacer_2">
-                     <property name="orientation">
-                      <enum>Qt::Vertical</enum>
+                   <item row="6" column="9">
+                    <widget class="QPushButton" name="st15">
+                     <property name="text">
+                      <string/>
                      </property>
-                     <property name="sizeHint" stdset="0">
-                      <size>
-                       <width>20</width>
-                       <height>40</height>
-                      </size>
-                     </property>
-                    </spacer>
+                    </widget>
                    </item>
-                   <item row="1" column="2" colspan="2">
+                   <item row="7" column="9">
+                    <widget class="QPushButton" name="st16">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="9">
+                    <widget class="QPushButton" name="st17">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="9" column="9">
+                    <widget class="QPushButton" name="st18">
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="2" colspan="3">
                     <widget class="QPushButton" name="change_s">
                      <property name="text">
                       <string>Change</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="11" column="0">
-                    <widget class="QPushButton" name="clear_s">
-                     <property name="font">
-                      <font>
-                       <weight>75</weight>
-                       <bold>true</bold>
-                      </font>
-                     </property>
-                     <property name="text">
-                      <string>Clear selection</string>
                      </property>
                     </widget>
                    </item>

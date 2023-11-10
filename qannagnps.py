@@ -21,12 +21,12 @@
 
     
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt
-from PyQt5.QtWidgets import QFrame
+from PyQt5.QtWidgets import QFrame,QTableWidgetItem
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QFileDialog
 from qgis.core import QgsProject
 from PyQt5.QtCore import QVariant,QObject, QThread, pyqtSignal, QSize
-from qgis.PyQt import QtWidgets
+from qgis.PyQt import QtWidgets,QtGui
 from qgis.utils import iface
 from qgis.core import *
 from qgis.gui import QgsMapToolEmitPoint,QgsMessageBar
@@ -34,7 +34,6 @@ from PyQt5.QtGui import QFont,QColor
 from qgis.PyQt.QtWidgets import QApplication, QMainWindow, QProgressBar, QLabel, QWidget, QHBoxLayout, QVBoxLayout
 from qgis.core import QgsTask, QgsApplication
 from PyQt5.QtGui import QPixmap
-
 
 
 import subprocess
@@ -56,6 +55,8 @@ import statistics
 from functools import partial
 import itertools
 from matplotlib.ticker import FuncFormatter
+import sys
+import chardet
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -77,6 +78,7 @@ from .ui.overwrite_dialog import OverwriteDialog
 from .ui.output_dialog import OutputDialog
 from .ui.existing_dialog import ExistingDialog
 from .ui.documentation_dialog import DocumentationDialog
+from .ui.table_inputs import TableDialog
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -86,7 +88,7 @@ import os.path
 import webbrowser
 #from .Coordinate_capturer import PrintClickedPoint
 
-
+import threading
 
 class qannagnps():
 
@@ -247,12 +249,14 @@ class qannagnps():
         dic_buttons_simulation = {self.inputs.s19:self.inputs.l_54,self.inputs.s20:self.inputs.l_55,self.inputs.s21:self.inputs.l_56,self.inputs.s22:self.inputs.l_57,self.inputs.s23:self.inputs.l_58,self.inputs.s24:self.inputs.l_59,self.inputs.s25:self.inputs.l_60,self.inputs.s26:self.inputs.l_61,self.inputs.s27:self.inputs.l_62,self.inputs.s28:self.inputs.l_63,self.inputs.s29:self.inputs.l_64,self.inputs.s30:self.inputs.l_65,self.inputs.s31:self.inputs.l_66,self.inputs.s32:self.inputs.l_67,self.inputs.s33:self.inputs.l_68,self.inputs.s34:self.inputs.l_69,self.inputs.s35:self.inputs.l_70,self.inputs.s36:self.inputs.l_71}
         self.dic_botones = {**dic_buttons_watershed,**dic_general,**dic_climate,**dic_buttons_simulation}
         self.inverted_dict = {value: key for key, value in self.dic_botones.items()} #es el diccionario a la inversa, para que sea más facil luego cambiar los iconos
+        
         #Ahora se crea un diccionario con el nombre de los archivos por cada sección. En el caso de que no haya texto escrito se crearán archivos csv con estos nombres para cada sección. 
         nombres_archivos = ["aqua_pond.csv", "AnnAGNPS_Cell_Data_Section.csv", "classic_gully.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","feedlot.csv","field_pond.csv","impoundment.csv","point_source.csv","AnnAGNPS_Reach_Data_Section.csv","rice.csv","watershed_data.csv","wetland.csv","out_cells.csv","out_feedlots.csv","out_field_ponds.csv","out_classic_gullies.csv","out_eg.csv","out_impoundments.csv","out_point_sources.csv","out_reaches.csv","out_wetlands.csv","aq_pond_schedule.csv","contour.csv","crop.csv","crop_growth.csv","feedlot_man.csv","fert_app.csv","fert_ref.csv","geology.csv","hyd_geom.csv","irr_app.csv","manfield.csv","manoper.csv","mansched.csv","non_crop.csv","pest_app.csv","pest_ref.csv","reach_nutr.csv","rip_buff.csv","run_curve.csv","soil.csv","soil_layer.csv","strip_crop.csv","tile_drain.csv","climate_station.csv","climate_daily.csv","ei_percentage.csv","storm_type_rfd.csv","storm_type_updrc.csv","annaid.csv","glob_error.csv","glob_id.csv","pest_init.csv","pl_cal.csv","rcn_cal.csv","sim_period.csv","soil_init.csv","rusle2.csv","out_glob.csv","out_csv.csv","out_dp.csv","out_input.csv","out_sim.csv","out_aa.csv","out_ev.csv","out_tbl.csv","out_minmax.csv"]
         self.dic_boton_archivo = {}
         for i, clave in enumerate(self.dic_botones.keys()):
             if i < len(nombres_archivos):
-                self.dic_boton_archivo[clave] = nombres_archivos[i]     
+                self.dic_boton_archivo[clave] = nombres_archivos[i]
+
         #Ahora se cambian los colores de las líneas y el icono de los botones
         self.lines_dialog = [self.inputs.l_2, self.inputs.l_3, self.inputs.l_4, self.inputs.l_5, self.inputs.l_6, self.inputs.l_7, self.inputs.l_8, self.inputs.l_9, self.inputs.l_10, self.inputs.l_11, self.inputs.l_12, self.inputs.l_13, self.inputs.l_14, self.inputs.l_15, self.inputs.l_16, self.inputs.l_17, self.inputs.l_18, self.inputs.l_19, self.inputs.l_20, self.inputs.l_21, self.inputs.l_22,self.inputs.l_24, self.inputs.l_25, self.inputs.l_26, self.inputs.l_27, self.inputs.l_28, self.inputs.l_29, self.inputs.l_30, self.inputs.l_31, self.inputs.l_32, self.inputs.l_33, self.inputs.l_34, self.inputs.l_35, self.inputs.l_36, self.inputs.l_37, self.inputs.l_38, self.inputs.l_39, self.inputs.l_40, self.inputs.l_41, self.inputs.l_42, self.inputs.l_43, self.inputs.l_44, self.inputs.l_45, self.inputs.l_46, self.inputs.l_48, self.inputs.l_49, self.inputs.l_50, self.inputs.l_51, self.inputs.l_52, self.inputs.l_54, self.inputs.l_55, self.inputs.l_56, self.inputs.l_57, self.inputs.l_58, self.inputs.l_59, self.inputs.l_60, self.inputs.l_61, self.inputs.l_62, self.inputs.l_63, self.inputs.l_64, self.inputs.l_65, self.inputs.l_66, self.inputs.l_67, self.inputs.l_68, self.inputs.l_69, self.inputs.l_70, self.inputs.l_71]
         self.dic_lines_search = {self.inputs.l_2:self.inputs.w1,self.inputs.l_3:self.inputs.w2,self.inputs.l_4:self.inputs.w3,self.inputs.l_5:self.inputs.w4,self.inputs.l_6:self.inputs.w5,self.inputs.l_7:self.inputs.w6,self.inputs.l_8:self.inputs.w7,self.inputs.l_9:self.inputs.w8,self.inputs.l_10:self.inputs.w9,self.inputs.l_11:self.inputs.w10,self.inputs.l_12:self.inputs.w11,self.inputs.l_13:self.inputs.w12,self.inputs.l_14:self.inputs.w13,self.inputs.l_15:self.inputs.w14,self.inputs.l_16:self.inputs.w15,self.inputs.l_17:self.inputs.w16,self.inputs.l_18:self.inputs.w17,self.inputs.l_19:self.inputs.w18,self.inputs.l_20:self.inputs.w19,self.inputs.l_21:self.inputs.w20,self.inputs.l_22:self.inputs.w21,self.inputs.l_24:self.inputs.g1,self.inputs.l_25:self.inputs.g2,self.inputs.l_26:self.inputs.g3,self.inputs.l_27:self.inputs.g4,self.inputs.l_28:self.inputs.g5,self.inputs.l_29:self.inputs.g6,self.inputs.l_30:self.inputs.g7,self.inputs.l_31:self.inputs.g8,self.inputs.l_32:self.inputs.g9,self.inputs.l_33:self.inputs.g10,self.inputs.l_34:self.inputs.g11,self.inputs.l_35:self.inputs.g12,self.inputs.l_36:self.inputs.g13,self.inputs.l_37:self.inputs.g14,self.inputs.l_38:self.inputs.g15,self.inputs.l_39:self.inputs.g16,self.inputs.l_40:self.inputs.g17,self.inputs.l_41:self.inputs.g18,self.inputs.l_42:self.inputs.g19,self.inputs.l_43:self.inputs.g20,self.inputs.l_44:self.inputs.g21,self.inputs.l_45:self.inputs.g22,self.inputs.l_46:self.inputs.g23,self.inputs.l_48:self.inputs.c1,self.inputs.l_49:self.inputs.c2,self.inputs.l_50:self.inputs.c3,self.inputs.l_51:self.inputs.c4,self.inputs.l_52:self.inputs.c5,self.inputs.l_54:self.inputs.s1,self.inputs.l_55:self.inputs.s2,self.inputs.l_56:self.inputs.s3,self.inputs.l_57:self.inputs.s4,self.inputs.l_58:self.inputs.s5,self.inputs.l_59:self.inputs.s6,self.inputs.l_60:self.inputs.s7,self.inputs.l_61:self.inputs.s8,self.inputs.l_62:self.inputs.s9,self.inputs.l_63:self.inputs.s10,self.inputs.l_64:self.inputs.s11,self.inputs.l_65:self.inputs.s12,self.inputs.l_66:self.inputs.s13,self.inputs.l_67:self.inputs.s14,self.inputs.l_68:self.inputs.s15,self.inputs.l_69:self.inputs.s16,self.inputs.l_70:self.inputs.s17,self.inputs.l_71:self.inputs.s18}
@@ -383,8 +387,32 @@ class qannagnps():
         out_tbl_col =  ["CCHE1D", "CONCEPTS_XML", "Gaging_Station_Hyd", "REMM", "Gaging_Station_Evt"]
         out_minmax_col = ["Min_Evt_Date","Max_Evt_Date","Max_Number_Evts","Min_Rnof_Evt","Min_Rnof_Cell","Min_Rnof_Outlet","Min_Subarea_ID","Max_Subarea_ID","Subarea_Units_Positn","Max_Vrfy_File_Access","Max_Vrfy_File_Bytes","Input_Units_Code"]
         dic_bc_simulation = {self.inputs.s19:annaid_col,self.inputs.s20:global_error_col,self.inputs.s21:global_ids_col,self.inputs.s22:pesticide_initial_col,self.inputs.s23:pl_calibration_col,self.inputs.s24:rcn_col,self.inputs.s25:sim_col,self.inputs.s26:soil_initial_col,self.inputs.s27:rusle2_col,self.inputs.s28:out_global_col,self.inputs.s29:out_csv_col,self.inputs.s30:out_dpp_col,self.inputs.s31:out_inver_col,self.inputs.s32:out_sim_col,self.inputs.s33:out_aa_col,self.inputs.s34:out_ev_col,self.inputs.s35:out_tbl_col,self.inputs.s36:out_minmax_col}
+        #Dictionary csv button - column names
         self.dic_boton_columnas = {**dic_bc_watershed,**dic_bc_general,**dic_bc_climate,**dic_bc_simulation}
-                        
+        #Dictionary table - column names
+        self.table_buttons = [self.inputs.wt1 ,  self.inputs.wt2 ,  self.inputs.wt3 ,  self.inputs.wt4 ,  self.inputs.wt5 ,  self.inputs.wt6 ,  self.inputs.wt7 ,  self.inputs.wt8 ,  self.inputs.wt9 ,  self.inputs.wt10 ,  self.inputs.wt11 ,  self.inputs.wt12 ,  self.inputs.wt13 ,  self.inputs.wt14 ,  self.inputs.wt15 ,  self.inputs.wt16 ,  self.inputs.wt17 ,  self.inputs.wt18 ,  self.inputs.wt19 ,  self.inputs.wt20 ,  self.inputs.wt21 , self.inputs.gt1 ,  self.inputs.gt2 ,  self.inputs.gt3 ,  self.inputs.gt4 ,  self.inputs.gt5 ,  self.inputs.gt6 ,  self.inputs.gt7 ,  self.inputs.gt8 ,  self.inputs.gt9 ,  self.inputs.gt10 ,  self.inputs.gt11 ,  self.inputs.gt12 ,  self.inputs.gt13 ,  self.inputs.gt14 ,  self.inputs.gt15 ,  self.inputs.gt16 ,  self.inputs.gt17 ,  self.inputs.gt18 ,  self.inputs.gt19 ,  self.inputs.gt20 ,  self.inputs.gt21 ,  self.inputs.gt22 ,  self.inputs.gt23 , self.inputs.ct1 ,  self.inputs.ct2 ,  self.inputs.ct3 ,  self.inputs.ct4 ,  self.inputs.ct5 , self.inputs.st1 ,  self.inputs.st2 ,  self.inputs.st3 ,  self.inputs.st4 ,  self.inputs.st5 ,  self.inputs.st6 ,  self.inputs.st7 ,  self.inputs.st8 ,  self.inputs.st9 ,  self.inputs.st10 ,  self.inputs.st11 ,  self.inputs.st12 ,  self.inputs.st13 ,  self.inputs.st14 ,  self.inputs.st15 ,  self.inputs.st16 ,  self.inputs.st17 ,  self.inputs.st18 ]
+        self.dic_table_button = {}
+        for k,i in enumerate(self.dic_boton_columnas.values()):
+            self.dic_table_button[self.table_buttons[k]] = i
+        
+        #Dictionary of AnnAGNPS input file tables - names of news files
+        self.dic_table_filename = {}
+        for k,i in enumerate(self.table_buttons):
+            self.dic_table_filename[i]=nombres_archivos[k]
+            
+        #Butons to modify AnnAGNPS inputs with dialog table
+        for i in self.dic_table_button.keys():
+            i.clicked.connect(lambda _,b=i: self.table_inputs(b))
+        #Dictionary to relate table buttons with lines
+        self.dic_line_table = {}
+        for k,i in enumerate(self.dic_table_button.keys()):
+            self.dic_line_table[i] = list(self.dic_botones.values())[k]
+        
+        #Change icons of annagnps table inputs
+        icon_table = os.path.join(plugin_directory, "images/table.svg")
+        for i in self.table_buttons:
+            i.setIcon(QIcon(icon_table))
+        
         #Importar el archivo master
         self.inputs.pb_master.clicked.connect(self.add_master)
         
@@ -482,6 +510,140 @@ class qannagnps():
         dic = {self.output.pushButton_11:"Cell_raster",self.output.pushButton_13:"Cell_vectorial",self.output.pushButton_14:"Boundary_raster",self.output.pushButton_19:"Boundary_vectorial",self.output.pushButton_22:"Reaches_raster",self.output.pushButton_20:"Reaches_vectorial",self.output.pushButton_21:"Accumulated",self.output.pushButton_23:"Terrain_slope",self.output.pushButton_24:"Hydraulic",self.output.pushButton_25:"Terrain_aspect",self.output.pushButton_26:"RUSLE",self.output.pushButton_27:"Longest_raster",self.output.pushButton_28:"Longest_vectorial"}
         for i in dic.keys():
             i.clicked.connect(lambda _,b = dic[i]:self.output_topagnps(b))
+    
+    def obtener_codificacion(self,archivo_csv):
+        #Metod to detect code type of csv. If I dont do this ' character gives an error for example in Global IDs, Factors and Flags. 
+        with open(archivo_csv, 'rb') as file:
+            resultado = chardet.detect(file.read())
+        return resultado['encoding']
+    
+    def table_inputs(self,button):
+        #Metod to add a dialog where inputs of AnnAGNPS can be modified
+        self.table_input = TableDialog()
+        #Icons
+        self.table_input.add.setIcon(QIcon(os.path.join(self.plugin_directory, "images/add.svg")))
+        self.table_input.remove.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
+        
+        #Function to return the path depending if the file path is absolute or relative
+        def file_input(boton):
+            if os.path.isabs(self.dic_line_table[button].text()):
+                return self.dic_line_table[button].text()
+            else:
+                return self.dic_folder[self.dic_line_table[button]].text()+"/"+self.dic_line_table[button].text() 
+           
+        if self.dic_line_table[button].text() =="":
+            #If file exist then warning
+            name_file = self.dic_table_filename[button]
+            file_path = self.dic_folder[self.dic_line_table[button]].text()+"/"+name_file
+            if path.exists(file_path):
+                self.table_input_overwrite = True
+                self.end_inputing = False
+                self.overwrite.show()
+                self.table_input_overwrite = False
+                if self.end_inputing:
+                    return
+            #Add files and columns
+            #Add columns
+            columnas = self.dic_table_button[button]
+            self.table_input.tableWidget.setColumnCount(len(columnas))
+            self.table_input.tableWidget.setHorizontalHeaderLabels(columnas)
+            #Show dialog
+            self.table_input.show()
+        else:
+            file_path = file_input(button)
+            if os.path.exists(file_path): 
+                #Add files and columns
+                #Add columns
+                def obtener_datos_filas(archivo_csv):
+                    datos_filas = []
+                    # Determinar la codificación del archivo CSV
+                    codificacion = self.obtener_codificacion(archivo_csv)
+                    with open(archivo_csv, 'r', encoding=codificacion) as file:
+                        reader = csv.reader(file)
+                        # Leer la primera fila del archivo CSV (nombres de las columnas)
+                        nombres_columnas = next(reader)
+                        # Iterar sobre las filas restantes y construir la lista de listas
+                        for fila in reader:
+                            datos_filas.append(fila)
+                    return nombres_columnas, datos_filas
+                    
+                columnas, datos_filas = obtener_datos_filas(file_path)
+                self.table_input.tableWidget.setColumnCount(len(columnas))
+                self.table_input.tableWidget.setHorizontalHeaderLabels(columnas)
+                #Add rows
+                self.table_input.tableWidget.setRowCount(len(datos_filas))
+                for fila, datos in enumerate(datos_filas):
+                    for columna, valor in enumerate(datos):
+                        item = QTableWidgetItem(valor)
+                        self.table_input.tableWidget.setItem(fila, columna, item)
+                        item.setTextAlignment(Qt.AlignCenter)
+                #Show dialog
+                self.table_input.show()
+            elif self.dic_line_table[button].text() != "-- Provided by TopAGNPS --":
+                self.existing.label.setText("{} does not exist".format(file_path))
+                self.existing.show()
+        
+        #Add the functionality to the dialog to add and remove rows and create document
+        self.table_input.add.clicked.connect(self.add_row)
+        self.table_input.remove.clicked.connect(self.remove_row)
+        self.table_input.accept.clicked.connect(lambda _,b = button:self.create_file_table(b))
+    
+    def create_file_table(self,button):
+        #Metod to create or upload file when modifying AnnAGNPS input with the table
+        #Fist we determine the file path
+        if os.path.isabs(self.dic_line_table[button].text()):
+                file_path =  self.dic_line_table[button].text()
+        else:
+            file_path =  self.dic_folder[self.dic_line_table[button]].text()+"/"+self.dic_line_table[button].text() 
+        #Now we create or upload the files
+        if self.dic_line_table[button].text() == "":
+            #Here we create a new file
+            name_file = self.dic_table_filename[button]
+            file_path = self.dic_folder[self.dic_line_table[button]].text()+"/"+name_file
+            with open(file_path, 'w', newline='') as csv_file:
+                csv_writer = csv.writer(csv_file)
+                # Get column names from the table
+                column_names = [self.table_input.tableWidget.horizontalHeaderItem(col).text() for col in range(self.table_input.tableWidget.columnCount())]
+                csv_writer.writerow(column_names)
+                # Get row data from the table
+                for row in range(self.table_input.tableWidget.rowCount()):
+                    row_data = []
+                    for col in range(self.table_input.tableWidget.columnCount()):
+                        try: #this is because if there is not data in the cell then it gives error
+                            row_data.append(self.table_input.tableWidget.item(row, col).text())
+                        except:
+                            row_data.append("")
+                    csv_writer.writerow(row_data)
+            self.dic_line_table[button].setText(name_file)
+            self.table_input.close()
+        else:
+            #Here we upload the file
+            try:
+                codificacion = self.obtener_codificacion(file_path)
+                with open(file_path, 'w', newline='',encoding=codificacion) as csv_file:
+                    csv_writer = csv.writer(csv_file)
+                    # Get column names from the table
+                    column_names = [self.table_input.tableWidget.horizontalHeaderItem(col).text() for col in range(self.table_input.tableWidget.columnCount())]
+                    csv_writer.writerow(column_names)
+                    # Get row data from the table
+                    for row in range(self.table_input.tableWidget.rowCount()):
+                        row_data = [self.table_input.tableWidget.item(row, col).text() for col in range(self.table_input.tableWidget.columnCount())]
+                        csv_writer.writerow(row_data)
+                self.table_input.close()
+            except:
+                iface.messageBar().pushMessage(f"Please close {file_path} to update data",level=Qgis.Warning, duration=10)
+                return
+    
+    def add_row(self):
+        #Metod to add rows in tables for AnnAGNPS inputs
+        row_position = self.table_input.tableWidget.rowCount()
+        self.table_input.tableWidget.insertRow(row_position)
+            
+    def remove_row(self):
+        #Metod to remove rows in tables for AnnAGNPS inputs
+        selected_row = self.table_input.tableWidget.rowCount()
+        if selected_row >= 0:
+            self.table_input.tableWidget.removeRow(selected_row-1)
         
     def general_output(self):
         #Método para añadir los outputs generales al diálogo
@@ -1690,11 +1852,17 @@ class qannagnps():
         
     def path_exist(self):
         #Método para mostrar si los inputs de AnnAGNPS existen o no
+        #Function to return the path depending if the file path is absolute or relative
+        def file_input(line):
+            if os.path.isabs(line.text()):
+                return line.text()
+            else:
+                return self.dic_folder[line].text()+"/"+line.text() 
         if self.border == False:
             for i in self.lines_dialog:
-                    if i.text()!="" and path.exists(self.dic_folder[i].text()+"\\"+i.text()) and i.text()!="-- Provided by TopAGNPS --":
+                    if i.text()!="" and path.exists(file_input(i)) and i.text()!="-- Provided by TopAGNPS --":
                         i.setStyleSheet("QLineEdit {border: 3px solid #00FF00; }\n QLineEdit { background-color: rgb(196, 240, 119) ; }")
-                    elif i.text()!="" and not path.exists(self.dic_folder[i].text()+"\\"+i.text()) and i.text()!="-- Provided by TopAGNPS --":
+                    elif i.text()!="" and not path.exists(file_input(i)) and i.text()!="-- Provided by TopAGNPS --":
                         i.setStyleSheet("QLineEdit {border: 3px solid red;}\n QLineEdit { background-color: rgb(196, 240, 119) ; }")
         if self.border == True:
             for i in self.lines_dialog:
@@ -1787,29 +1955,35 @@ class qannagnps():
             linea.setStyleSheet("QLineEdit { background-color: #FFFFFF; }")
         
     def overwrite_file(self):
-        #Se crea el nuevo archivo y se abre
-        with open(self.file_to_overwrite, mode="w", newline="") as archivo:
-            writer = csv.writer(archivo)
-            writer.writerow(self.dic_boton_columnas[self.boton_to_overwrite])
-        os.startfile(self.file_to_overwrite)
-        #Se pone en la línea de texto el nuevo archivo creado
-        if os.path.isabs(self.file_to_overwrite):
-            self.line_to_write.setText(os.path.split(self.file_to_overwrite)[1])
+        if not self.table_input_overwrite:
+            #Se crea el nuevo archivo y se abre
+            with open(self.file_to_overwrite, mode="w", newline="") as archivo:
+                writer = csv.writer(archivo)
+                writer.writerow(self.dic_boton_columnas[self.boton_to_overwrite])
+            os.startfile(self.file_to_overwrite)
+            #Se pone en la línea de texto el nuevo archivo creado
+            if os.path.isabs(self.file_to_overwrite):
+                self.line_to_write.setText(os.path.split(self.file_to_overwrite)[1])
+            else:
+                self.line_to_write.setText(self.file_to_overwrite)
+            self.overwrite.close()
         else:
-            self.line_to_write.setText(self.file_to_overwrite)
-        self.overwrite.close()
+            return
         
     def not_overwrite_file(self):
-        self.overwrite.close()
+        if not self.table_input_overwrite:
+            self.overwrite.close()
+        else:
+            self.end_inputing = True
     
     def change_icons(self,linea):
         #Método para cambiar el icono según haya o no texto en las secciones (inputs) de AnnAGNPS.
         if linea.text()!="":
             self.inverted_dict[linea].setIcon(QIcon(self.icon_path_document))
-            self.inverted_dict[linea].setToolTip(self.tr("Open document"))
+            self.inverted_dict[linea].setToolTip(self.tr("Open CSV file"))
         else:
             self.inverted_dict[linea].setIcon(QIcon(self.icon_path_createdocument))
-            self.inverted_dict[linea].setToolTip(self.tr("Create document"))
+            self.inverted_dict[linea].setToolTip(self.tr("Create CSV file"))
             
     def open_file(self,boton):
         #Método para que se abra el archivo que contiene los datos de las secciones de AnnAGNPS
@@ -3970,6 +4144,9 @@ class qannagnps():
             i.setToolTip(self.tr("Search document"))
         #Create documents
         for i in self.dic_botones.keys():
-            i.setToolTip(self.tr("Create document"))
+            i.setToolTip(self.tr("Create CSV file"))
+        #Modify annagnps inputs with table
+        for i in self.table_buttons:
+            i.setToolTip(self.tr("Modify input"))
         
         
