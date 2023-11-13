@@ -403,6 +403,8 @@ class qannagnps():
         #Butons to modify AnnAGNPS inputs with dialog table
         for i in self.dic_table_button.keys():
             i.clicked.connect(lambda _,b=i: self.table_inputs(b))
+        self.table_input_overwrite = False
+        
         #Dictionary to relate table buttons with lines
         self.dic_line_table = {}
         for k,i in enumerate(self.dic_table_button.keys()):
@@ -520,6 +522,7 @@ class qannagnps():
     def table_inputs(self,button):
         #Metod to add a dialog where inputs of AnnAGNPS can be modified
         self.table_input = TableDialog()
+        self.button = button #for when we are in overwriting
         #Icons
         self.table_input.add.setIcon(QIcon(os.path.join(self.plugin_directory, "images/add.svg")))
         self.table_input.remove.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
@@ -535,13 +538,12 @@ class qannagnps():
             #If file exist then warning
             name_file = self.dic_table_filename[button]
             file_path = self.dic_folder[self.dic_line_table[button]].text()+"/"+name_file
-            if path.exists(file_path):
-                self.table_input_overwrite = True
-                self.end_inputing = False
+            if path.exists(file_path) and self.table_input_overwrite == False:
                 self.overwrite.show()
-                self.table_input_overwrite = False
-                if self.end_inputing:
-                    return
+                self.overwrite.label.setText(f"{file_path} exist. Do you want to overwrite the file?")
+                self.overwriting_input = True #to say to the button "Yes" that we are modifying with table and not with CSV file
+                return
+
             #Add files and columns
             #Add columns
             columnas = self.dic_table_button[button]
@@ -627,7 +629,12 @@ class qannagnps():
                     csv_writer.writerow(column_names)
                     # Get row data from the table
                     for row in range(self.table_input.tableWidget.rowCount()):
-                        row_data = [self.table_input.tableWidget.item(row, col).text() for col in range(self.table_input.tableWidget.columnCount())]
+                        row_data = []
+                        for col in range(self.table_input.tableWidget.columnCount()):
+                            try: #this is because if there is not data in the cell then it gives error
+                                row_data.append(self.table_input.tableWidget.item(row, col).text())
+                            except:
+                                row_data.append("")
                         csv_writer.writerow(row_data)
                 self.table_input.close()
             except:
@@ -1955,7 +1962,8 @@ class qannagnps():
             linea.setStyleSheet("QLineEdit { background-color: #FFFFFF; }")
         
     def overwrite_file(self):
-        if not self.table_input_overwrite:
+        #Metod to create file with the name of existing file. If we are using the input table tool then close the dialog. 
+        if not self.overwriting_input: #we are overwriting in CSV file creation mode
             #Se crea el nuevo archivo y se abre
             with open(self.file_to_overwrite, mode="w", newline="") as archivo:
                 writer = csv.writer(archivo)
@@ -1964,17 +1972,19 @@ class qannagnps():
             #Se pone en la línea de texto el nuevo archivo creado
             if os.path.isabs(self.file_to_overwrite):
                 self.line_to_write.setText(os.path.split(self.file_to_overwrite)[1])
-            else:
+            else: 
                 self.line_to_write.setText(self.file_to_overwrite)
             self.overwrite.close()
-        else:
-            return
+        else: #we are overwriting in table file creation mode
+            self.overwrite.close()
+            self.table_input_overwrite = True
+            self.table_inputs(self.button)
+            self.table_input_overwrite = False
+            
         
     def not_overwrite_file(self):
-        if not self.table_input_overwrite:
-            self.overwrite.close()
-        else:
-            self.end_inputing = True
+        #Metod to not overwriting the file if there is a file with the same name. 
+        self.overwrite.close()
     
     def change_icons(self,linea):
         #Método para cambiar el icono según haya o no texto en las secciones (inputs) de AnnAGNPS.
