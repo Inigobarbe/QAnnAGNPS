@@ -6,14 +6,17 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>955</width>
-    <height>552</height>
+    <width>1160</width>
+    <height>432</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
   <layout class="QGridLayout" name="gridLayout_4">
+   <item row="0" column="1">
+    <widget class="QLineEdit" name="lineEdit"/>
+   </item>
    <item row="0" column="0">
     <widget class="QLabel" name="label">
      <property name="text">
@@ -21,10 +24,7 @@
      </property>
     </widget>
    </item>
-   <item row="0" column="1">
-    <widget class="QLineEdit" name="lineEdit"/>
-   </item>
-   <item row="1" column="0" rowspan="2">
+   <item row="1" column="0" rowspan="3">
     <layout class="QVBoxLayout" name="verticalLayout">
      <property name="spacing">
       <number>0</number>
@@ -69,8 +69,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>279</width>
-        <height>506</height>
+        <width>172</width>
+        <height>357</height>
        </rect>
       </property>
       <layout class="QGridLayout" name="gridLayout">
@@ -83,6 +83,12 @@
    </item>
    <item row="1" column="3">
     <widget class="QScrollArea" name="scrollArea_2">
+     <property name="minimumSize">
+      <size>
+       <width>700</width>
+       <height>0</height>
+      </size>
+     </property>
      <property name="widgetResizable">
       <bool>true</bool>
      </property>
@@ -91,8 +97,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>279</width>
-        <height>506</height>
+        <width>723</width>
+        <height>340</height>
        </rect>
       </property>
       <layout class="QGridLayout" name="gridLayout_2">
@@ -109,68 +115,64 @@
            <layout class="QGridLayout" name="gridLayout_5">
             <item row="0" column="0">
              <layout class="QGridLayout" name="gridLayout_3">
-              <item row="0" column="0">
+              <item row="2" column="1">
+               <widget class="QLineEdit" name="first"/>
+              </item>
+              <item row="1" column="0">
                <widget class="QLabel" name="label_2">
                 <property name="text">
                  <string>Distribution</string>
                 </property>
                </widget>
               </item>
-              <item row="1" column="0">
-               <widget class="QLabel" name="label_3">
-                <property name="text">
-                 <string>Minimum</string>
-                </property>
-               </widget>
-              </item>
-              <item row="2" column="0">
+              <item row="3" column="0">
                <widget class="QLabel" name="label_4">
                 <property name="text">
                  <string>Maximum</string>
                 </property>
                </widget>
               </item>
-              <item row="1" column="1">
-               <widget class="QLineEdit" name="lineEdit_3"/>
+              <item row="2" column="0">
+               <widget class="QLabel" name="label_3">
+                <property name="text">
+                 <string>Minimum</string>
+                </property>
+               </widget>
               </item>
-              <item row="3" column="0">
+              <item row="4" column="1">
+               <widget class="QLineEdit" name="m"/>
+              </item>
+              <item row="9" column="0">
+               <widget class="QLabel" name="label_7">
+                <property name="text">
+                 <string>Delete previous data</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
                <widget class="QLabel" name="label_5">
                 <property name="text">
                  <string>M</string>
                 </property>
                </widget>
               </item>
-              <item row="2" column="1">
-               <widget class="QLineEdit" name="lineEdit_4"/>
-              </item>
-              <item row="3" column="1">
-               <widget class="QLineEdit" name="lineEdit_5"/>
-              </item>
-              <item row="5" column="0">
-               <widget class="QLabel" name="label_7">
-                <property name="text">
-                 <string>Delete previous</string>
-                </property>
-               </widget>
-              </item>
-              <item row="4" column="1">
+              <item row="5" column="1">
                <widget class="QLineEdit" name="lineEdit_6"/>
               </item>
-              <item row="4" column="0">
+              <item row="3" column="1">
+               <widget class="QLineEdit" name="second"/>
+              </item>
+              <item row="5" column="0">
                <widget class="QLabel" name="label_6">
                 <property name="text">
                  <string>Samples</string>
                 </property>
                </widget>
               </item>
-              <item row="5" column="1">
-               <widget class="QPushButton" name="pushButton">
-                <property name="text">
-                 <string/>
-                </property>
-               </widget>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="distributions"/>
               </item>
-              <item row="6" column="0">
+              <item row="12" column="0">
                <spacer name="verticalSpacer">
                 <property name="orientation">
                  <enum>Qt::Vertical</enum>
@@ -183,13 +185,76 @@
                 </property>
                </spacer>
               </item>
+              <item row="9" column="1">
+               <widget class="QPushButton" name="delete_previous">
+                <property name="text">
+                 <string/>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="0">
+               <widget class="QLabel" name="label_8">
+                <property name="text">
+                 <string>Row</string>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="1">
+               <widget class="QLineEdit" name="row">
+                <property name="text">
+                 <string>0</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_10">
+                <property name="text">
+                 <string>Parameter</string>
+                </property>
+               </widget>
+              </item>
+              <item row="7" column="1">
+               <widget class="QPushButton" name="add">
+                <property name="text">
+                 <string/>
+                </property>
+               </widget>
+              </item>
+              <item row="7" column="0">
+               <widget class="QLabel" name="label_9">
+                <property name="text">
+                 <string>Add row</string>
+                </property>
+               </widget>
+              </item>
               <item row="0" column="1">
-               <widget class="QComboBox" name="comboBox"/>
+               <widget class="QLineEdit" name="parameter"/>
+              </item>
+              <item row="8" column="0">
+               <widget class="QLabel" name="label_11">
+                <property name="text">
+                 <string>Delete row</string>
+                </property>
+               </widget>
+              </item>
+              <item row="8" column="1">
+               <widget class="QPushButton" name="delete_row">
+                <property name="text">
+                 <string/>
+                </property>
+               </widget>
               </item>
              </layout>
             </item>
             <item row="0" column="1">
-             <widget class="QTableWidget" name="tableWidget"/>
+             <widget class="QTableWidget" name="table">
+              <property name="minimumSize">
+               <size>
+                <width>500</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
             </item>
            </layout>
           </widget>
@@ -210,9 +275,15 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>278</width>
-        <height>506</height>
+        <width>200</width>
+        <height>340</height>
        </rect>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>200</width>
+        <height>0</height>
+       </size>
       </property>
       <layout class="QGridLayout" name="gridLayout_6">
        <item row="0" column="0">
@@ -220,6 +291,19 @@
        </item>
       </layout>
      </widget>
+    </widget>
+   </item>
+   <item row="2" column="3">
+    <widget class="QPushButton" name="accept">
+     <property name="maximumSize">
+      <size>
+       <width>300</width>
+       <height>16777215</height>
+      </size>
+     </property>
+     <property name="text">
+      <string>Accept</string>
+     </property>
     </widget>
    </item>
   </layout>

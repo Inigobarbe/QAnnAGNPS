@@ -57,6 +57,8 @@ import itertools
 from matplotlib.ticker import FuncFormatter
 import sys
 import chardet
+from SALib.analyze import sobol
+from SALib.sample import saltelli
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -523,6 +525,18 @@ class qannagnps():
         self.sensitivity_dialog.General.clicked.connect(lambda _,b = "General":self.annagnps_inputs(b))
         self.sensitivity_dialog.Climate.clicked.connect(lambda _,b = "Climate":self.annagnps_inputs(b))
         self.sensitivity_dialog.Simulation.clicked.connect(lambda _,b = "Simulation":self.annagnps_inputs(b))
+        
+        #Add distributions to combobox
+        self.sensitivity_dialog.distributions.addItems(["Uniform","Triangular","Normal","Lognormal"])
+        
+        #Button to add information to the sensitivity table 
+        self.sensitivity_dialog.add.clicked.connect(self.add_sensitivity_table)
+        
+        #Button to delete information of the sensitivity table
+        self.sensitivity_dialog.delete_row.clicked.connect(self.delete_sensitivity_table)
+        
+        #Run sensitivity analysis
+        self.sensitivity_dialog.accept.clicked.connect(self.run_sensitivity_analysis)
     
     def obtener_codificacion(self,archivo_csv):
         #Metod to detect code type of csv. If I dont do this ' character gives an error for example in Global IDs, Factors and Flags. 
@@ -4225,3 +4239,61 @@ class qannagnps():
             boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents_3)
             boton.setObjectName(nombre)
             self.sensitivity_dialog.verticalLayout_3.addWidget(boton)
+            boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label(b))
+    
+    def add_sensitivity_table(self):
+        #Metod to add sensitivity analysis parameters to table
+        if self.sensitivity_dialog.table.columnCount() == 0:
+            #Añadir columnas
+            nombres_columnas = ["Parameter","Distribution","Minimum","Maximum","Row"]
+            self.sensitivity_dialog.table.setColumnCount(len(nombres_columnas))
+            self.sensitivity_dialog.table.setHorizontalHeaderLabels(nombres_columnas)
+        
+        #Añadir filas
+        #Primero la información de los lineEdits
+        numero_filas = self.sensitivity_dialog.table.rowCount()
+        lineEdits = [self.sensitivity_dialog.parameter,self.sensitivity_dialog.first,self.sensitivity_dialog.second,self.sensitivity_dialog.row]
+        self.sensitivity_dialog.table.setRowCount(numero_filas + 1)
+        columnas_linedits = [0,2,3,4]
+        for i in range(len(lineEdits)):
+            item = QTableWidgetItem(lineEdits[i].text())
+            self.sensitivity_dialog.table.setItem(numero_filas, columnas_linedits[i], item)
+            item.setTextAlignment(Qt.AlignCenter)
+        #Luego la información del combobox
+        item = QTableWidgetItem([self.sensitivity_dialog.distributions.itemText(i) for i in range(self.sensitivity_dialog.distributions.count())][self.sensitivity_dialog.distributions.currentIndex()])
+        self.sensitivity_dialog.table.setItem(numero_filas,1, item)
+        item.setTextAlignment(Qt.AlignCenter)
+    
+    def delete_sensitivity_table(self):
+        #Metod to delete sensitivity analysis parameters to table
+        numero_filas = self.sensitivity_dialog.table.rowCount()
+        if numero_filas > 0:
+            self.sensitivity_dialog.table.removeRow(numero_filas - 1)
+        if numero_filas == 1:
+            self.sensitivity_dialog.table.setColumnCount(0)
+    
+    def add_parameter_label(self,nombre):
+        #Metod to add the parameter to the lineEdit
+        self.sensitivity_dialog.parameter.setText(str(nombre))
+    
+    def run_sensitivity_analysis(self):
+        #Metod to run sensitiviy analysis
+        #Diccionario nombre en el dialogo - [nombre del archivo, nombre de la columna]
+        dic_name_column = {"Yield Units Harvested per Area":[self.inputs.l_26,"Yield_Units_Harvested"],"Residue Mass Ratio":[self.inputs.l_26,"Residue_Mass_Ratio"],"Surface decomposition":[self.inputs.l_26,"Surface_Decomp"]}
+        #Diccionario nombre en el diálogo - [parametros del análisis de sensibilidad]
+        dic_data = {}
+        for i in range(self.sensitivity_dialog.table.rowCount()):
+            #Diccionario [Parametro] = (Distribucion, Minimo, Maximo, Row)
+            name = self.sensitivity_dialog.table.item(i, 0).text()
+            if name in dic_data:name = name+"__1"
+            dic_data[name] = [str(self.sensitivity_dialog.table.item(i, 1).text()),float(self.sensitivity_dialog.table.item(i, 2).text()),float(self.sensitivity_dialog.table.item(i, 3).text()),int(self.sensitivity_dialog.table.item(i, 4).text())]
+        #Se crean las muestras
+        problem = {'num_vars': len(dic_data),'names': list(dic_data.keys()),'bounds': [[x[1],x[2]] for x in dic_data.values()]}
+        param_values = saltelli.sample(problem, int(self.sensitivity_dialog.m.text()))
+        for i in param_values:
+            for j,k in enumerate(dic_data.keys()):
+                direccion = dic_name_column[k][0] #PONE BIEN LA DIRECCIÓN. ESTO SOLO ES EL NOMBRE DEL ARCHIVO
+                df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",") #MIRAR LO QUE DABA ERROR CUANDO HABÍA UN CARACTER ESPECIAL
+                df[dic_name_column[k][1]].iloc[dic_data[k][3]] = i[j] #REPASAR TODO ESTO
+                
+                
