@@ -467,6 +467,9 @@ class qannagnps():
         #Botón para respositorio de github
         self.dlg.pg_github.clicked.connect(self.url_github)
         
+        #Botón para llevar al artículo
+        self.dlg.article.clicked.connect(self.url_article)
+        
         #Cambiar el color de las elecciones de los outputs
         self.output_selection = {self.output.pushButton_6:"Runoff",self.output.pushButton_2:"Subtotal",self.output.pushButton_3:"Gully",self.output.pushButton_4:"Pond",self.output.pushButton_5:"Sheet & Rill",self.output.pushButton_7:"Nitrogen",self.output.pushButton_8:"Carbon",self.output.pushButton_10:"Phosphorus"}
         for i in self.output_selection.keys():
@@ -537,6 +540,9 @@ class qannagnps():
         
         #Run sensitivity analysis
         self.sensitivity_dialog.accept.clicked.connect(self.run_sensitivity_analysis)
+        
+        #Por defecto, cuando se sobreescribe se sobreescibe con el CSV no con la tabla del diálogo
+        self.overwriting_input =False
     
     def obtener_codificacion(self,archivo_csv):
         #Metod to detect code type of csv. If I dont do this ' character gives an error for example in Global IDs, Factors and Flags. 
@@ -1971,6 +1977,9 @@ class qannagnps():
     def url_github(self,event):
         #Método para abrir el repositorio de github
         webbrowser.open("https://github.com/Inigobarbe/QGIS-AnnAGNPS")
+    def url_article(self,event):
+        #Método para abrir el artículo 
+        webbrowser.open("https://www.sciencedirect.com/science/article/pii/S136481522400029X")
 
     def topagnps_provided(self,check):
         #Método para poner si se va a usar el output de topagnps para cell, EG, reach y riparian buffer data

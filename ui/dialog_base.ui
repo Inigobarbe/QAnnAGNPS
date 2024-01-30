@@ -28,15 +28,15 @@ background-color: #87CEEB
      </property>
     </widget>
    </item>
-   <item row="1" column="4">
-    <widget class="QLabel" name="label_15">
+   <item row="1" column="3">
+    <widget class="QLabel" name="label_99">
      <property name="text">
       <string/>
      </property>
     </widget>
    </item>
-   <item row="1" column="3">
-    <widget class="QLabel" name="label_99">
+   <item row="1" column="4">
+    <widget class="QLabel" name="label_15">
      <property name="text">
       <string/>
      </property>
@@ -49,29 +49,6 @@ background-color: #87CEEB
      </property>
     </widget>
    </item>
-   <item row="1" column="6">
-    <widget class="QPushButton" name="pg_github">
-     <property name="font">
-      <font>
-       <weight>75</weight>
-       <bold>true</bold>
-      </font>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">QPushButton {
-    background-color: #becbd1;
-    color: black;
-}
-
-QPushButton:hover {
-    color: white;
-}</string>
-     </property>
-     <property name="text">
-      <string>GitHub repository</string>
-     </property>
-    </widget>
-   </item>
    <item row="1" column="5">
     <widget class="QLabel" name="label_11">
      <property name="text">
@@ -79,7 +56,7 @@ QPushButton:hover {
      </property>
     </widget>
    </item>
-   <item row="2" column="6">
+   <item row="2" column="8">
     <widget class="QLabel" name="label_6">
      <property name="font">
       <font>
@@ -88,11 +65,11 @@ QPushButton:hover {
       </font>
      </property>
      <property name="text">
-      <string>Version 1.0</string>
+      <string>Version 1.0.0</string>
      </property>
     </widget>
    </item>
-   <item row="0" column="0" colspan="7">
+   <item row="0" column="0" colspan="9">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
       <number>0</number>
@@ -279,7 +256,7 @@ QPushButton:hover {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>479</width>
+            <width>474</width>
             <height>538</height>
            </rect>
           </property>
@@ -997,8 +974,8 @@ QCheckBox::indicator:unchecked {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>496</width>
-            <height>365</height>
+            <width>469</width>
+            <height>242</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_3">
@@ -1274,8 +1251,8 @@ QCheckBox::indicator:unchecked {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>496</width>
-            <height>365</height>
+            <width>413</width>
+            <height>94</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_11">
@@ -1405,20 +1382,66 @@ QCheckBox::indicator:unchecked {
      </widget>
     </widget>
    </item>
+   <item row="1" column="8">
+    <widget class="QPushButton" name="article">
+     <property name="font">
+      <font>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton {
+    background-color: #becbd1;
+    color: black;
+}
+
+QPushButton:hover {
+    color: white;
+}</string>
+     </property>
+     <property name="text">
+      <string>Article</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="7">
+    <widget class="QPushButton" name="pg_github">
+     <property name="font">
+      <font>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton {
+    background-color: #becbd1;
+    color: black;
+}
+
+QPushButton:hover {
+    color: white;
+}</string>
+     </property>
+     <property name="text">
+      <string>GitHub repository</string>
+     </property>
+    </widget>
+   </item>
   </layout>
   <zorder>upna_label</zorder>
   <zorder>tabWidget</zorder>
-  <zorder>pg_github</zorder>
   <zorder>label_6</zorder>
   <zorder>label_11</zorder>
   <zorder>label_15</zorder>
   <zorder>label_99</zorder>
   <zorder>usda_label</zorder>
+  <zorder>article</zorder>
+  <zorder>pg_github</zorder>
  </widget>
  <tabstops>
   <tabstop>pb_load</tabstop>
   <tabstop>pb_save</tabstop>
-  <tabstop>pg_github</tabstop>
   <tabstop>comboBox</tabstop>
   <tabstop>comboBox_2</tabstop>
   <tabstop>comboBox_3</tabstop>
