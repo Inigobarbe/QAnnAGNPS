@@ -4292,8 +4292,8 @@ class qannagnps():
         param_values = saltelli.sample(problem, int(self.sensitivity_dialog.m.text()))
         for i in param_values:
             for j,k in enumerate(dic_data.keys()):
-                direccion = dic_name_column[k][0] #PONE BIEN LA DIRECCIÓN. ESTO SOLO ES EL NOMBRE DEL ARCHIVO
+                direccion = dic_name_column[k][0] #PONER BIEN LA DIRECCIÓN. ESTO SOLO ES EL NOMBRE DEL ARCHIVO
                 df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",") #MIRAR LO QUE DABA ERROR CUANDO HABÍA UN CARACTER ESPECIAL
                 df[dic_name_column[k][1]].iloc[dic_data[k][3]] = i[j] #REPASAR TODO ESTO
                 
-                
+                #IGUAL SE PUEDE HACER PRIMERO LA EJECUCIÓN EN EL FOR Y UNA VEZ SE HAYAN MOVIDO LOS ARCHIVOS A LAS CARPETAS (climate, watershed etc.) CREAR UNA FUNCIÓN QUE SE LLAME CHANGE_PARAMETERS O ALGO ASÍ
