@@ -4287,6 +4287,13 @@ class qannagnps():
     
     def run_sensitivity_analysis(self):
         #Metod to run sensitiviy analysis
+        #Functions
+        def file_input(lineEdit): #function to go from line edit to the final direction
+            if os.path.isabs(lineEdit.text()):
+                return lineEdit.text()
+            else:
+                return self.dic_folder[lineEdit].text()+"/"+lineEdit.text()
+                
         #Diccionario nombre en el dialogo - [nombre del archivo, nombre de la columna]
         dic_name_column = {"Yield Units Harvested per Area":[self.inputs.l_26,"Yield_Units_Harvested"],"Residue Mass Ratio":[self.inputs.l_26,"Residue_Mass_Ratio"],"Surface decomposition":[self.inputs.l_26,"Surface_Decomp"]}
         #Diccionario nombre en el diálogo - [parametros del análisis de sensibilidad]
@@ -4296,13 +4303,55 @@ class qannagnps():
             name = self.sensitivity_dialog.table.item(i, 0).text()
             if name in dic_data:name = name+"__1"
             dic_data[name] = [str(self.sensitivity_dialog.table.item(i, 1).text()),float(self.sensitivity_dialog.table.item(i, 2).text()),float(self.sensitivity_dialog.table.item(i, 3).text()),int(self.sensitivity_dialog.table.item(i, 4).text())]
+        #Hay que hacer algo para guardar los resultados originales y luego ponerlos después
         #Se crean las muestras
         problem = {'num_vars': len(dic_data),'names': list(dic_data.keys()),'bounds': [[x[1],x[2]] for x in dic_data.values()]}
         param_values = saltelli.sample(problem, int(self.sensitivity_dialog.m.text()))
+        resultados = []
         for i in param_values:
             for j,k in enumerate(dic_data.keys()):
-                direccion = dic_name_column[k][0] #PONER BIEN LA DIRECCIÓN. ESTO SOLO ES EL NOMBRE DEL ARCHIVO
-                df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",") #MIRAR LO QUE DABA ERROR CUANDO HABÍA UN CARACTER ESPECIAL
-                df[dic_name_column[k][1]].iloc[dic_data[k][3]] = i[j] #REPASAR TODO ESTO
-                
-                #IGUAL SE PUEDE HACER PRIMERO LA EJECUCIÓN EN EL FOR Y UNA VEZ SE HAYAN MOVIDO LOS ARCHIVOS A LAS CARPETAS (climate, watershed etc.) CREAR UNA FUNCIÓN QUE SE LLAME CHANGE_PARAMETERS O ALGO ASÍ
+                try: #este try es para cuando se elige la misma columna pero distintas filas
+                    direccion = file_input(dic_name_column[k][0])
+                    columna = dic_name_column[k][1]
+                except:
+                    direccion = file_input(dic_name_column[k.split("__")[0]][0])
+                    columna = dic_name_column[k.split("__")[0]][1]
+                df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",") 
+                df[columna].iloc[dic_data[k][3]] = i[j]
+                df.to_csv(direccion, index=False, float_format='%.5f')
+            self.ejecucion_completa()
+            #Condición de error
+            if self.end_sensitivity:
+                iface.messageBar().pushMessage("Error in sensitivity analysis", "Please check the error in the opened file",level=Qgis.Warning, duration=10)
+                return
+            resultados.append(self.save_result()) #COMPROBAR QUE SE ESTÉN GUARDANDO LOS DATOS QUE SE QUIEREN
+        #Se analizan los resultados
+        Si = sobol.analyze(problem, np.array(resultados))
+        plt.bar([x for x in range(len(Si["S1"]))],[x for x in Si["S1"]])
+        plt.savefig(self.direccion+"\\Sensitivity.png",transparent=False,bbox_inches = "tight",dpi=300)
+        print("resultados",resultados)
+        print(param_values)
+        
+    def save_result(self):
+        #Metod to save the results of the sensitivity analysis
+        fichero = self.direccion+"\\INPUTS\\"+"AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv"
+        file = open(fichero)
+        csvreader = csv.reader(file)
+        rows = []
+        for row in csvreader:
+                rows.append(row)
+        lista = []
+        a = 0
+        for i in rows:
+            try:
+                if i[0]=="Day":
+                    a = 1
+                    lista.append(i)
+                elif a ==1:
+                    lista.append(i[:-1])
+            except:
+                continue
+        erosion = [float(lista[x][27]) for x in range(1,len(lista)) if len(lista[x])==30]
+        return sum(erosion)
+            
+        
