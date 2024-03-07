@@ -820,7 +820,7 @@ Blank defaults to 1.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>662</width>
+                <width>779</width>
                 <height>2318</height>
                </rect>
               </property>
@@ -14751,7 +14751,7 @@ Must match a valid wetland id in the WETLAND DATA section.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>625</width>
+                <width>779</width>
                 <height>1704</height>
                </rect>
               </property>
@@ -17269,7 +17269,7 @@ A blank defaults to 3.</string>
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>679</width>
+                <width>779</width>
                 <height>1513</height>
                </rect>
               </property>
@@ -17649,7 +17649,7 @@ Growth_N_Uptake_Sen</string>
                          <property name="text">
                           <string>Crop_Residue_30%
 Crop_Residue_60%
-Crop_Residue_90</string>
+Crop_Residue_90%</string>
                          </property>
                          <property name="alignment">
                           <set>Qt::AlignCenter</set>
