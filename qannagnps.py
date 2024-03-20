@@ -59,6 +59,8 @@ import sys
 import chardet
 from SALib.analyze import sobol
 from SALib.sample import saltelli
+from SALib.sample.morris import sample as sample_morris 
+from SALib.analyze.morris import analyze as analyze_morris
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -285,6 +287,10 @@ class qannagnps():
             self.dic_lines_search[i].clicked.connect(lambda _, b=i: self.search_document(b))
             i.textChanged.connect(lambda _, b=i: self.change_colors(b))
             i.textChanged.connect(lambda _, b=i: self.change_icons(b))
+        
+        #Se pone la imagen de buscar la carpeta del proyecto y se le da funciones
+        self.dlg.button_project.setIcon(QIcon(self.icon_path_search))
+        self.dlg.button_project.clicked.connect(self.add_project_folder)
         
         #Cambiar el borde de la línea de texto si no existe la ruta
         self.border = False #no están puestos los bordes
@@ -561,6 +567,64 @@ class qannagnps():
         
         #Add new parameters to distribution in sensitivity dialog
         self.sensitivity_dialog.distributions.currentIndexChanged.connect(self.distribution_parameters)
+        
+        #Change number of samples in dialog depending on sensitivity analysis metod
+        self.sensitivity_dialog.sobol.toggled.connect(self.change_sensitivity_metod)
+        self.sensitivity_dialog.morris.toggled.connect(self.change_sensitivity_metod)
+        self.sensitivity_dialog.trajectories.textChanged.connect(self.change_sensitivity_metod)
+        
+        #Add topagnps inputs with buttons
+        self.dlg.pb_dem.clicked.connect(lambda _,b = "DEM":self.add_topagnps_input(b))
+        self.dlg.pb_buffer.clicked.connect(lambda _,b = "buffer":self.add_topagnps_input(b))
+        self.dlg.pb_vegetation.clicked.connect(lambda _,b = "vegetation":self.add_topagnps_input(b))
+        self.dlg.pb_soil.clicked.connect(lambda _,b = "soil":self.add_topagnps_input(b))
+        self.dlg.pb_management.clicked.connect(lambda _,b = "management":self.add_topagnps_input(b))
+    
+    def add_topagnps_input(self,type_input):
+        #Metod to add topagnps inputs with pushbutton
+        fname = QFileDialog.getOpenFileName(self.inputs,"Select file","C/")
+        if fname[0]!="":
+            dic = {"DEM":self.dlg.comboBox,"buffer":self.dlg.comboBox_2,"vegetation":self.dlg.comboBox_3,"soil":self.dlg.cbSoil,"management":self.dlg.cbMan}
+            combo = dic[type_input]
+            print(type_input,dic[type_input])
+            #Se añade el archivo al canvas
+            layer = QgsRasterLayer(fname[0],type_input)
+            QgsProject.instance().addMapLayer(layer, False)
+            root = QgsProject.instance().layerTreeRoot()
+            root.insertLayer(0, layer)
+            #QgsProject.instance().addMapLayer(layer)
+            #Se obtienen las capas que hay en el canvas
+            layers = QgsProject.instance().layerTreeRoot().children()
+            project_layers=[layer.name() for layer in layers]
+            project_layers.insert(0,"")
+            #Se actualizan las capas
+            for i in dic.keys():
+                if i!=type_input:
+                    index = dic[i].currentIndex()
+                    if index ==0:index =-1
+                else:index = 0
+                print(i,index)
+                #Clear
+                dic[i].clear()
+                #Add values
+                dic[i].addItems(project_layers)
+                #Se ponen bien los índices
+                dic[i].setCurrentIndex(index+1)              
+        
+        
+    def add_project_folder(self):
+        #Metod to add the folder of project to line
+        fname = QFileDialog.getExistingDirectory(self.dlg, "Select folder", "C/")
+        #Condiciones en donde si se elige un archivo y la carpeta coincide con la de su sección, solo se pone el nombre del archivo, sino toda la dirección.
+        if fname!="":
+            self.dlg.project.setText(fname)
+        #Make project directory
+        self.direccion = str(self.dlg.project.text())
+        #Poner el nombre de la carpeta en los outputs
+        self.output.lineEdit.setText(self.direccion)
+        self.output.lineEdit_2.setText(self.direccion)
+        #Pone la dirección del proyecto en las direcciones de las carpetas de los inputs de annagnps
+        self.files_directory()
         
     def obtener_codificacion(self,archivo_csv):
         #Metod to detect code type of csv. If I dont do this ' character gives an error for example in Global IDs, Factors and Flags. 
@@ -1101,12 +1165,12 @@ class qannagnps():
                 if sensitivity: #cuando se hace el análisis de sensibilidad la ruta es otra
                     path = self.direccion+"\\INPUTS\\AnnAGNPS_EV_Sediment_yield_(mass).csv"
                 column_name = "Subtotals [Mg]"
-                #try:
-                df = dataframe_creation(path,column_name,erosion = True, source = data_type)
-                r'''except:
+                try:
+                    df = dataframe_creation(path,column_name,erosion = True, source = data_type)
+                except:
                     iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
                     self.error = True
-                    return'''
+                    return
             if data_type == "Nitrogen":
                 path =  self.output.lineEdit.text()+"\\AnnAGNPS_EV_Nitrogen_yield_(mass).csv"
                 if sensitivity: #cuando se hace el análisis de sensibilidad la ruta es otra
@@ -2001,6 +2065,8 @@ class qannagnps():
         self.output.spatial_run.setIcon(QIcon(icon))
         for i in [self.output.pushButton_11,self.output.pushButton_13,self.output.pushButton_14,self.output.pushButton_19,self.output.pushButton_22,self.output.pushButton_20,self.output.pushButton_21,self.output.pushButton_23,self.output.pushButton_24,self.output.pushButton_25,self.output.pushButton_26,self.output.pushButton_27,self.output.pushButton_28]:
             i.setIcon(QIcon(icon))
+        #Project folder
+        
         
     def url_upna(self,event):
         #Método para abrir las páginas web de la upna
@@ -2108,24 +2174,25 @@ class qannagnps():
             linea.setStyleSheet("QLineEdit { background-color: rgb(250, 159, 160) ; }")
 
     def setDirectory(self):
-        #Método para que cuando se seleccione el DEM ya se tenga en todo el código la dirección y el epsg. También se ponen la dirección de las carpetas en el diálogo de los outputs. 
+        #Método para que cuando se seleccione el DEM ya se tenga en todo el código la dirección y el epsg. También se ponen la dirección de las carpetas en el diálogo de los outputs y se asigna el nombre del dem en Topagnps.csv. 
         if self.dlg.comboBox.currentIndex() >=1:
-            try: #el try es para que no de error cuando se escoge una capa que no esté guardada en algún sitio
+            try: 
+                self.epsg = QgsProject.instance().crs().authid()
+            except:
+                pass
+            #Se pone el nombre del mdt en TOPAGNPS.csv
+            try:
                 layers = QgsProject.instance().layerTreeRoot().children()
                 selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
                 selectedLayer = layers[selectedLayerIndex].layer()
                 fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
-                mdt_directory, mdt_file = os.path.split(fichero_mdt)
-                self.mdt_directory = mdt_directory
-                self.direccion=mdt_directory
-                self.epsg = QgsProject.instance().crs().authid()
-                self.files_directory()
-                #Poner el nombre de la carpeta en los outputs
-                self.output.lineEdit.setText(mdt_directory)
-                self.output.lineEdit_2.setText(mdt_directory)
+                dir_mdt, name_mdt = os.path.split(fichero_mdt)
+                topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
+                topagnps_control_file["FILENAME"].iloc[0]=name_mdt
+                topagnps_control_file.to_csv(self.direccion+"\\TOPAGNPS.CSV", index=False, float_format='%.5f')
             except:
-                pass
-        
+                pass     
+
         
     def set_coordinates(self):
         #ESTO ES PARA LA CAPTURA DE COORDENADAS
@@ -2234,7 +2301,7 @@ class qannagnps():
         
         #Inicializar variables
         self.segunda_ronda = False #cuando se elige la coordenada automáticamente se ejecuta TOPAGNPS dos veces. Esto es para que se sepa si es la primera o segunda ronda.
-        self.end_sensitivity = 0 #si es igual a 1 entonces se para el análisis de sensibilidad
+        self.end_execution = 0 #si es igual a 1 entonces se para el análisis de sensibilidad
 
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
@@ -2294,8 +2361,9 @@ class qannagnps():
         self.dlg.close()
         #Ejecutar
         self.ejecucion_completa()
-        #MENSAJE DE ÉXITO
-        self.iface.messageBar().pushMessage("Success", "Succes in execution ",level=Qgis.Success, duration=5)
+        if self.end_execution != 1:
+            #MENSAJE DE ÉXITO
+            self.iface.messageBar().pushMessage("Success", "Succes in execution ",level=Qgis.Success, duration=5)
           
     def ejecucion_completa(self):
         #Esta función es en donde se ejecuta el modelo
@@ -2305,28 +2373,54 @@ class qannagnps():
         #Establecer directorio de DEM y EPSG del proyecto
         #Solo se hace una vez. Es decir, si elijo outlet solo se elige en la primera ronda. Sino el selected layer puede cambiar de DEM a los reaches y da error después.
         if not self.dlg.checkBox_2.isChecked() or (self.dlg.checkBox_2.isChecked() and not self.segunda_ronda):
+            #Se elige aquí otra vez porque igual cuando se había seleccionado el proyecto estaba en otro epsg
+            epsg = QgsProject.instance().crs().authid()
+            self.epsg = epsg
+            
+            #Se cambia de directorio al directorio del proyecto y se establece el directorio donde están los ejecutables
+            self.executable_directory  = self.plugin_dir+"\\Executables"
+            os.chdir(self.direccion)
+        
+        #EJECUCIÓN DE TOPAGNPS
+        if self.dlg.cbTop.isChecked():
+            #Se mueve el DEM a la carpeta del proyecto
             selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
             selectedLayer = layers[selectedLayerIndex].layer()
             fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
-            epsg = QgsProject.instance().crs().authid()
-            self.epsg = epsg
+            dir_mdt, name_mdt = os.path.split(fichero_mdt)
+            try: #si el origen y el destino son los mismos da error
+                shutil.copyfile(fichero_mdt,self.direccion+"\\"+name_mdt)
+            except:
+                pass
             #Establecer el fichero de suelo escogido en el plugin
             selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
             selectedLayer = layers[selectedLayerIndex].layer()
             fichero_soil =  selectedLayer.dataProvider().dataSourceUri()
             soil_directory, self.fichero_soil = os.path.split(fichero_soil)
-            #Establecer el fichero de manejo escogido en el plugin
+            #Establecer el fichero de manejo escogido en el plugin 
             selectedLayerIndex = self.dlg.cbMan.currentIndex()-1
             selectedLayer = layers[selectedLayerIndex].layer()
             fichero_manag =  selectedLayer.dataProvider().dataSourceUri()
             manag_directory, self.fichero_manag = os.path.split(fichero_manag)
-            #Se cambia de directorio al mismo en el que se encuentra el mdt y se establece el directorio donde están los ejecutables
-            self.mdt_directory, self.mdt_file = os.path.split(fichero_mdt)
-            self.executable_directory  = self.plugin_dir+"\\Executables"
-            os.chdir(self.mdt_directory)
-        
-        #EJECUCIÓN DE TOPAGNPS
-        if self.dlg.cbTop.isChecked():
+            #Establecer el fichero de buffer escogido en el plugin y moverlo a la carpeta del proyecto
+            selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
+            selectedLayer = layers[selectedLayerIndex].layer()
+            fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
+            buf_directory, nombre_buf = os.path.split(fichero_buf)
+            try: #si el origen y el destino son los mismos da error
+                shutil.copyfile(fichero_buf,self.direccion+"\\"+nombre_buf)
+            except:
+                pass
+            #Establecer el fichero de vegetation escogido en el plugin y moverlo a la carpeta del proyecto
+            selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
+            selectedLayer = layers[selectedLayerIndex].layer()
+            fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
+            veg_directory, nombre_veg = os.path.split(fichero_veg)
+            try: #si el origen y el destino son los mismos da error
+                shutil.copyfile(fichero_veg,self.direccion+"\\"+nombre_veg)
+            except:
+                pass
+                
             #Si el input output_global Glbl_All_V3_sim no se pone en T no se obtiene el archivo que se necesita para calcular la erosión por cárcavas efímeras (AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv) y por lo tanto no se puede hacer el análisis de sensibilidad
             #Esto se hace primero porque la dirección puede estar dada con el nombre del archivo o en dirección completa
             if os.path.isabs(r"{}".format(str(self.inputs.l_63.text()))):
@@ -2335,43 +2429,42 @@ class qannagnps():
                 file_glbl = str(self.inputs.l_53.text()) + "/" + str(self.inputs.l_63.text())
             #Función para que se le diga el nombre del archivo y te devuelva la dirección completa
             def fichero(nombre):
-                return self.mdt_directory+"\\"+nombre
+                return self.direccion+"\\"+nombre
             
-            #Si el mdt elegido en el plugin es distinto al que sale en TOPAGNPS.csv entonces cambiar el nombre del de TOPAGNPS.csv al elegido por en el plugin
+            #Dar error si no existe el archivo TOPAGNPS.CSV
             if not os.path.exists(self.direccion+"\\TOPAGNPS.CSV"):
                 iface.messageBar().pushMessage("Error Input data", "Control file of TopAGNPS, TOPAGNPS.CSV, not found" ,level=Qgis.Warning, duration=10)
+                self.end_execution = 1
                 return
+            #Si el formato de la columna FILENAME no es str entonces dar error
             topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
             if type(topagnps_control_file["FILENAME"].iloc[0])!=str:
                 iface.messageBar().pushMessage("Error Input data", "Please select a correct FILENAME in TOPAGNPS.CSV" ,level=Qgis.Warning, duration=10)
+                self.end_execution = 1
                 return
-            if topagnps_control_file["FILENAME"].iloc[0] != self.mdt_file:
-                processing.run("gdal:translate", 
-                    {'INPUT':fichero(self.mdt_file),
-                    'TARGET_CRS':self.epsg,'NODATA':None,'COPY_SUBDATASETS':False,
-                    'OPTIONS':'','EXTRA':'','DATA_TYPE':0,'OUTPUT':topagnps_control_file["FILENAME"].iloc[0]})
             
             #Si se ha elegido poner coordenadas automáticamente entonces hay que hacer que TopAGNPS haga sólo DEM elevation preprocessing and full network generation
             if self.dlg.checkBox_2.isChecked() and not self.segunda_ronda:
                 topagnps_control_file = pd.read_csv(fichero("TOPAGNPS.csv"),encoding = "ISO-8859-1",delimiter=",")
-                topagnps_control_file["DEMPROC"].iloc[0] = 2
+                topagnps_control_file["DEMPROC"].iloc[0] = "2" #se pone en texto porque sino se guarda en decimal y da error.
                 topagnps_control_file.to_csv(fichero("TOPAGNPS.csv"), index=False, float_format='%.5f')
             
             #EJECUCIÓN DE TOPAGNPS            
             def main():
                 f = open(self.executable_directory+"\\"+"EjecutarTopagnps.bat","w+")
-                linea_uno = "CD {}".format(self.mdt_directory)
+                linea_uno = "CD {}".format(self.direccion)
                 linea_dos = r"CALL {}\TopAGNPS_v6.00.a.020_release_64-bit.exe".format(self.executable_directory)
                 f.write("{} \n".format(linea_uno))
                 f.write("{} \n".format(linea_dos))
                 f.close()
             main()
-            proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarTopagnps.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-            stdout, stderr = proc.communicate()
+            subprocess.call(self.executable_directory+"\\"+"EjecutarTopagnps.bat")
+            #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarTopagnps.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+            #stdout, stderr = proc.communicate()
 
             #Cuando se eligen coordenadas automáticamente con el plugin primero se ejecuta Topagnps y da error (se ejecuta la primera para poner el reaches en QGIS) osea que no queremos que python salte si hay error en la primera ronda. Queremos que salte python cuando hay error y si se ha seleccionado que no se elige automaticamente. O sino cuando hay error y se ha elegido automáticamente pero la segunda ejecución de Topagnps da error. 
             if os.path.isfile("TOPAGNPS_err.CSV") and os.path.getsize("TOPAGNPS_err.CSV")>0 and (not self.dlg.checkBox_2.isChecked() or self.segunda_ronda):
-                self.end_sensitivity = 1
+                self.end_execution = 1
                 error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
                 iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning, duration=10)
                 #Se abre el archivo de errores
@@ -2384,13 +2477,26 @@ class qannagnps():
             
             #Función para cambiar de coordenadas
             def change_coordinates(filename,outputname):
-                        input_raster = gdal.Open(fichero(filename))
-                        output_raster = fichero(outputname)
-                        warp = gdal.Warp(output_raster,input_raster,dstSRS=self.epsg)
-                        warp = None # Closes the files
+                input_raster = gdal.Open(fichero(filename))
+                output_raster = fichero(outputname)
+                warp = gdal.Warp(output_raster,input_raster,dstSRS=self.epsg)
+                warp = None # Closes the files
             #Esto es para cambiar las coordenadas del outlet en TOPAGNPS.csv. Para ello se tiene que estar en primera ronda y se tiene que haber elegido la opción de escoger el outlet automáticamente. 
             if self.dlg.checkBox_2.isChecked() and not self.segunda_ronda:
                 if self.ejecucion_condicion == 0:
+                    #Primero, si no existe "NETFUL.asc" entonces ha dado error TOPAGNPS y hay que para la ejecución. Si no se para antes es porque le he dicho que no pare porque el hecho de no poner coordenadas daba error.
+                    if not os.path.exists(self.direccion+"\\NETFUL.asc"):
+                        self.end_execution = 1
+                        error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
+                        iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning, duration=10)
+                        #Se abre el archivo de errores
+                        try:
+                            os.startfile(self.direccion+"\\TopAGNPS_err.csv")
+                        except:
+                            pass
+                        #Este return es para parar el codigo
+                        return
+                    
                     change_coordinates("NETFUL.asc","NETFUL_epsg.asc")
                     layer = QgsRasterLayer(fichero("NETFUL_epsg.asc"),"reaches")
                     QgsProject.instance().addMapLayer(layer)
@@ -2438,7 +2544,7 @@ class qannagnps():
 
                 #Pasar de shp a gpkg
                 processing.run("native:reprojectlayer", 
-                    {'INPUT':fichero(fichero_suelo),
+                    {'INPUT':fichero_suelo,
                     'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
                     'OPERATION':'+proj=noop','OUTPUT':fichero("suelos{}.gpkg".format(numero))})
                 #Reproyectar celdas al epsg del proyecto
@@ -2522,12 +2628,14 @@ class qannagnps():
             if str(self.dlg.lineEdit.text())=="":
                 if self.dlg.cbSoil.currentIndex()==0:
                     iface.messageBar().pushMessage("Error with soil layer","There isn't any soil information to use",level=Qgis.Warning, duration=10)
+                    self.end_execution = 1
                     return
                 #Se aplica el suelo al fichero de cells
                 try:
-                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
+                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
                 except:
                     iface.messageBar().pushMessage("Error with soil layer","Soil layer has to be saved in the same folder as the DEM. Also the DEM and the soil layer have to overlap.",level=Qgis.Warning, duration=20)
+                    self.end_execution = 1
                     return
                 annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
@@ -2565,6 +2673,7 @@ class qannagnps():
                         annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
                     except:
                         iface.messageBar().pushMessage("Error soil map","The soil type layer may not cover the full extent of the watershed",level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
                         return 
                     annagnps_eg_data.to_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"), index=False, float_format='%.5f')
                 
@@ -2572,57 +2681,60 @@ class qannagnps():
             if str(self.dlg.lineEdit_2.text())=="":
                 if self.dlg.cbMan.currentIndex()==0:
                         iface.messageBar().pushMessage("Error with soil management","There isn't any management information to use",level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
                         return 
                 try:
-                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
+                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
                 except:
                     iface.messageBar().pushMessage("Error with soil use layer","Soil use layer has to be saved in the same folder as the DEM. Also the DEM and the soil use layer have to overlap.",level=Qgis.Warning, duration=20)
+                    self.end_execution = 1
                     return
                 annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el uso al fichero de cárcavas efímeras
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
-                def create_layer():
-                    layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
-                    layer.updateFields()
-                    features = []
-                    for i in range(len(summary)):
-                        feature = QgsFeature()
-                        feature.setFields(layer.fields())
-                        x = summary.X.iloc[i]
-                        y = summary.Y.iloc[i]
-                        pt = QgsPointXY(x,y)
-                        geom = QgsGeometry.fromPointXY(pt)
-                        feature.setGeometry(geom)
-                        feature.setAttribute(0,summary.GULLY_ID.iloc[i])
-                        features.append(feature)
-                    layer.dataProvider().addFeatures(features)
-                    return layer
-                summary_layer = create_layer()
-                sampling = processing.run("native:rastersampling", 
-                    {'INPUT':summary_layer,
-                    'RASTERCOPY':fichero("suelo_ras.tif"),
-                    'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
-                capa = sampling["OUTPUT"]
-                dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
-                annagnps_eg_data = pd.read_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
-                suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
-                annagnps_eg_data["Mgmt_Field_ID"]= [dic_conv[x] for x in suelos_eg]
-                #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
-                def float_to_str(column):
-                    lista = []
-                    for i in annagnps_eg_data[column]:
-                        try:
-                            lista.append(str(int(i)))
-                        except:
-                            lista.append("")
-                    annagnps_eg_data[column] = lista
-                #Primero para la columna de celdas
-                float_to_str("Cell_ID")
-                #Ahora para la columna de reaches
-                float_to_str("Reach_ID")
-                annagnps_eg_data.to_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"), index=False, float_format='%.5f')
+                if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
+                    summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                    def create_layer():
+                        layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
+                        layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                        layer.updateFields()
+                        features = []
+                        for i in range(len(summary)):
+                            feature = QgsFeature()
+                            feature.setFields(layer.fields())
+                            x = summary.X.iloc[i]
+                            y = summary.Y.iloc[i]
+                            pt = QgsPointXY(x,y)
+                            geom = QgsGeometry.fromPointXY(pt)
+                            feature.setGeometry(geom)
+                            feature.setAttribute(0,summary.GULLY_ID.iloc[i])
+                            features.append(feature)
+                        layer.dataProvider().addFeatures(features)
+                        return layer
+                    summary_layer = create_layer()
+                    sampling = processing.run("native:rastersampling", 
+                        {'INPUT':summary_layer,
+                        'RASTERCOPY':fichero("suelo_ras.tif"),
+                        'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
+                    capa = sampling["OUTPUT"]
+                    dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
+                    annagnps_eg_data = pd.read_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
+                    suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
+                    annagnps_eg_data["Mgmt_Field_ID"]= [dic_conv[x] for x in suelos_eg]
+                    #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
+                    def float_to_str(column):
+                        lista = []
+                        for i in annagnps_eg_data[column]:
+                            try:
+                                lista.append(str(int(i)))
+                            except:
+                                lista.append("")
+                        annagnps_eg_data[column] = lista
+                    #Primero para la columna de celdas
+                    float_to_str("Cell_ID")
+                    #Ahora para la columna de reaches
+                    float_to_str("Reach_ID")
+                    annagnps_eg_data.to_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"), index=False, float_format='%.5f')
                 
             #Si se ha puesto un suelo único entonces se añade a todas las celdas
             if str(self.dlg.lineEdit.text())!="":
@@ -2644,7 +2756,7 @@ class qannagnps():
         if (self.dlg.cbAnn.isChecked() and not self.segunda_ronda and (self.ejecucion_condicion==1 or not self.dlg.checkBox_2.isChecked())):
             #CREACIÓN DE LA CARPETA QUE CONTENDRÁ LOS INPUTS DE ANNAGNPS
             directory = "INPUTS"
-            parent_dir = self.mdt_directory
+            parent_dir = self.direccion
             path_file = os.path.join(parent_dir, directory)
             mode = 0o666
             try:
@@ -2654,7 +2766,7 @@ class qannagnps():
 
             #CREACIÓN DE LAS SUBCARPETAS EN DONDE SE ORGANIZARÁN LOS INPUTS
             carpetas = ["simulation","general","watershed","climate"]
-            parent_dir = self.mdt_directory +"\\" + directory
+            parent_dir = self.direccion +"\\" + directory
             try:
                 for c in carpetas: 
                     path_file = os.path.join(parent_dir, c)
@@ -2753,7 +2865,7 @@ class qannagnps():
                 if os.path.isabs(file_name):
                     return os.path.dirname(file_name)+"/"+ directory + "/" +direct+"/"+os.path.basename(file_name)
                 else:
-                    return self.mdt_directory+"/"+ directory + "/" + direct + "/" +file_name
+                    return self.direccion+"/"+ directory + "/" + direct + "/" +file_name
             
             #Listas de los nombres de archivos para cada tipo de input. Se elminan aquellos que no han sido escogidos ("")
             #Clima
@@ -2803,24 +2915,28 @@ class qannagnps():
                             shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
                     except:
                         iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
                         return
                     try:
                         if t == general_files and origin_direction(f,"general")!= fichero_input(f,"general"):
                            shutil.copyfile(origin_direction(f,"general"),fichero_input(f,"general"))
                     except:
                         iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"general")),level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
                         return
                     try:
                         if t == simulation_files and origin_direction(f,"simulation")!=fichero_input(f,"simulation"):
                            shutil.copyfile(origin_direction(f,"simulation"),fichero_input(f,"simulation"))
                     except:
                         iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"simulation")),level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
                         return
                     try:
                         if t == watershed_files and origin_direction(f,"watershed")!=fichero_input(f,"watershed"):
                             shutil.copyfile(origin_direction(f,"watershed"),fichero_input(f,"watershed"))
                     except:
                         iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"watershed")),level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
                         return
                         
             #CREACIÓN DEL ARCHIVO annagnps_master.csv
@@ -2877,25 +2993,26 @@ class qannagnps():
             data_section = [list(master_dict)[x] for x in range(len(master_dict)) if master_dict[list(master_dict)[x]] !=""]
             file_name = [fichero_master(master_dict[x]) for x in data_section]
             master = pd.DataFrame(data = {"Data Section ID":data_section,"File Name":file_name})
-            master.to_csv(self.mdt_directory + "\\" +directory + "\\" + "annagnps_master.csv", encoding='utf-8', index=False)
+            master.to_csv(self.direccion + "\\" +directory + "\\" + "annagnps_master.csv", encoding='utf-8', index=False)
             
             #MOVER EL EJECUTABLE DE ANNAGNPS Y EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS 
-            shutil.copyfile(self.executable_directory + "\\" +"AnnAGNPS.fil" ,self.mdt_directory + "\\"+directory+ "\\" +"AnnAGNPS.fil")
+            shutil.copyfile(self.executable_directory + "\\" +"AnnAGNPS.fil" ,self.direccion + "\\"+directory+ "\\" +"AnnAGNPS.fil")
 
             #EJECUCIÓN DE ANNAGNPS
-            os.chdir(self.mdt_directory+"\\"+directory)
+            os.chdir(self.direccion+"\\"+directory)
             def execute_bat():
                def main():
                    f = open(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
-                   linea_uno = "CD {}".format(self.mdt_directory+"\\"+directory)
+                   linea_uno = "CD {}".format(self.direccion+"\\"+directory)
                    linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
                    f.write("{} \n".format(linea_uno))
                    f.write("{} \n".format(linea_dos))
                    f.close()
                main()
             execute_bat()
-            proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-            stdout, stderr = proc.communicate()
+            subprocess.call(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
+            #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+            #stdout, stderr = proc.communicate()
             
             #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
             time.sleep(1)
@@ -2910,7 +3027,7 @@ class qannagnps():
                     except:
                         pass
                     iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning, duration=10)
-                    self.end_sensitivity = 1
+                    self.end_execution = 1
                     #Se abre el archivo de errores
                     try:
                         os.startfile(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv")
@@ -2921,8 +3038,8 @@ class qannagnps():
             
             #EJECUCIÓN DEL OUTPUT_TABLES
             time.sleep(1)
-            shutil.copyfile(self.executable_directory + "\\" +"STEAD.fil" ,self.mdt_directory + "\\"+directory + "\\" +"STEAD.fil")
-            os.chdir(self.mdt_directory+"\\"+directory)
+            shutil.copyfile(self.executable_directory + "\\" +"STEAD.fil" ,self.direccion + "\\"+directory + "\\" +"STEAD.fil")
+            os.chdir(self.direccion+"\\"+directory)
             proc = subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             stdout, stderr = proc.communicate()
 
@@ -2975,7 +3092,7 @@ class qannagnps():
         
     def update(self, point: QgsPointXY):
         def fichero(nombre):
-            return self.mdt_directory +"\\"+nombre
+            return self.direccion +"\\"+nombre
         userCrsPoint = self.transform.transform(point)
         self.dockwidget.userCrsEdit.setText('{0:.{2}f},{1:.{2}f}'.format(userCrsPoint.x(),
                                                                          userCrsPoint.y(),
@@ -2987,9 +3104,9 @@ class qannagnps():
                                                                          userCrsPoint.y(),
                                                                          self.userCrsDisplayPrecision)
         topagnps_control_file = pd.read_csv(fichero("TOPAGNPS.csv"),encoding = "ISO-8859-1",delimiter=",")
-        topagnps_control_file["FORMAT"].iloc[0] = 0
-        topagnps_control_file["OUTFORMAT"].iloc[0] = 1
-        topagnps_control_file["DEMPROC"].iloc[0] = 0
+        #topagnps_control_file["FORMAT"].iloc[0] = 0
+        topagnps_control_file["OUTFORMAT"].iloc[0] = str(1)
+        topagnps_control_file["DEMPROC"].iloc[0] = str(0)
         topagnps_control_file["OUTROW"].iloc[0] =coordenada_puntos.split(",")[1]
         topagnps_control_file["OUTCOL"].iloc[0] = coordenada_puntos.split(",")[0]
         topagnps_control_file.to_csv(fichero("TOPAGNPS.csv"), index=False, float_format='%.5f')
@@ -3018,7 +3135,7 @@ class qannagnps():
         
     def create_control_file_topagnps(self):
         #Función para que cuando se le de al botón de aceptar en el control file de topagnps se cree el control file TOPAGNPS.csv con los datos que se han puesto
-        control_file = pd.DataFrame(data = {"FILENAME":[self.ctopagnps.lineEdit_7.text()],"FORMAT":[0],
+        control_file = pd.DataFrame(data = {"FILENAME":[self.ctopagnps.lineEdit_7.text()],"FORMAT":[self.ctopagnps.lineEdit_8.text()],
                                     "DEMPROC":[self.ctopagnps.lineEdit_5.text()],"OUTFORMAT":[self.ctopagnps.lineEdit_14.text()],
                                     "OUTROW":[self.ctopagnps.lineEdit_22.text()],"OUTCOL":[self.ctopagnps.lineEdit_15.text()],
                                     "CSA":[self.ctopagnps.lineEdit_3.text()],"MSCL":[self.ctopagnps.lineEdit_10.text()],
@@ -3692,13 +3809,13 @@ class qannagnps():
         lista = [self.inputs.l_1,self.inputs.l_23,self.inputs.l_47,self.inputs.l_53]
         for i in lista:
             if i.text()=="":
-                i.setText(str(self.mdt_directory))
+                i.setText(str(self.dlg.project.text()))
         
     def add_master(self):
         #Método para añadir la información de un archivo master a los inputs de AnnAGNPS
         #Se abre la opción de escoger archivo y se obtiene la información
         if hasattr(self, 'mdt_directory'):
-            fname = QFileDialog.getOpenFileName(self.inputs,"Select master file",self.mdt_directory,"CSV files (*.csv)")
+            fname = QFileDialog.getOpenFileName(self.inputs,"Select master file",self.direccion,"CSV files (*.csv)")
         else:
             fname = QFileDialog.getOpenFileName(self.inputs,"Select master file","C/","CSV files (*.csv)")
         if fname[0]!="":
@@ -3831,28 +3948,28 @@ class qannagnps():
         #Método para cambiar el directorio de las secciones en el diálog de AnnAGNPS input editor
         if section =="watershed":
             if hasattr(self, 'mdt_directory'):
-                fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", self.mdt_directory)
+                fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", self.direccion)
             else:
                 fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", "C/")
             if fname!="":
                 self.inputs.l_1.setText(fname)
         if section =="general":
             if hasattr(self, 'mdt_directory'):
-                fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", self.mdt_directory)
+                fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", self.direccion)
             else:
                 fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", "C/")
             if fname!="":
                 self.inputs.l_23.setText(fname)
         if section =="climate":
             if hasattr(self, 'mdt_directory'):
-                fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", self.mdt_directory)
+                fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", self.direccion)
             else:
                 fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", "C/")
             if fname!="":
                 self.inputs.l_47.setText(fname)
         if section =="simulation":
             if hasattr(self, 'mdt_directory'):
-                fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", self.mdt_directory)
+                fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", self.direccion)
             else:
                 fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", "C/")
             if fname!="":
@@ -4181,6 +4298,7 @@ class qannagnps():
         self.ctopagnps.label_5.setToolTip(self.tr("This keyword allows the user to specify the level of processing from module DEDNM. \n Optional; the default value of “0” will be assumed. \n 0 = full DEM processing - (DEFAULT=0, if blank or keyword not used.) \n 1 = DEM elevation preprocessing only \n 2 = DEM elevation preprocessing and full network generation"))
         self.ctopagnps.label_6.setToolTip(self.tr("This keyword allows the user to specify if the original control file “DNMCNT.INP” is \n to be used to control processing rather than the keywords found in “TopAGNPS.csv”. \n Optional; the default value of “0” will be assumed. \n 0 = do not use the dnmcnt.inp control file - (DEFAULT=0, if blank or keyword not used.) \n 1 = use the dnmcnt.inp control file, if present"))
         self.ctopagnps.label_7.setToolTip(self.tr("This keyword allows the user to specify the input path and filename of input DEM data.\n Optional; the default value of “DEDNM.ASC” will be assumed. (DEFAULT=DEDNM.ASC, if blank or keyword not used.)"))
+        self.ctopagnps.label_13.setToolTip(self.tr("This keyword allows the user to specify the format of the input DEM data. \n There are currently only two formats allowed. Optional; the default value of “0” will be assumed. \n0 = ASCII raster grid format (ASC input format) - (DEFAULT=0, if blank or keyword not used.) \n1 = one value per record in row-major order (original “DEDNM.INP” input format)"))
         self.ctopagnps.label_9.setToolTip(self.tr("This keyword allows the user to specify whether or not to keep the intermediate output \n files produced from DEDNM whose file size is greater than zero. If the control file “TopAGNPS.csv” \n is not used, the default is “1” which will keep the intermediate output files. \n Optional; the default value of “0” (do not keep) will be assumed when the control file “TopAGNPS.csv” is used; \n “1” otherwise. (DEFAULT=0, if blank or keyword not used.)"))
         self.ctopagnps.label_10.setToolTip(self.tr("Minimum Source Channel Length in meters. \n Optional; the default value of “100.0” [m] will be assumed. (DEFAULT=100.0 [m], if blank or keyword not used.)"))
         self.ctopagnps.label_11.setToolTip(self.tr("“nodata” value for input DEM data"))
@@ -4325,24 +4443,42 @@ class qannagnps():
         #Metod to add sensitivity analysis parameters to table
         if self.sensitivity_dialog.table.columnCount() == 0:
             #Añadir columnas
-            nombres_columnas = ["Parameter","Distribution","Minimum","Maximum","Row"]
+            nombres_columnas = ["Parameter","Distribution","Distribution parameters","Row"]
             self.sensitivity_dialog.table.setColumnCount(len(nombres_columnas))
             self.sensitivity_dialog.table.setHorizontalHeaderLabels(nombres_columnas)
-        
+            #Cambiar el ancho de las columnas
+            self.sensitivity_dialog.table.setColumnWidth(nombres_columnas.index("Parameter"), 180)
+            self.sensitivity_dialog.table.setColumnWidth(nombres_columnas.index("Distribution parameters"), 200)
+            
         #Añadir filas
+        def add_element(columna,texto):
+            item = QTableWidgetItem(texto)
+            self.sensitivity_dialog.table.setItem(numero_filas, columna, item)
+            item.setTextAlignment(Qt.AlignCenter)
+        
         #Primero la información de los lineEdits
         numero_filas = self.sensitivity_dialog.table.rowCount()
-        lineEdits = [self.sensitivity_dialog.parameter,self.sensitivity_dialog.first,self.sensitivity_dialog.second,self.sensitivity_dialog.row]
         self.sensitivity_dialog.table.setRowCount(numero_filas + 1)
-        columnas_linedits = [0,2,3,4]
-        for i in range(len(lineEdits)):
-            item = QTableWidgetItem(lineEdits[i].text())
-            self.sensitivity_dialog.table.setItem(numero_filas, columnas_linedits[i], item)
-            item.setTextAlignment(Qt.AlignCenter)
-        #Luego la información del combobox
-        item = QTableWidgetItem([self.sensitivity_dialog.distributions.itemText(i) for i in range(self.sensitivity_dialog.distributions.count())][self.sensitivity_dialog.distributions.currentIndex()])
-        self.sensitivity_dialog.table.setItem(numero_filas,1, item)
-        item.setTextAlignment(Qt.AlignCenter)
+        #Add parameter
+        add_element(0,self.sensitivity_dialog.parameter.text())
+        #Add distribution
+        distribution = [self.sensitivity_dialog.distributions.itemText(i) for i in range(self.sensitivity_dialog.distributions.count())][self.sensitivity_dialog.distributions.currentIndex()]
+        add_element(1,distribution)
+        #Add distribution parameters
+        if distribution=="Uniform" or distribution=="Logaritmic uniform":
+            add_element(2,f"min:{self.sensitivity_dialog.first.text()},max:{self.sensitivity_dialog.second.text()}")
+        elif distribution == "Triangular":
+            add_element(2,f"min:{self.sensitivity_dialog.first.text()},max:{self.sensitivity_dialog.second.text()},peak:{self.sensitivity_dialog.third.text()}")
+        elif distribution == "Normal" or distribution == "Lognormal":
+            add_element(2,f"mean:{self.sensitivity_dialog.first.text()},stdv:{self.sensitivity_dialog.second.text()}")
+        elif distribution == "Normal truncated":
+            add_element(2,f"min:{self.sensitivity_dialog.first.text()},max:{self.sensitivity_dialog.second.text()},mean:{self.sensitivity_dialog.third.text()},stdv:{self.sensitivity_dialog.fourth.text()}")
+        #Add row
+        add_element(3,self.sensitivity_dialog.row.text())
+        
+        #Update number of samples
+        self.change_sensitivity_metod()
+    
     
     def delete_sensitivity_table(self):
         #Metod to delete sensitivity analysis parameters to table
@@ -4363,26 +4499,55 @@ class qannagnps():
         self.dlg.close()
         #Start with the progress bar
         self.progress_metod(start = True)
-        
+        #Functions to convert user specified inputs into inputs that SALib can read
+        def distribution_parameters_fun(row):
+            if str(self.sensitivity_dialog.table.item(row, 1).text()) == "Uniform":
+                distribution = "unif"
+                texto = str(self.sensitivity_dialog.table.item(row, 2).text())
+                parameters = [float(x.split(":")[-1]) for x in texto.split(",")]
+            elif str(self.sensitivity_dialog.table.item(row, 1).text()) == "Logaritmic uniform":
+                distribution = "logunif"
+                texto = str(self.sensitivity_dialog.table.item(row, 2).text())
+                parameters = [float(x.split(":")[-1]) for x in texto.split(",")]
+            elif str(self.sensitivity_dialog.table.item(row, 1).text()) == "Triangular":
+                distribution = "triang"
+                texto = str(self.sensitivity_dialog.table.item(row, 2).text())
+                parameters = [float(x.split(":")[-1]) for x in texto.split(",")]
+            elif str(self.sensitivity_dialog.table.item(row, 1).text()) == "Normal":
+                distribution = "norm"
+                texto = str(self.sensitivity_dialog.table.item(row, 2).text())
+                parameters = [float(x.split(":")[-1]) for x in texto.split(",")]
+            elif str(self.sensitivity_dialog.table.item(row, 1).text()) == "Normal truncated":
+                distribution = "truncnorm"
+                texto = str(self.sensitivity_dialog.table.item(row, 2).text())
+                parameters = [float(x.split(":")[-1]) for x in texto.split(",")]
+            elif str(self.sensitivity_dialog.table.item(row, 1).text()) == "Lognormal":
+                distribution = "lognorm"
+                texto = str(self.sensitivity_dialog.table.item(row, 2).text())
+                parameters = [float(x.split(":")[-1]) for x in texto.split(",")]
+            return distribution, parameters
+            
+            
         #Diccionario nombre en el diálogo - [parametros del análisis de sensibilidad]
         self.dic_data = {}
         for i in range(self.sensitivity_dialog.table.rowCount()):
-            #Diccionario [Parametro] = (Distribucion, Minimo, Maximo, Row)
+            #Diccionario [Parametro] = (Distribucion, Parametros, Row)
             name = self.sensitivity_dialog.table.item(i, 0).text()
-            #Change name of distributions
-            if str(self.sensitivity_dialog.table.item(i, 1).text()) == "Uniform":distribution = "unif"
-            if str(self.sensitivity_dialog.table.item(i, 1).text()) == "Logaritmic uniform":distribution = "logunif"
-            if str(self.sensitivity_dialog.table.item(i, 1).text()) == "Triangular":distribution = "triang"
-            if str(self.sensitivity_dialog.table.item(i, 1).text()) == "Normal":distribution = "norm"
-            if str(self.sensitivity_dialog.table.item(i, 1).text()) == "Normal truncated":distribution = "truncnorm"
-            if str(self.sensitivity_dialog.table.item(i, 1).text()) == "Lognormal":distribution = "lognorm"
+            #Obtain name of distribution and parameters
+            dis,param = distribution_parameters_fun(i)
             if name in self.dic_data:name = name+"__1"
-            self.dic_data[name] = [distribution,float(self.sensitivity_dialog.table.item(i, 2).text()),float(self.sensitivity_dialog.table.item(i, 3).text()),int(self.sensitivity_dialog.table.item(i, 4).text())]
+            self.dic_data[name] = [dis,param,int(self.sensitivity_dialog.table.item(i, 3).text())]
         #Hay que hacer algo para guardar los resultados originales y luego ponerlos después
         #Se crean las muestras
-        problem = {'num_vars': len(self.dic_data),'names': list(self.dic_data.keys()),'bounds': [[x[1],x[2]] for x in self.dic_data.values()],"dists":[x[0] for x in self.dic_data.values()]}
-        self.param_values = saltelli.sample(problem, int(self.sensitivity_dialog.m.text()))
-        resultados = []
+        #Problema
+        problem = {'num_vars': len(self.dic_data),'names': list(self.dic_data.keys()),'bounds': [x[1] for x in self.dic_data.values()],"dists":[x[0] for x in self.dic_data.values()]}
+        #Muestras
+        if self.sensitivity_dialog.sobol.isChecked():
+            self.param_values = saltelli.sample(problem, int(self.sensitivity_dialog.trajectories.text()))
+        elif self.sensitivity_dialog.morris.isChecked():
+            self.param_values = sample_morris(problem, int(self.sensitivity_dialog.trajectories.text()))
+            
+        self.resultados = []
         numero_ejecucion = 0
         #Results are obtained
         for i in self.param_values:
@@ -4392,28 +4557,21 @@ class qannagnps():
             #Progress bar update
             self.progress_metod(start = False,values = i,execution = numero_ejecucion)
             self.ejecucion_completa()
-            resultados.append(self.save_result()) #COMPROBAR QUE SE ESTÉN GUARDANDO LOS DATOS QUE SE QUIEREN
             #Condición de error
-            if self.end_sensitivity:
+            if self.end_execution:
                 iface.messageBar().pushMessage("Error in sensitivity analysis", "Please check the error in the opened file",level=Qgis.Warning, duration=10)
                 return
+            #Se guardan los resultados
+            self.resultados.append(self.save_result())
         #Se analizan los resultados
-        Si = sobol.analyze(problem, np.array(resultados))
+        if self.sensitivity_dialog.sobol.isChecked():
+            self.Si = sobol.analyze(problem, np.array(self.resultados))
+        elif self.sensitivity_dialog.morris.isChecked():
+            self.Si = analyze_morris(problem,np.array(self.param_values),np.array(self.resultados))
         #Se guarda gráfico
-        try:
-            Si.plot()
-            plt.savefig(self.direccion+"\\Sensitivity.png",transparent=False,bbox_inches = "tight",dpi=300)
-        except:
-            pass
-        #Se guardan datos
-        df_dic = {}
-        for i,k in enumerate(self.dic_data.keys()):
-            df_dic[k] = [x[i] for x in self.param_values]
-        df_dic["Results"] = resultados
-        df = pd.DataFrame(data = df_dic) 
-        df.to_csv(self.direccion+"\\"+'Sensitivity_results.csv', index=False, float_format='%.5f')
-        self.progress_metod(close = True)
-        
+        self.create_sensitivity_graph()
+        #Se cierra la barra de progreso
+        self.progress_dialog.close()
         #MENSAJE DE ÉXITO
         self.iface.messageBar().pushMessage("Success", "Succes in the sensitiviy analysis ",level=Qgis.Success, duration=10)
         
@@ -4426,11 +4584,15 @@ class qannagnps():
             else:
                 direccion = self.file_input(self.dic_name_column[k][0])
                 columna = self.dic_name_column[k][1]
-        except: #misma columna, distintas filas
-            direccion = self.file_input(self.dic_name_column[k.split("__")[0]][0])
-            columna = self.dic_name_column[k.split("__")[0]][1]
+        except KeyError: #misma columna, distintas filas
+            if self.dic_name_column[k.split("__")[0]][0]=="Spatial":
+                direccion = self.direccion+"\\"+self.dic_name_column[k.split("__")[0]][1]
+                columna = self.dic_name_column[k.split("__")[0]][2]
+            else:
+                direccion = self.file_input(self.dic_name_column[k.split("__")[0]][0])
+                columna = self.dic_name_column[k.split("__")[0]][1]
         df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",") 
-        df[columna].iloc[self.dic_data[k][3]] = i[j]
+        df[columna].iloc[self.dic_data[k][2]] = i[j]
         #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
         def float_to_str(df,column):
             #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
@@ -4543,7 +4705,7 @@ class qannagnps():
             #Creation of text
             text = f"Execution {execution}/{len(self.param_values)}\n"
             for key in range(len(self.dic_data)):
-                text+= f"{list(self.dic_data.keys())[key]}:{round(values[key],2)}\n"
+                text+= str([x.replace('\n','') for x in self.dic_data.keys()][key])+":"+str(round(values[key],2))+"\n"
             #Add updates
             self.progress_dialog.setLabelText(text)
             self.progress_dialog.setValue(int(100*(execution/len(self.param_values))))
@@ -4648,10 +4810,10 @@ class qannagnps():
             #Luego se añade
             # Crea un nuevo QLabel y QLineEdit
             newLabel = QLabel("Peak")
-            newLineEdit = QLineEdit()
+            self.sensitivity_dialog.third = QLineEdit()
             # Agrega el nuevo QLabel y QLineEdit a la siguiente fila
             self.sensitivity_dialog.gridLayout_3.addWidget(newLabel, 4, 0)
-            self.sensitivity_dialog.gridLayout_3.addWidget(newLineEdit, 4, 1)
+            self.sensitivity_dialog.gridLayout_3.addWidget(self.sensitivity_dialog.third, 4, 1)
 
         elif distribution=="Normal":
             #Primero se borra
@@ -4686,14 +4848,78 @@ class qannagnps():
             #Luego se añade
             # Crea un nuevo QLabel y QLineEdit
             newLabel = QLabel("Mean")
-            newLineEdit = QLineEdit()
+            self.sensitivity_dialog.third = QLineEdit()
             # Agrega el nuevo QLabel y QLineEdit a la siguiente fila
             self.sensitivity_dialog.gridLayout_3.addWidget(newLabel, 4, 0)
-            self.sensitivity_dialog.gridLayout_3.addWidget(newLineEdit, 4, 1)
+            self.sensitivity_dialog.gridLayout_3.addWidget(self.sensitivity_dialog.third, 4, 1)
             
             # Crea un nuevo QLabel y QLineEdit
             newLabel = QLabel("Standard deviation")
-            newLineEdit = QLineEdit()
+            self.sensitivity_dialog.fourth = QLineEdit()
             # Agrega el nuevo QLabel y QLineEdit a la siguiente fila
             self.sensitivity_dialog.gridLayout_3.addWidget(newLabel, 5, 0)
-            self.sensitivity_dialog.gridLayout_3.addWidget(newLineEdit, 5, 1)
+            self.sensitivity_dialog.gridLayout_3.addWidget(self.sensitivity_dialog.fourth, 5, 1)
+    
+    def change_sensitivity_metod(self):
+        #Metod to change sensitivity inputs depending on selected senstitivity metod
+        if self.sensitivity_dialog.sobol.isChecked():
+            self.sensitivity_dialog.label_5.setText("M")
+            try:
+                if self.sensitivity_dialog.trajectories.text()=="":
+                    self.sensitivity_dialog.lineEdit_6.setText("")
+                self.sensitivity_dialog.lineEdit_6.setText(str(int(self.sensitivity_dialog.trajectories.text())*(2*self.sensitivity_dialog.table.rowCount()+2)))
+            except:
+                pass
+        elif self.sensitivity_dialog.morris.isChecked():
+            self.sensitivity_dialog.label_5.setText("Trajectories")
+            try:
+                if self.sensitivity_dialog.trajectories.text()=="":
+                    self.sensitivity_dialog.lineEdit_6.setText("")
+                self.sensitivity_dialog.lineEdit_6.setText(str(int(self.sensitivity_dialog.trajectories.text())*(self.sensitivity_dialog.table.rowCount()+1)))
+            except:
+                pass
+    
+    def create_sensitivity_graph(self):
+        #Metod to create sensitivity graph
+        if self.sensitivity_dialog.sobol.isChecked(): 
+            try:
+                self.Si.plot()
+                plt.savefig(self.direccion+"\\Sobol.png",transparent=False,bbox_inches = "tight",dpi=300)
+            except:
+                pass
+            #Se guardan datos
+            df_dic = {}
+            for i,k in enumerate(self.dic_data.keys()):
+                df_dic[k] = [x[i] for x in self.param_values]
+            df_dic["Results"] = self.resultados
+            df = pd.DataFrame(data = df_dic) 
+            df.to_csv(self.direccion+"\\"+'Results_sobol.csv', index=False, float_format='%.5f')
+            self.progress_metod(close = True)
+        elif self.sensitivity_dialog.morris.isChecked():
+            plt.rcParams["figure.figsize"] = [10, 8]
+            fig = plt.figure()
+            ax0 = plt.subplot()
+            # Graficar los puntos con color granate y agregar etiquetas
+            for i, (x, y) in enumerate(zip(self.Si["mu_star"], self.Si["sigma"])):
+                ax0.scatter(x, y, marker="o", color="maroon")
+                ax0.annotate(f'{self.Si["names"][i]}', (x, y), textcoords="offset points", xytext=(10,10), ha='center', fontweight='bold')
+            #Linea 1:1
+            line_plot = list(range(-1,int(max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)+2))
+            ax0.plot(line_plot, line_plot, color="red",linestyle="--")
+
+            ax0.set_xlim(-1,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
+            ax0.set_ylim(-1,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
+
+            ax0.set_xlabel("Mean of Elementary Effects ($\mu_{i}^{*}$)",size = 15,family="arial",weight = "bold",color = "black")
+            ax0.set_ylabel("Standard Deviation of Elementary Effects ($\sigma_{i}$)",size = 15,family="arial",weight = "bold",color = "black")
+            plt.savefig(self.direccion+"\\"+"Morris.png",transparent=False,bbox_inches = "tight",dpi=300)
+            
+            #Se guardan datos
+            df_dic = {}
+            for i,k in enumerate(self.dic_data.keys()):
+                df_dic[k.replace("\n", "")] = [x[i] for x in self.param_values]
+            df_dic["Results"] = self.resultados
+            df = pd.DataFrame(data = df_dic) 
+            df.to_csv(self.direccion+"\\"+'Results_morris.csv', index=False, float_format='%.5f')
+            self.progress_metod(close = True)
+        
