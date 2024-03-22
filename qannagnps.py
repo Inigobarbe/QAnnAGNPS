@@ -292,6 +292,13 @@ class qannagnps():
         self.dlg.button_project.setIcon(QIcon(self.icon_path_search))
         self.dlg.button_project.clicked.connect(self.add_project_folder)
         
+        #Se pone la imagen a buscar los inputs de TopAGNPS
+        self.dlg.pb_dem.setIcon(QIcon(self.icon_path_search))
+        self.dlg.pb_buffer.setIcon(QIcon(self.icon_path_search))
+        self.dlg.pb_vegetation.setIcon(QIcon(self.icon_path_search))
+        self.dlg.pb_soil.setIcon(QIcon(self.icon_path_search))
+        self.dlg.pb_management.setIcon(QIcon(self.icon_path_search))
+        
         #Cambiar el borde de la línea de texto si no existe la ruta
         self.border = False #no están puestos los bordes
         self.inputs.path.clicked.connect(self.path_exist)
@@ -555,7 +562,7 @@ class qannagnps():
         self.sensitivity_dialog.search.textChanged.connect(self.search_sensitiviy_input)
         
         #Diccionario analisis de sensibilidad nombre en el dialogo - [nombre del archivo, nombre de la columna]
-        dic_spatial = {'Critical Source Area':['Spatial','TOPAGNPS.csv','CSA'],'Minimum Source Channel \nLength':['Spatial','TOPAGNPS.csv','MSCL'],'Absolute CTI':['Spatial','PEG.csv','CTI_value'],'Relative CTI':['Spatial','PEG.csv','Accum_pct'],'Cell Threshold':['Spatial','AGBUF.csv','C_THRESHOLD'],'Reach Threshold':['Spatial','AGBUF.csv','R_THRESHOLD'],'Drainage area \nto concentrated flow':['Spatial','AGFLOW.csv','Area'],'Maximum profile length \nuntil deposition':['Spatial','AGFLOW.csv','Length'],'Maximum Profile Slope':['Spatial','AGFLOW.csv','MxSlope'],'Wetness Index Threshold':['Spatial','AGWET.csv','WI_Threshold'],'Erosion Index Threshold':['Spatial','AGWET.csv','Erosion_Index_Threshold'],'Drainage Area Threshold':['Spatial','AGWET.csv','DA_Threshold'],'Maximum Wetland Ratio':['Spatial','AGWET.csv','Max_Wetland_Ratio'],'Minimum Wetland Ratio':['Spatial','AGWET.csv','Min_Wetland_Ratio'],'Barrier Height':['Spatial','AGWET.csv','Barrier_Height'],'Barrier Height Increment':['Spatial','AGWET.csv','Barrier_Height_Increment'],'Barrier Height Maximum':['Spatial','AGWET.csv','Barrier_Height_Max'],'Buffer width':['Spatial','AGWET.csv','Buffer_Width'],'Pothole Surface Area':['Spatial','POTHOLE.csv','POTHOLE_SURFACE_AREA']}
+        dic_spatial = {'Pixel Size':['Spatial','TOPAGNPS.csv','FILENAME'],'Critical Source Area':['Spatial','TOPAGNPS.csv','CSA'],'Minimum Source Channel \nLength':['Spatial','TOPAGNPS.csv','MSCL'],'Absolute CTI':['Spatial','PEG.csv','CTI_value'],'Relative CTI':['Spatial','PEG.csv','Accum_pct'],'Cell Threshold':['Spatial','AGBUF.csv','C_THRESHOLD'],'Reach Threshold':['Spatial','AGBUF.csv','R_THRESHOLD'],'Drainage area \nto concentrated flow':['Spatial','AGFLOW.csv','Area'],'Maximum profile length \nuntil deposition':['Spatial','AGFLOW.csv','Length'],'Maximum Profile Slope':['Spatial','AGFLOW.csv','MxSlope'],'Wetness Index Threshold':['Spatial','AGWET.csv','WI_Threshold'],'Erosion Index Threshold':['Spatial','AGWET.csv','Erosion_Index_Threshold'],'Drainage Area Threshold':['Spatial','AGWET.csv','DA_Threshold'],'Maximum Wetland Ratio':['Spatial','AGWET.csv','Max_Wetland_Ratio'],'Minimum Wetland Ratio':['Spatial','AGWET.csv','Min_Wetland_Ratio'],'Barrier Height':['Spatial','AGWET.csv','Barrier_Height'],'Barrier Height Increment':['Spatial','AGWET.csv','Barrier_Height_Increment'],'Barrier Height Maximum':['Spatial','AGWET.csv','Barrier_Height_Max'],'Buffer width':['Spatial','AGWET.csv','Buffer_Width'],'Pothole Surface Area':['Spatial','POTHOLE.csv','POTHOLE_SURFACE_AREA']}
         dic_watershed = {'Pond area':[self.inputs.l_2,'Pond_Area'],'Pond Depth':[self.inputs.l_2,'Pond_Depth'],'Seepage Rate':[self.inputs.l_2,'Seepage_Rate'],'Sediment Delivery Ratio Pond':[self.inputs.l_2,'Sediment_Delivery_Ratio'],'Organic Carbon \nCalibration Factor Pond':[self.inputs.l_2,'OC_Calib_Fctr'],'Nitrogen Calibration Factor Pond':[self.inputs.l_2,'N_Calib_Fctr'],'Phosphorus Calibration Factor Pond':[self.inputs.l_2,'P_Calib_Fctr'],'Erosion Calibration Factor Pond':[self.inputs.l_2,'Erosion_Calib_Fctr'],'Sheet flow Manning’s n':[self.inputs.l_3,'Sheet_Flow_Mannings_n'],'Concentrated flow \nhydraulic depth':[self.inputs.l_3,'Conc_Flow_Hydraulic_Depth'],'Concentrated flow Manning’s n':[self.inputs.l_3,'Conc_Flow_Mannings_n'],'Delivery Ratio Pond':[self.inputs.l_3,'Delivery_Ratio'],'Constant USLE C factor':[self.inputs.l_3,'Constant_USLE_C_Fctr'],'Constant USLE P factor':[self.inputs.l_3,'Constant_USLE_P_Fctr'],'All Organic Carbon \nCalibration Factor':[self.inputs.l_3,'All_OC_Calib_Fctr'],'All Nitrogen Calibration Factor':[self.inputs.l_3,'All_N_Calib_Fctr'],'All Phosphorus Calibration Factor':[self.inputs.l_3,'All_P_Calib_Fctr'],'Sheet and Rill Erosion \nCalibration Factor':[self.inputs.l_3,'Sheet_and_Rill_Erosion_Calib_Fctr'],'Gullies Erosion Calibration Factor':[self.inputs.l_3,'Gullies_Erosion_Calib_Fctr'],'Head Cut Depth':[self.inputs.l_4,'Headcut_Depth'],'Erosion Coefficient':[self.inputs.l_4,'Erosion_Coef'],'Erosion Exponent':[self.inputs.l_4,'Erosion_exp'],'Delivery Ratio Gully':[self.inputs.l_4,'Delivery_Ratio'],'Organic Carbon \nCalibration Factor Gully':[self.inputs.l_4,'OC_Calib_Fctr'],'Nitrogen Calibration Factor Gully':[self.inputs.l_4,'N_Calib_Fctr'],'Phosphorus Calibration Factor Gully':[self.inputs.l_4,'P_Calib_Fctr'],'Erosion Calibration Factor Gully':[self.inputs.l_4,'Erosion_Calib_Fctr'],'Critical Shear Stress \nEphemeral Gully':[self.inputs.l_5,'Critical_Shear_Stress'],'Erosion Depth':[self.inputs.l_5,'Erosion_Depth'],'Delivery Ratio Ephemeral Gully':[self.inputs.l_5,'Delivery_Ratio'],'Manning’s n Ephemeral Gully':[self.inputs.l_5,'Mannings_n'],'Re Plant Period':[self.inputs.l_5,'Replant_Period'],'Organic Carbon':[self.inputs.l_5,'OC_Calib_Fctr'],'Nitrogen':[self.inputs.l_5,'N_Calib_Fctr'],'Phosphorus':[self.inputs.l_5,'P_Calib_Fctr'],'Erosion':[self.inputs.l_5,'Erosion_Calib_Fctr'],'Headcut detachment leading \ncoefficient a':[self.inputs.l_5,'Headcut_Dtach/Erod_Coef_a'],'Headcut erodibility \nleading coefficient a':[self.inputs.l_5,'Headcut_Dtach/Erod_Coef_a'],'Headcut detachment exponent \ncoefficient b':[self.inputs.l_5,'Headcut_Dtach/Erod_Exp_Coef_b'],'Headcut erodibility exponent \ncoefficient b':[self.inputs.l_5,'Headcut_Dtach/Erod_Exp_Coef_b'],'Maximum Buffer Trapping \nEfficiency TE m':[self.inputs.l_5,'Max_Trapping_Efficiency'],'Open Area':[self.inputs.l_6,'Open_Area'],'Paved Ratio':[self.inputs.l_6,'Paved_Ratio'],'Roof Area':[self.inputs.l_6,'Roof_Area'],'Upslope Area':[self.inputs.l_6,'Upslope_Area'],'Feedlot Initial N':[self.inputs.l_6,'Initial_N'],'Feedlot Initial P':[self.inputs.l_6,'Initial_P'],'Feedlot Initial OrgC':[self.inputs.l_6,'Initial_OC'],'Delta N':[self.inputs.l_6,'Delta_N'],'Delta P':[self.inputs.l_6,'Delta_P'],'Delta OrgC':[self.inputs.l_6,'Delta_OC'],'Feedlot Max N':[self.inputs.l_6,'Max_N'],'Feedlot Max P':[self.inputs.l_6,'Max_P'],'Feedlot Max OrgC':[self.inputs.l_6,'Max_OC'],'Feedlot Pack N':[self.inputs.l_6,'Pack_N'],'Feedlot Pack P':[self.inputs.l_6,'Pack_P'],'Feedlot Pack OrgC':[self.inputs.l_6,'Pack_OC'],'Organic Carbon Calibration \nFactor Feedlot':[self.inputs.l_6,'OC_Calib_Fctr'],'Nitrogen Calibration \nFactor Feedlot':[self.inputs.l_6,'N_Calib_Fctr'],'Phosphorus Calibration \nFactor Feedlot':[self.inputs.l_6,'P_Calib_Fct'],'Erosion Calibration \nFactor Feedlot':[self.inputs.l_6,'Erosion_Calib_Fctr'],'Cell Buffer Length':[self.inputs.l_6,'Cell_Buffer_Length'],'Field Pond area':[self.inputs.l_7,'Pond_Area'],'Number of rotation years':[self.inputs.l_7,'Number_of_Rotation_Years'],'Number gate operations':[self.inputs.l_7,'Number_of_Gate_Operations'],'Delivery Ratio Field Pond':[self.inputs.l_7,'Delivery_Ratio'],'Volume of release water':[self.inputs.l_7,'Volume_of_Release_Water'],'Drain Time':[self.inputs.l_7,'Drain_Time'],'Release rate':[self.inputs.l_7,'Release_Rate'],'Sediment Concentration':[self.inputs.l_7,'Sediment_Conc'],'Clay content Field Pond':[self.inputs.l_7,'Clay_Content'],'Silt content Field Pond':[self.inputs.l_7,'Silt_Content'],'Organic Carbon Calibration Factor Field Pond':[self.inputs.l_7,'OC_Calib_Fctr'],'Nitrogen Calibration Factor Field Pond':[self.inputs.l_7,'N_Calib_Fctr'],'Phosphorus Calibration Factor Field Pond':[self.inputs.l_7,'P_Calib_Fctr'],'Erosion Calibration Factor Field Pond':[self.inputs.l_7,'Erosion_Calib_Fctr'],'Impoundment Infiltration':[self.inputs.l_8,'Infiltration'],'Impoundment Seepage':[self.inputs.l_8,'Seepage'],'Permanent Pool Depth':[self.inputs.l_8,'Permanent_Pool_Depth'],'Impound Volume Coefficient':[self.inputs.l_8,'Volume_Coef'],'Impound Volume Exponent':[self.inputs.l_8,'Volume_Exp'],'Impound Discharge Coefficient':[self.inputs.l_8,'Discharge_Coef'],'Impound Discharge Exponent':[self.inputs.l_8,'Discharge_Exp'],'Sediment Clean Out Depth':[self.inputs.l_8,'Sed_Clean_Out_Depth'],'Sediment Clean Out Year':[self.inputs.l_8,'Sed_Clean_Out_Year'],'Point Flow':[self.inputs.l_9,'Point_Flow'],'Point Nitrogen':[self.inputs.l_9,'Point_N'],'Point Phosphorus':[self.inputs.l_9,'Point_P'],'Point Organic Carbon':[self.inputs.l_9,'Point_OC'],'Organic Carbon Calibration Factor':[self.inputs.l_9,'OC_Calib_Fctr'],'Nitrogen Calibration Factor':[self.inputs.l_9,'N_Calib_Fctr'],'Phosphorus Calibration Factor':[self.inputs.l_9,'P_Calib_Fctr'],'Erosion Calibration Factor':[self.inputs.l_9,'Erosion_Calib_Fctr'],'Reach Manning’s n':[self.inputs.l_10,'Mannings_n'],'Reach Flow Depth':[self.inputs.l_10,'Flow_Depth'],'Valley Width':[self.inputs.l_10,'Valley_Width'],'Valley n':[self.inputs.l_10,'Valley_Mannings_n'],'Delivery Ratio Reach':[self.inputs.l_10,'Delivery_Ratio'],'Latitude':[self.inputs.l_12,'Latitude'],'Longitude':[self.inputs.l_12,'Longitude'],'Wetland Area':[self.inputs.l_13,'Wetland_Area'],'Initial Water Depth':[self.inputs.l_13,'Initial_Water_Depth'],'Minimum Water Depth':[self.inputs.l_13,'Min_Water_Depth'],'Maximum Water Depth':[self.inputs.l_13,'Max_Water_Depth'],'Water Temperature':[self.inputs.l_13,'Water_Temperature'],'Potential Daily Infiltration':[self.inputs.l_13,'Potential_Daily_Infiltration'],'Weir Coefficient':[self.inputs.l_13,'Weir_Coef'],'Weir Width':[self.inputs.l_13,'Weir_Width'],'Weir Height':[self.inputs.l_13,'Weir_Height'],'Soluble N Concentration':[self.inputs.l_13,'Soluble_N_Conc'],'Nitrate Loss Rate':[self.inputs.l_13,'Nitrate-N_Loss_Rate'],'Nitrate Loss Rate Coefficient':[self.inputs.l_13,'Nitrate-N_Loss_Rate_Coef'],'Temperature Coefficient':[self.inputs.l_13,'Temperature_Coef'],'Weir Exponent':[self.inputs.l_13,'Weir_Exp']}
         dic_general = {'Maximum Pool Depth':[self.inputs.l_24,'Max_Pool_Depth'],'Minimum Pool Depth':[self.inputs.l_24,'Min_Pool_Depth'],'Fill/Release Volume':[self.inputs.l_24,'Fill/Release_Vol'],'Fill/Drain Time':[self.inputs.l_24,'Fill/Drain_Time'],'Fill/Release Rate':[self.inputs.l_24,'Fill/Release_Rate'],'Fill/Drain All':[self.inputs.l_24,'Fill/Drain_All_Code'],'Total Sediment Concentration':[self.inputs.l_24,'Total_Sed_Conc'],'Clay Content Pond Schedule':[self.inputs.l_24,'Clay_Content'],'Silt Content Pond Schedule':[self.inputs.l_24,'Silt_Content'],'Total Nitrogen':[self.inputs.l_24,'Total_N'],'Dissolved Nitrogen':[self.inputs.l_24,'Dissolved_N'],'Total Phosphorus':[self.inputs.l_24,'Total_P'],'Dissolved Phosphorus':[self.inputs.l_24,'Dissolved_P'],'Sediment Concentration—Winter':[self.inputs.l_24,'Sed_Conc_Winter'],'Total Nitrogen—Winter':[self.inputs.l_24,'Total_N_Winter'],'Dissolved Nitrogen—Winter':[self.inputs.l_24,'Dissolved_N_Winter'],'Total Phosphorus—Winter':[self.inputs.l_24,'Total_P_Winter'],'Dissolved Phosphorus—Winter':[self.inputs.l_24,'Dissolved_P_Winter'],'Sediment Concentration—Spring':[self.inputs.l_24,'Sed_Conc_Spring'],'Total Nitrogen—Spring':[self.inputs.l_24,'Total_N_Spring'],'Dissolved Nitrogen—Spring':[self.inputs.l_24,'Dissolved_N_Spring'],'Total Phosphorus—Spring':[self.inputs.l_24,'Total_P_Spring'],'Dissolved Phosphorus—Spring':[self.inputs.l_24,'Dissolved_P_Spring'],'Sediment Concentration—Summer':[self.inputs.l_24,'Sed_Conc_Summer'],'Total Nitrogen—Summer':[self.inputs.l_24,'Total_N_Summer'],'Dissolved Nitrogen—Summer':[self.inputs.l_24,'Dissolved_N_Summer'],'Total Phosphorus—Summer':[self.inputs.l_24,'Total_P_Summer'],'Dissolved Phosphorus—Summer':[self.inputs.l_24,'Dissolved_P_Summer'],'Sediment Concentration—Autumn':[self.inputs.l_24,'Sed_Conc_Autumn'],'Total Nitrogen—Autumn':[self.inputs.l_24,'Total_N_Autumn'],'Dissolved Nitrogen—Autumn':[self.inputs.l_24,'Dissolved_N_Autumn'],'Total Phosphorus—Autumn':[self.inputs.l_24,'Total_P_Autumn'],'Dissolved Phosphorus—Autumn':[self.inputs.l_24,'Dissolved_P_Autumn'],'Furrow Slope':[self.inputs.l_25,'Furrow_Slope'],'Yield Units Harvested per Area':[self.inputs.l_26,'Yield_Units_Harvested'],'Residue Mass Ratio':[self.inputs.l_26,'Residue_Mass_Ratio'],'Surface decomposition Crop':[self.inputs.l_26,'Surface_Decomp'],'Sub-surface decomposition Crop':[self.inputs.l_26,'Subsurface_Decomp'],'USLE C-Factor Crop':[self.inputs.l_26,'USLE_C_Fctr'],'Moisture Depletion':[self.inputs.l_26,'Moisture_Depletion'],'Crop Residue_30%':[self.inputs.l_26,'Crop_Residue_30%'],'Crop Residue_60%':[self.inputs.l_26,'Crop_Residue_60%'],'Crop Residue_90%':[self.inputs.l_26,'Crop_Residue_90%'],'Yield Unit Mass':[self.inputs.l_26,'Yield_Unit_Mass'],'Harvest C-N Ratio':[self.inputs.l_26,'Harvest_CN_Ratio'],'N Uptake':[self.inputs.l_26,'N_Uptake'],'P Uptake':[self.inputs.l_26,'P_Uptake'],'Harvest C-P Ratio':[self.inputs.l_26,'Harvest_CP_Ratio'],'Growth Time Ini':[self.inputs.l_26,'Growth_Time_Ini'],'Growth Time Dev':[self.inputs.l_26,'Growth_Time_Dev'],'Growth Time Mat':[self.inputs.l_26,'Growth_Time_Mat'],'Basal Crop Coefficient (“Kcb-ini”) crop':[self.inputs.l_26,'Basal_Crop_Coef_Ini'],'Basal Crop Coefficient (“Kcb-mid”) crop':[self.inputs.l_26,'Basal_Crop_Coef_Mid'],'Basal Crop Coefficient (“Kcb-end”) crop':[self.inputs.l_26,'Basal_Crop_Coef_End'],'Root Mass':[self.inputs.l_27,'Root_Mass'],'Canopy Cover':[self.inputs.l_27,'Canopy_Cover'],'Rain Fall Height':[self.inputs.l_27,'Rain_Fall_Height'],'Pack Remove Ratio':[self.inputs.l_28,'Pack_Remove_Ratio'],'Pack Start N':[self.inputs.l_28,'Pack_Start_N'],'Pack Start P':[self.inputs.l_28,'Pack_Start_P'],'Pack Start OrgC':[self.inputs.l_28,'Pack_Start_OC'],'Pack Change N':[self.inputs.l_28,'Pack_Change_N'],'Pack Change P':[self.inputs.l_28,'Pack_Change_P'],'Pack Change OrgC':[self.inputs.l_28,'Pack_Change_OC'],'Fertilizer Rate':[self.inputs.l_29,'Application_Rate'],'Fertilizer Inorganic N':[self.inputs.l_30,'Inorganic_N'],'Fertilizer Organic N':[self.inputs.l_30,'Organic_N'],'Fertilizer Inorganic P':[self.inputs.l_30,'Inorganic_P'],'Fertilizer Organic P':[self.inputs.l_30,'Organic_P'],'Fertilizer Organic Matter':[self.inputs.l_30,'Organic_Matter'],'Delay Time':[self.inputs.l_31,'Delay_Time'],'Water Table':[self.inputs.l_31,'Water_Table'],'Aquifer Saturated \nHydraulic Conductivity':[self.inputs.l_31,'Aquifer_Sat_Hyd_Conduct'],'K-vadose Saturated \nHydraulic Conductivity':[self.inputs.l_31,'Vadose_Sat_Hyd_Conduct'],'Aquifer Porosity':[self.inputs.l_31,'Porosity'],'Aquifer Field Capacity':[self.inputs.l_31,'Field_Capacity'],'Aquifer Specific Yield':[self.inputs.l_31,'Specific_Yield'],'Aquifer Thickness':[self.inputs.l_31,'Thickness'],'Aquifer Soluble Nitrogen':[self.inputs.l_31,'Soluble_N'],'Aquifer Soluble Phosphorus':[self.inputs.l_31,'Soluble_P'],'Channel Length Coefficient':[self.inputs.l_32,'Channel_Length_Coef'],'Channel Length Exponent':[self.inputs.l_32,'Channel_Length_Exp'],'Channel Width Coefficient':[self.inputs.l_32,'Channel_Width_Coef'],'Channel Width Exponent':[self.inputs.l_32,'Channel_Width_Exp'],'Channel Depth Coefficient':[self.inputs.l_32,'Channel_Depth_Coef'],'Channel Depth Exponent':[self.inputs.l_32,'Channel_Depth_Exp'],'Valley Width Coefficient':[self.inputs.l_32,'Valley_Width_Coef'],'Valley Width Exponent':[self.inputs.l_32,'Valley_Width_Exp'],'Cycle Duration':[self.inputs.l_33,'Cycle_Duration'],'Amount Lost':[self.inputs.l_33,'Amount_Lost'],'Application Rate':[self.inputs.l_33,'Application_Rate'],'Tailwater Recovery':[self.inputs.l_33,'Tailwater_Recovery'],'Depletion Lower Limit':[self.inputs.l_33,'Depletion_Lower_Limit'],'Application Amount':[self.inputs.l_33,'Application_Amount'],'Area Fraction':[self.inputs.l_33,'Area_Fraction'],'Interval Number':[self.inputs.l_33,'Interval_Number'],'Interval Days':[self.inputs.l_33,'Interval_Days'],'Chemical Multiple':[self.inputs.l_33,'Chemical_Multiple'],'Sediment Rate':[self.inputs.l_33,'Sediment_Rate'],'Depletion Upper Limit':[self.inputs.l_33,'Depletion_Upper_Limit'],'Percent Rock Cover':[self.inputs.l_34,'Percent_Rock_Cover'],'Random Roughness':[self.inputs.l_34,'Random_Roughness'],'Terrace Horizontal Distance':[self.inputs.l_34,'Terrace_Horizontal_Distance'],'Terrace grade':[self.inputs.l_34,'Terrace_Grade'],'Residue Cover Remaining':[self.inputs.l_35,'Residue_Cover_Remaining'],'Residue Weight Remaining':[self.inputs.l_35,'Residue_Weight_Remaining'],'Area Disturbed':[self.inputs.l_35,'Area_Disturbed'],'Initial Random Roughness':[self.inputs.l_35,'Initial_Random_Roughness'],'Final Random Roughness':[self.inputs.l_35,'Final_Random_Roughness'],'Operation Tillage Depth':[self.inputs.l_35,'Operation_Tillage_Depth'],'Added Surface Residue':[self.inputs.l_35,'Added_Surface_Residue'],'Surface Decomposition \nmanagement':[self.inputs.l_35,'Surface_Decomp'],'Sub-surface Decomposition \nmanagement':[self.inputs.l_35,'Subsurface_Decomp'],'Surface Residue_30%':[self.inputs.l_35,'Surface_Residue_30%'],'Surface Residue_60%':[self.inputs.l_35,'Surface_Residue_60%'],'Surface Residue_90%':[self.inputs.l_35,'Surface_Residue_90%'],'Post Event Manning’s n':[self.inputs.l_36,'Post_Event_Mannings_n'],'Post Event Surface Constant':[self.inputs.l_36,'Post_Event_Surface_Constant'],'Operation Residue Change':[self.inputs.l_36,'Operation_Residue_Change'],'Tile Drain Controlled Depth':[self.inputs.l_36,'Tile_Drain_Controlled_Depth'],'Annual Root Mass':[self.inputs.l_37,'Annual_Root_Mass'],'Annual Cover Ratio':[self.inputs.l_37,'Annual_Cover_Ratio'],'Annual Rain Fall Height':[self.inputs.l_37,'Annual_Rain_Fall_Height'],'Surface Residue Cover':[self.inputs.l_37,'Surface_Cover_Residue'],'USLE C-Factor Non Crop':[self.inputs.l_37,'USLE_C-Fctr'],'Basal Crop Coefficient (“Kcb-mid”) Non Crop':[self.inputs.l_37,'Basal_Crop_Coef_Mid'],'Pesticide Rate':[self.inputs.l_38,'Application_Rate'],'Pesticide Depth':[self.inputs.l_38,'Depth'],'Pesticide Foliage Fraction':[self.inputs.l_38,'Foliage_Fraction'],'Pesticide Soil Fraction':[self.inputs.l_38,'Soil_Fraction'],'Pesticide Solubility':[self.inputs.l_39,'Solubility'],'Pesticide Partition':[self.inputs.l_39,'Partition'],'Pesticide Soil Half-life':[self.inputs.l_39,'Soil_Half-life'],'Pesticide Foliage Half-life':[self.inputs.l_39,'Foliage_Halflife'],'Pesticide Washoff':[self.inputs.l_39,'Washoff'],'Metabolite Transformation':[self.inputs.l_39,'Metabolite_Transformation'],'Pesticide Reach Half-life':[self.inputs.l_39,'Reach_Halflife'],'Reach Nitrogen Half-life':[self.inputs.l_40,'N_Half-life'],'Reach Phosphorus Half-life':[self.inputs.l_40,'P_Half-life'],'Reach Organic Carbon Half-life':[self.inputs.l_40,'OC_Half-life'],'Slope':[self.inputs.l_41,'Buffer_Slope'],'Maximum Trapping \nEfficiency “TE-m”':[self.inputs.l_41,'Max_Trap_Efficiency'],'Effective Buffer Width':[self.inputs.l_41,'Eff_Wdth_Thru_Buffer'],'Effective Concentrated \nFlow Width':[self.inputs.l_41,'Eff_Wdth_Along_Buffer'],'Drainage Area to Upstream \nPortion of Buffer':[self.inputs.l_41,'Drainage_Area_to_Buffer'],'Actual Trapping Efficiency \n“TE-a” Clay':[self.inputs.l_41,'Actual_Trap_Efficiency_Clay'],'Actual Trapping Efficiency \n“TE-a” Silt':[self.inputs.l_41,'Actual_Trap_Efficiency_Silt'],'Actual Trapping Efficiency \n“TE-a” Sand':[self.inputs.l_41,'Actual_Trap_Efficiency_Sand'],'Actual Trapping Efficiency \n“TE-a” Sm Agg':[self.inputs.l_41,'Actual_Trap_Efficiency_Sm_Agg'],'Actual Trapping Efficiency \n“TE-a” Lg Agg':[self.inputs.l_41,'Actual_Trap_Efficiency_Lg_Agg'],'Fraction Trapped “TE-ps” Clay':[self.inputs.l_41,'Fraction_Trapped_Clay'],'Fraction Trapped “TE-ps” Silt':[self.inputs.l_41,'Fraction_Trapped_Silt'],'Fraction Trapped “TE-ps” Sand':[self.inputs.l_41,'Fraction_Trapped_Sand'],'Fraction Trapped “TE-ps” Sm Agg':[self.inputs.l_41,'Fraction_Trapped_Sm_Agg'],'Fraction Trapped “TE-ps” Lg Agg':[self.inputs.l_41,'Fraction_Trapped_Lg_Agg'],'Curve Number “A”':[self.inputs.l_42,'CN_A'],'Curve Number “B”':[self.inputs.l_42,'CN_B'],'Curve Number “C”':[self.inputs.l_42,'CN_C'],'Curve Number “D”':[self.inputs.l_42,'CN_D'],'K-factor':[self.inputs.l_43,'K_Factor'],'Albedo':[self.inputs.l_43,'Albedo'],'Time to consolidation':[self.inputs.l_43,'Time_to_Consolidation'],'Impervious Depth':[self.inputs.l_43,'Impervious_Depth'],'Specific Gravity':[self.inputs.l_43,'Specific_Gravity'],'Layer Depth':[self.inputs.l_44,'Layer_Depth'],'Bulk Density':[self.inputs.l_44,'Bulk_Density'],'Clay Ratio':[self.inputs.l_44,'Clay_Ratio'],'Silt Ratio':[self.inputs.l_44,'Silt_Ratio'],'Sand Ratio':[self.inputs.l_44,'Sand_Ratio'],'Rock Ratio':[self.inputs.l_44,'Rock_Ratio'],'Very Fine Sand Ratio':[self.inputs.l_44,'Very_Fine_Sand_Ratio'],'CaCO3':[self.inputs.l_44,'CaCO3_Content'],'Saturated Conductivity':[self.inputs.l_44,'Saturated_Conductivity'],'Field Capacity':[self.inputs.l_44,'Field_Capacity'],'Wilting Point':[self.inputs.l_44,'Wilting_Point'],'Base Saturation':[self.inputs.l_44,'Base_Saturation'],'Unstable Aggregate Ratio':[self.inputs.l_44,'Unstable_Aggregate_Ratio'],'pH':[self.inputs.l_44,'pH'],'Organic Matter Ratio':[self.inputs.l_44,'Organic_Matter_Ratio'],'Organic N Ratio':[self.inputs.l_44,'Organic_N_Ratio'],'Inorganic N Ratio':[self.inputs.l_44,'Inorganic_N_Ratio'],'Organic P Ratio':[self.inputs.l_44,'Organic_P_Ratio'],'Inorganic P Ratio':[self.inputs.l_44,'Inorganic_P_Ratio'],'P Factor':[self.inputs.l_45,'P_Factor'],'Sediment Delivery Ratio Strip Crop':[self.inputs.l_45,'Delivery_Ratio'],'Drain Rate':[self.inputs.l_46,'Drain_Rate'],'Invert Depth':[self.inputs.l_46,'Invert_Depth']}
         dic_climate = {'Station Latitude':[self.inputs.l_48,'Latitude'],'Station Longitude':[self.inputs.l_48,'Longitude'],'Station Elevation':[self.inputs.l_48,'Elevation'],'Adiabatic Air Temperature \nLapse Rate':[self.inputs.l_48,'Temperature_Lapse_Rate'],'Precipitation Nitrogen':[self.inputs.l_48,'Precipitation_N'],'Elevation Difference (1)':[self.inputs.l_48,'1st_Elevation_Difference'],'Elevation Rain Factor (1)':[self.inputs.l_48,'1st_Elevation_Rain_Factor'],'Elevation Difference (2)':[self.inputs.l_48,'2nd_Elevation_Difference'],'Elevation Rain Factor (2)':[self.inputs.l_48,'2nd_Elevation_Rain_Factor'],'2 Yr 24 Hr Precipitation':[self.inputs.l_48,'2_Yr_24_hr_Precipitation'],'Rainfall Calibration or Areal \nCorrection Coefficient':[self.inputs.l_48,'Calibration_or_Areal_Correction_Coefficient'],'Areal Rainfall \nCorrection Exponent':[self.inputs.l_48,'Calibration_or_Areal_Correction_Exponent'],'Minimum interception \nevaporation station':[self.inputs.l_48,'Minimum_Interception_Evaporation'],'Maximum interception \nevaporation station':[self.inputs.l_48,'Maximum_Interception_Evaporation'],'EI_Pct_01':[self.inputs.l_50,'EI_Pct_01'],'EI_Pct_02':[self.inputs.l_50,'EI_Pct_02'],'EI_Pct_03':[self.inputs.l_50,'EI_Pct_03'],'EI_Pct_04':[self.inputs.l_50,'EI_Pct_04'],'EI_Pct_05':[self.inputs.l_50,'EI_Pct_05'],'EI_Pct_06':[self.inputs.l_50,'EI_Pct_06'],'EI_Pct_07':[self.inputs.l_50,'EI_Pct_07'],'EI_Pct_08':[self.inputs.l_50,'EI_Pct_08'],'EI_Pct_09':[self.inputs.l_50,'EI_Pct_09'],'EI_Pct_10':[self.inputs.l_50,'EI_Pct_10'],'EI_Pct_11':[self.inputs.l_50,'EI_Pct_11'],'EI_Pct_12':[self.inputs.l_50,'EI_Pct_12'],'EI_Pct_13':[self.inputs.l_50,'EI_Pct_13'],'EI_Pct_14':[self.inputs.l_50,'EI_Pct_14'],'EI_Pct_15':[self.inputs.l_50,'EI_Pct_15'],'EI_Pct_16':[self.inputs.l_50,'EI_Pct_16'],'EI_Pct_17':[self.inputs.l_50,'EI_Pct_17'],'EI_Pct_18':[self.inputs.l_50,'EI_Pct_18'],'EI_Pct_19':[self.inputs.l_50,'EI_Pct_19'],'EI_Pct_20':[self.inputs.l_50,'EI_Pct_20'],'EI_Pct_21':[self.inputs.l_50,'EI_Pct_21'],'EI_Pct_22':[self.inputs.l_50,'EI_Pct_22'],'EI_Pct_23':[self.inputs.l_50,'EI_Pct_23'],'EI_Pct_24':[self.inputs.l_50,'EI_Pct_24']}
@@ -582,13 +589,15 @@ class qannagnps():
     
     def add_topagnps_input(self,type_input):
         #Metod to add topagnps inputs with pushbutton
-        fname = QFileDialog.getOpenFileName(self.inputs,"Select file","C/")
+        fname = QFileDialog.getOpenFileName(self.inputs,f"Select {type_input} file","C/")
         if fname[0]!="":
             dic = {"DEM":self.dlg.comboBox,"buffer":self.dlg.comboBox_2,"vegetation":self.dlg.comboBox_3,"soil":self.dlg.cbSoil,"management":self.dlg.cbMan}
             combo = dic[type_input]
-            print(type_input,dic[type_input])
             #Se añade el archivo al canvas
-            layer = QgsRasterLayer(fname[0],type_input)
+            if type_input=="DEM" or type_input=="buffer" or type_input=="vegetation":
+                layer = QgsRasterLayer(fname[0],type_input)
+            else:
+                layer = QgsVectorLayer(fname[0],type_input)
             QgsProject.instance().addMapLayer(layer, False)
             root = QgsProject.instance().layerTreeRoot()
             root.insertLayer(0, layer)
@@ -603,7 +612,6 @@ class qannagnps():
                     index = dic[i].currentIndex()
                     if index ==0:index =-1
                 else:index = 0
-                print(i,index)
                 #Clear
                 dic[i].clear()
                 #Add values
@@ -2176,19 +2184,16 @@ class qannagnps():
     def setDirectory(self):
         #Método para que cuando se seleccione el DEM ya se tenga en todo el código la dirección y el epsg. También se ponen la dirección de las carpetas en el diálogo de los outputs y se asigna el nombre del dem en Topagnps.csv. 
         if self.dlg.comboBox.currentIndex() >=1:
-            try: 
-                self.epsg = QgsProject.instance().crs().authid()
-            except:
-                pass
-            #Se pone el nombre del mdt en TOPAGNPS.csv
             try:
+                self.epsg = QgsProject.instance().crs().authid()
+                #Se pone el nombre del mdt en TOPAGNPS.csv
                 layers = QgsProject.instance().layerTreeRoot().children()
                 selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
                 selectedLayer = layers[selectedLayerIndex].layer()
-                fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
-                dir_mdt, name_mdt = os.path.split(fichero_mdt)
+                self.fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
+                dir_mdt, self.name_mdt = os.path.split(self.fichero_mdt)
                 topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
-                topagnps_control_file["FILENAME"].iloc[0]=name_mdt
+                topagnps_control_file["FILENAME"].iloc[0]=self.name_mdt
                 topagnps_control_file.to_csv(self.direccion+"\\TOPAGNPS.CSV", index=False, float_format='%.5f')
             except:
                 pass     
@@ -2264,29 +2269,39 @@ class qannagnps():
                 
     def buffer_nombre(self):
         #Asignar en el control file de AGBUF el nombre del archivo que se ha seleccionado en el plugin como el buffer
-        if self.dlg.comboBox.currentIndex()>0:
-            if path.exists(self.direccion+"/AGBUF.csv"):
-                layers = QgsProject.instance().layerTreeRoot().children()
-                selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
-                selectedLayer = layers[selectedLayerIndex].layer()
-                fichero_buffer =  selectedLayer.dataProvider().dataSourceUri()
-                buffer_directory, buffer_file = os.path.split(fichero_buffer)
-                control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-                control.iloc[0,0]=buffer_file
-                control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
+        try:
+            if self.dlg.comboBox.currentIndex()>0:
+                if path.exists(self.direccion+"/AGBUF.csv"):
+                    layers = QgsProject.instance().layerTreeRoot().children()
+                    selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
+                    selectedLayer = layers[selectedLayerIndex].layer()
+                    fichero_buffer =  selectedLayer.dataProvider().dataSourceUri()
+                    buffer_directory, buffer_file = os.path.split(fichero_buffer)
+                    control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
+                    control.iloc[0,0]=buffer_file
+                    control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
+        except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
+            pass
+        except Exception as e:
+            raise e
         
     def vegetation_nombre(self):
         #Asignar en el control file de AGBUF el nombre del archivo que se ha seleccionado en el plugin como el vegetation   
-        if self.dlg.comboBox.currentIndex()>0:
-            if path.exists(self.direccion+"/AGBUF.csv"):
-                layers = QgsProject.instance().layerTreeRoot().children()
-                selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
-                selectedLayer = layers[selectedLayerIndex].layer()
-                fichero_vegetation =  selectedLayer.dataProvider().dataSourceUri()
-                vegetation_directory, vegetation_file = os.path.split(fichero_vegetation)
-                control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-                control.iloc[0,1]=vegetation_file
-                control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
+        try:
+            if self.dlg.comboBox.currentIndex()>0:
+                if path.exists(self.direccion+"/AGBUF.csv"):
+                    layers = QgsProject.instance().layerTreeRoot().children()
+                    selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
+                    selectedLayer = layers[selectedLayerIndex].layer()
+                    fichero_vegetation =  selectedLayer.dataProvider().dataSourceUri()
+                    vegetation_directory, vegetation_file = os.path.split(fichero_vegetation)
+                    control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
+                    control.iloc[0,1]=vegetation_file
+                    control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
+        except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
+            pass
+        except Exception as e:
+            raise e
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -2384,12 +2399,8 @@ class qannagnps():
         #EJECUCIÓN DE TOPAGNPS
         if self.dlg.cbTop.isChecked():
             #Se mueve el DEM a la carpeta del proyecto
-            selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
-            selectedLayer = layers[selectedLayerIndex].layer()
-            fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
-            dir_mdt, name_mdt = os.path.split(fichero_mdt)
             try: #si el origen y el destino son los mismos da error
-                shutil.copyfile(fichero_mdt,self.direccion+"\\"+name_mdt)
+                shutil.copyfile(self.fichero_mdt,self.direccion+"\\"+self.name_mdt)
             except:
                 pass
             #Establecer el fichero de suelo escogido en el plugin
@@ -4546,6 +4557,17 @@ class qannagnps():
             self.param_values = saltelli.sample(problem, int(self.sensitivity_dialog.trajectories.text()))
         elif self.sensitivity_dialog.morris.isChecked():
             self.param_values = sample_morris(problem, int(self.sensitivity_dialog.trajectories.text()))
+        
+        #Si se ha escogido la opción de "Pixel Size" se obtienen todos los DEMs con todos los tamaños de píxeles
+        if "Pixel Size" in list(self.dic_data.keys()):
+            orden_pixel = list(self.dic_data.keys()).index("Pixel Size") #columna en la que están los valores de tamaño de pixel
+            for pixel_size in np.unique(self.param_values[:,orden_pixel]):
+                self.nombre = self.name_mdt.rsplit(".", 1)[0] #nombre del archivo sin extensión
+                self.extension = self.name_mdt.split(".")[-1]
+                processing.run("gdal:warpreproject", 
+                    {'INPUT':self.fichero_mdt,'SOURCE_CRS':QgsCoordinateReferenceSystem(self.epsg),'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
+                    'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':float(pixel_size),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,
+                    'MULTITHREADING':False,'EXTRA':'','OUTPUT':self.direccion+"\\"+self.nombre+f"_{pixel_size}"+"."+self.extension})
             
         self.resultados = []
         numero_ejecucion = 0
@@ -4579,6 +4601,8 @@ class qannagnps():
         #Metod to change the inputs of sensitivity analysis
         try: #este try es para cuando cuando de error si elige la misma columna pero distintas filas
             if self.dic_name_column[k][0]=="Spatial":
+                #Se hace check en que se ejecute TopAGNPS
+                self.dlg.cbTop.setChecked(True)
                 direccion = self.direccion+"\\"+self.dic_name_column[k][1]
                 columna = self.dic_name_column[k][2]
             else:
@@ -4591,8 +4615,17 @@ class qannagnps():
             else:
                 direccion = self.file_input(self.dic_name_column[k.split("__")[0]][0])
                 columna = self.dic_name_column[k.split("__")[0]][1]
-        df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",") 
-        df[columna].iloc[self.dic_data[k][2]] = i[j]
+        df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
+        #Si el input es tamaño de pixel entonces se la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
+        print(k)
+        print(k =="Pixel Size")
+        if k =="Pixel Size":
+            df[columna].iloc[self.dic_data[k][2]] =str(self.nombre+f"_{i[j]}"+"."+self.extension)
+            print("sii",columna,self.dic_data[k][2])
+            print("si",self.nombre+f"_{i[j]}"+"."+self.extension)
+            print("a",direccion)
+        else:
+            df[columna].iloc[self.dic_data[k][2]] = i[j]
         #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
         def float_to_str(df,column):
             #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
