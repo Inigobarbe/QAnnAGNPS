@@ -457,7 +457,7 @@ class qannagnps():
         self.dic_folder = {self.inputs.l_2:self.inputs.l_1,self.inputs.l_3:self.inputs.l_1,self.inputs.l_4:self.inputs.l_1,self.inputs.l_5:self.inputs.l_1,self.inputs.l_6:self.inputs.l_1,self.inputs.l_7:self.inputs.l_1,self.inputs.l_8:self.inputs.l_1,self.inputs.l_9:self.inputs.l_1,self.inputs.l_10:self.inputs.l_1,self.inputs.l_11:self.inputs.l_1,self.inputs.l_12:self.inputs.l_1,self.inputs.l_13:self.inputs.l_1,self.inputs.l_14:self.inputs.l_1,self.inputs.l_15:self.inputs.l_1,self.inputs.l_16:self.inputs.l_1,self.inputs.l_17:self.inputs.l_1,self.inputs.l_18:self.inputs.l_1,self.inputs.l_19:self.inputs.l_1,self.inputs.l_20:self.inputs.l_1,self.inputs.l_21:self.inputs.l_1,self.inputs.l_22:self.inputs.l_1,self.inputs.l_24:self.inputs.l_23,self.inputs.l_25:self.inputs.l_23,self.inputs.l_26:self.inputs.l_23,self.inputs.l_27:self.inputs.l_23,self.inputs.l_28:self.inputs.l_23,self.inputs.l_29:self.inputs.l_23,self.inputs.l_30:self.inputs.l_23,self.inputs.l_31:self.inputs.l_23,self.inputs.l_32:self.inputs.l_23,self.inputs.l_33:self.inputs.l_23,self.inputs.l_34:self.inputs.l_23,self.inputs.l_35:self.inputs.l_23,self.inputs.l_36:self.inputs.l_23,self.inputs.l_37:self.inputs.l_23,self.inputs.l_38:self.inputs.l_23,self.inputs.l_39:self.inputs.l_23,self.inputs.l_40:self.inputs.l_23,self.inputs.l_41:self.inputs.l_23,self.inputs.l_42:self.inputs.l_23,self.inputs.l_43:self.inputs.l_23,self.inputs.l_44:self.inputs.l_23,self.inputs.l_45:self.inputs.l_23,self.inputs.l_46:self.inputs.l_23,self.inputs.l_48:self.inputs.l_47,self.inputs.l_49:self.inputs.l_47,self.inputs.l_50:self.inputs.l_47,self.inputs.l_51:self.inputs.l_47,self.inputs.l_52:self.inputs.l_47,self.inputs.l_54:self.inputs.l_53,self.inputs.l_55:self.inputs.l_53,self.inputs.l_56:self.inputs.l_53,self.inputs.l_57:self.inputs.l_53,self.inputs.l_58:self.inputs.l_53,self.inputs.l_59:self.inputs.l_53,self.inputs.l_60:self.inputs.l_53,self.inputs.l_61:self.inputs.l_53,self.inputs.l_62:self.inputs.l_53,self.inputs.l_63:self.inputs.l_53,self.inputs.l_64:self.inputs.l_53,self.inputs.l_65:self.inputs.l_53,self.inputs.l_66:self.inputs.l_53,self.inputs.l_67:self.inputs.l_53,self.inputs.l_68:self.inputs.l_53,self.inputs.l_69:self.inputs.l_53,self.inputs.l_70:self.inputs.l_53,self.inputs.l_71:self.inputs.l_53}
         
         #Poner que los inputs que genera topagnps los crea topagnps y que no es necesario decirle la ubicación
-        lista = [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4]
+        lista = [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
         for i in lista:
             i.stateChanged.connect(lambda _,b=i: self.topagnps_provided(b))
         
@@ -586,6 +586,13 @@ class qannagnps():
         self.dlg.pb_vegetation.clicked.connect(lambda _,b = "vegetation":self.add_topagnps_input(b))
         self.dlg.pb_soil.clicked.connect(lambda _,b = "soil":self.add_topagnps_input(b))
         self.dlg.pb_management.clicked.connect(lambda _,b = "management":self.add_topagnps_input(b))
+        
+        #Add project folder if text was changed
+        self.dlg.project.textChanged.connect(self.add_project_folder_text_changed)
+        
+    def add_project_folder_text_changed(self):
+        #Metod to add project folder if text was changed
+        self.direccion = str(self.dlg.project.text())
     
     def add_topagnps_input(self,type_input):
         #Metod to add topagnps inputs with pushbutton
@@ -2092,7 +2099,7 @@ class qannagnps():
 
     def topagnps_provided(self,check):
         #Método para poner si se va a usar el output de topagnps para cell, EG, reach y riparian buffer data
-        dic = {self.inputs.checkBox:self.inputs.l_3,self.inputs.checkBox_2:self.inputs.l_5,self.inputs.checkBox_3:self.inputs.l_10,self.inputs.checkBox_4:self.inputs.l_41}
+        dic = {self.inputs.checkBox:self.inputs.l_3,self.inputs.checkBox_2:self.inputs.l_5,self.inputs.checkBox_3:self.inputs.l_10,self.inputs.checkBox_4:self.inputs.l_41,self.inputs.checkBox_5:self.inputs.l_13}
         if check.isChecked():
             dic[check].setText("-- Provided by TopAGNPS --")
         elif str(dic[check].text())=="-- Provided by TopAGNPS --":
@@ -2382,6 +2389,10 @@ class qannagnps():
           
     def ejecucion_completa(self):
         #Esta función es en donde se ejecuta el modelo
+        
+        #Add project directory
+        self.direccion = str(self.dlg.project.text())
+        
         #Primero se establece la variable que contiene las capas del proyecto
         layers = QgsProject.instance().layerTreeRoot().children()
         
@@ -2398,6 +2409,8 @@ class qannagnps():
         
         #EJECUCIÓN DE TOPAGNPS
         if self.dlg.cbTop.isChecked():
+            #Se pone el epsg del proyecto
+            self.epsg = QgsProject.instance().crs().authid()
             #Se mueve el DEM a la carpeta del proyecto
             try: #si el origen y el destino son los mismos da error
                 shutil.copyfile(self.fichero_mdt,self.direccion+"\\"+self.name_mdt)
@@ -2416,19 +2429,19 @@ class qannagnps():
             #Establecer el fichero de buffer escogido en el plugin y moverlo a la carpeta del proyecto
             selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
             selectedLayer = layers[selectedLayerIndex].layer()
-            fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
-            buf_directory, nombre_buf = os.path.split(fichero_buf)
+            self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
+            buf_directory, nombre_buf = os.path.split(self.fichero_buf)
             try: #si el origen y el destino son los mismos da error
-                shutil.copyfile(fichero_buf,self.direccion+"\\"+nombre_buf)
+                shutil.copyfile(self.fichero_buf,self.direccion+"\\"+nombre_buf)
             except:
                 pass
             #Establecer el fichero de vegetation escogido en el plugin y moverlo a la carpeta del proyecto
             selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
             selectedLayer = layers[selectedLayerIndex].layer()
-            fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
-            veg_directory, nombre_veg = os.path.split(fichero_veg)
+            self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
+            veg_directory, nombre_veg = os.path.split(self.fichero_veg)
             try: #si el origen y el destino son los mismos da error
-                shutil.copyfile(fichero_veg,self.direccion+"\\"+nombre_veg)
+                shutil.copyfile(self.fichero_veg,self.direccion+"\\"+nombre_veg)
             except:
                 pass
                 
@@ -2645,7 +2658,7 @@ class qannagnps():
                 try:
                     suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
                 except:
-                    iface.messageBar().pushMessage("Error with soil layer","Soil layer has to be saved in the same folder as the DEM. Also the DEM and the soil layer have to overlap.",level=Qgis.Warning, duration=20)
+                    iface.messageBar().pushMessage("Error with soil layer","The DEM and the soil layer have to overlap.",level=Qgis.Warning, duration=20)
                     self.end_execution = 1
                     return
                 annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
@@ -2697,7 +2710,7 @@ class qannagnps():
                 try:
                     manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
                 except:
-                    iface.messageBar().pushMessage("Error with soil use layer","Soil use layer has to be saved in the same folder as the DEM. Also the DEM and the soil use layer have to overlap.",level=Qgis.Warning, duration=20)
+                    iface.messageBar().pushMessage("Error with soil use layer","The DEM and the soil use layer have to overlap.",level=Qgis.Warning, duration=20)
                     self.end_execution = 1
                     return
                 annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
@@ -2864,13 +2877,13 @@ class qannagnps():
 
             #METER ARCHIVOS EN CARPETAS DE INPUTS CORRESPONDIENTES. Completar cuales van a cada carpeta con el input editor.
             #Primero se asigna la dirección, si es que se ha elegido la opción de que se obtengan de la ejecución de TopAGNPS
-            checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4]
-            sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer]
-            names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv"]
+            checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
+            sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data]
+            names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
             for i in range(len(checks_list)):
                 if checks_list[i].isChecked():
                     sections_list[i]=self.direccion+"\\"+names_list[i]
-            cell_data,ephemeral_gully,reach_data,riparian_buffer = sections_list
+            cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data = sections_list
             #Función para que se le diga el nombre del archivo y te devuelva la dirección completa, en este caso para los inputs que usará AnnAGNPS
             def fichero_input(file_name,direct):
                 if os.path.isabs(file_name):
@@ -3950,7 +3963,7 @@ class qannagnps():
                 i.setText("")
         #Borrar el topagnps provided
         if section=="watershed":
-            for i in [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3]:
+            for i in [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_5]:
                 i.setChecked(False)
         if section=="general":
             self.inputs.checkBox_4.setChecked(False)
@@ -4037,13 +4050,13 @@ class qannagnps():
         unique_soil = self.dlg.lineEdit.text()
         unique_landuse = self.dlg.lineEdit_2.text()
         # Se crea el diccionario en el que se asigna a cada entrada un valor
-        dic_save = {"Input":"value","dem": dem_layer,"dem_name":dem_name,"soil_layer":soil_layer,"soil_name":soil_name,"soil_column":soil_column,"use_layer":use_layer,"use_name":use_name,"use_column":use_column,
+        dic_save = {"Input":"value","project_folder":str(self.dlg.project.text()),"epsg":QgsProject.instance().crs().authid(),"dem": dem_layer,"dem_name":dem_name,"soil_layer":soil_layer,"soil_name":soil_name,"soil_column":soil_column,"use_layer":use_layer,"use_name":use_name,"use_column":use_column,
             "buffer_layer":buffer_layer,"buffer_name":buffer_name,"vegetation_layer":vegetation_layer,"vegetation_name":vegetation_name,"unique_soil":unique_soil,"unique_landuse":unique_landuse,
             "add_outlet":self.dlg.checkBox_2.isChecked(),"execute_topagnps":self.dlg.cbTop.isChecked(),"execute_annagnps":self.dlg.cbAnn.isChecked(),
             "watershed_directory":self.inputs.l_1.text(),
             "general_directory":self.inputs.l_23.text(),"climate_directory":self.inputs.l_47.text(),
             "simulation_directory":self.inputs.l_53.text(),"cell_topagpns_provided":self.inputs.checkBox.isChecked(),"eg_topagpns_provided":self.inputs.checkBox_2.isChecked(),
-            "reach_topagpns_provided":self.inputs.checkBox_3.isChecked(),"riparian_topagpns_provided":self.inputs.checkBox_4.isChecked()}
+            "reach_topagpns_provided":self.inputs.checkBox_3.isChecked(),"riparian_topagpns_provided":self.inputs.checkBox_4.isChecked(),"wetland_topagpns_provided":self.inputs.checkBox_5.isChecked()}
         #A este diccionario se le añaden los inputs de AnnAGNPS
         master_dict = {"AnnAGNPS ID":self.inputs.l_54,"Aquaculture Pond Data":self.inputs.l_2,
                                "Aquaculture Schedule Data":self.inputs.l_24,"Cell Data":self.inputs.l_3,"Classic Gully Data":self.inputs.l_4,
@@ -4099,6 +4112,10 @@ class qannagnps():
         if fname[0]!="":
             try:
                 project_df = pd.read_csv(fname[0],encoding = "ISO-8859-1",delimiter=",")
+                #Se añade la carpeta del proyecto
+                self.dlg.project.setText(str(project_df[project_df.iloc[:,0]=="project_folder"].iloc[0,1]))
+                #El epsg
+                QgsProject.instance().setCrs(QgsCoordinateReferenceSystem(str(project_df[project_df.iloc[:,0]=="epsg"].iloc[0,1])))
                 #Primero se comprueba que existen las capas que estaban en el proyecto guardado. Si no lo están, se añaden. 
                 layers = {"dem":project_df[project_df.iloc[:,0]=="dem"].iloc[0,1],"soil":project_df[project_df.iloc[:,0]=="soil_layer"].iloc[0,1],
                     "use":project_df[project_df.iloc[:,0]=="use_layer"].iloc[0,1],"buffer":project_df[project_df.iloc[:,0]=="buffer_layer"].iloc[0,1],
@@ -4196,6 +4213,7 @@ class qannagnps():
                 self.inputs.checkBox_2.setChecked(retrieve_data("eg_topagpns_provided"))
                 self.inputs.checkBox_3.setChecked(retrieve_data("reach_topagpns_provided"))
                 self.inputs.checkBox_4.setChecked(retrieve_data("riparian_topagpns_provided"))
+                self.inputs.checkBox_5.setChecked(retrieve_data("wetland_topagpns_provided"))
             except:
                 iface.messageBar().pushMessage("Error Loading Project", "The file you have selected does not have the format or information necessary to upload a project. " ,level=Qgis.Warning, duration=10)
                 return 
@@ -4292,7 +4310,7 @@ class qannagnps():
                 line.setText(fname[0])
         
         #Si se ha elegido antes que los datos provengan de TopAGNPS entonces se quita el check
-        dic_search_check = {self.inputs.l_3:self.inputs.checkBox,self.inputs.l_5:self.inputs.checkBox_2,self.inputs.l_10:self.inputs.checkBox_3,self.inputs.l_41:self.inputs.checkBox_4}
+        dic_search_check = {self.inputs.l_3:self.inputs.checkBox,self.inputs.l_5:self.inputs.checkBox_2,self.inputs.l_10:self.inputs.checkBox_3,self.inputs.l_41:self.inputs.checkBox_4,self.inputs.l_13:self.inputs.checkBox_5}
         try:
             dic_search_check[line].setChecked(False)
         except:
@@ -4560,14 +4578,8 @@ class qannagnps():
         
         #Si se ha escogido la opción de "Pixel Size" se obtienen todos los DEMs con todos los tamaños de píxeles
         if "Pixel Size" in list(self.dic_data.keys()):
-            orden_pixel = list(self.dic_data.keys()).index("Pixel Size") #columna en la que están los valores de tamaño de pixel
-            for pixel_size in np.unique(self.param_values[:,orden_pixel]):
-                self.nombre = self.name_mdt.rsplit(".", 1)[0] #nombre del archivo sin extensión
-                self.extension = self.name_mdt.split(".")[-1]
-                processing.run("gdal:warpreproject", 
-                    {'INPUT':self.fichero_mdt,'SOURCE_CRS':QgsCoordinateReferenceSystem(self.epsg),'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
-                    'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':float(pixel_size),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,
-                    'MULTITHREADING':False,'EXTRA':'','OUTPUT':self.direccion+"\\"+self.nombre+f"_{pixel_size}"+"."+self.extension})
+            self.resample_rasters()
+            
             
         self.resultados = []
         numero_ejecucion = 0
@@ -4617,13 +4629,8 @@ class qannagnps():
                 columna = self.dic_name_column[k.split("__")[0]][1]
         df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
         #Si el input es tamaño de pixel entonces se la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
-        print(k)
-        print(k =="Pixel Size")
         if k =="Pixel Size":
             df[columna].iloc[self.dic_data[k][2]] =str(self.nombre+f"_{i[j]}"+"."+self.extension)
-            print("sii",columna,self.dic_data[k][2])
-            print("si",self.nombre+f"_{i[j]}"+"."+self.extension)
-            print("a",direccion)
         else:
             df[columna].iloc[self.dic_data[k][2]] = i[j]
         #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
@@ -4955,4 +4962,18 @@ class qannagnps():
             df = pd.DataFrame(data = df_dic) 
             df.to_csv(self.direccion+"\\"+'Results_morris.csv', index=False, float_format='%.5f')
             self.progress_metod(close = True)
-        
+    
+    def resample_rasters(self):
+        #Metod to resample rasters
+        orden_pixel = list(self.dic_data.keys()).index("Pixel Size") #columna en la que están los valores de tamaño de pixel
+        for pixel_size in np.unique(self.param_values[:,orden_pixel]):
+            self.nombre = self.name_mdt.rsplit(".", 1)[0] #nombre del archivo sin extensión
+            self.extension = self.name_mdt.split(".")[-1]
+            processing.run("gdal:warpreproject", 
+                {'INPUT':self.fichero_mdt,'SOURCE_CRS':QgsCoordinateReferenceSystem(self.epsg),'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
+                'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':float(pixel_size),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,
+                'MULTITHREADING':False,'EXTRA':'','OUTPUT':self.direccion+"\\"+self.nombre+f"_{pixel_size}"+"."+self.extension})
+            #If buffer exists then resample
+            self.fichero_buf
+            #If vegetation exists then resample
+            self.fichero_veg

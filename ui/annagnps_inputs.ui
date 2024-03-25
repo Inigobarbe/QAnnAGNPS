@@ -1232,6 +1232,22 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
+                   <item row="13" column="0">
+                    <widget class="QCheckBox" name="checkBox_5">
+                     <property name="styleSheet">
+                      <string notr="true">QCheckBox::hover{color:white}
+
+QCheckBox::indicator:unchecked {
+    background-color: white;
+	border: 1px solid black
+}
+</string>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
                   </layout>
                  </item>
                 </layout>
