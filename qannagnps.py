@@ -214,6 +214,11 @@ class qannagnps():
         self.dlg.pb_ann.clicked.connect(self.inputs.show)
         #Al seleccionar el MDT que se establezca ya el directorio
         self.dlg.comboBox.currentIndexChanged.connect(self.setDirectory)
+        
+        #Actualizar los control files cuando se le de a uno de los botones
+        push_buttons = [self.cgeneral.pushButton,self.cgeneral.pushButton_3,self.cgeneral.pushButton_9,self.cgeneral.pushButton_4,self.cgeneral.pushButton_5,self.cgeneral.pushButton_10,self.cgeneral.pushButton_2,self.cgeneral.pushButton_6,self.cgeneral.pushButton_8,self.cgeneral.pushButton_7]
+        for i in push_buttons:
+            i.clicked.connect(self.asignar_valores_control_dialogo)
         #Conectar a los dialogos para los control files
         self.dlg.pbControl.clicked.connect(self.cgeneral.show)
         self.cgeneral.pushButton.clicked.connect(self.ctopagnps.show)
@@ -229,8 +234,7 @@ class qannagnps():
         #Para cerrar el diálogo cuando se le de a cancel
         self.dlg.pushButton_7.clicked.connect(self.dlg.close)
         self.dlg.pushButton_5.clicked.connect(self.dlg.close)
-        #Asignar los valores de los control files a los diálogos
-        self.dlg.pbControl.clicked.connect(self.asignar_valores_control_dialogo)
+        
         #Añadir los valores del diálogo a los control files
         self.ctopagnps.pushButton.clicked.connect(self.create_control_file_topagnps)
         self.cpeg.pushButton.clicked.connect(self.create_control_file_peg)
@@ -590,9 +594,14 @@ class qannagnps():
         #Add project folder if text was changed
         self.dlg.project.textChanged.connect(self.add_project_folder_text_changed)
         
+        #Number of execution of sensitivity analysis
+        self.numero_ejecucion = 1
+        
     def add_project_folder_text_changed(self):
         #Metod to add project folder if text was changed
         self.direccion = str(self.dlg.project.text())
+        #Asignar los valores de los control files a los diálogos
+        self.asignar_valores_control_dialogo()
     
     def add_topagnps_input(self,type_input):
         #Metod to add topagnps inputs with pushbutton
@@ -2277,16 +2286,17 @@ class qannagnps():
     def buffer_nombre(self):
         #Asignar en el control file de AGBUF el nombre del archivo que se ha seleccionado en el plugin como el buffer
         try:
-            if self.dlg.comboBox.currentIndex()>0:
+            if self.dlg.comboBox_2.currentIndex()>0:
                 if path.exists(self.direccion+"/AGBUF.csv"):
                     layers = QgsProject.instance().layerTreeRoot().children()
                     selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
                     selectedLayer = layers[selectedLayerIndex].layer()
-                    fichero_buffer =  selectedLayer.dataProvider().dataSourceUri()
-                    buffer_directory, buffer_file = os.path.split(fichero_buffer)
+                    self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
+                    buffer_directory, self.name_buffer  = os.path.split(self.fichero_buf)
                     control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-                    control.iloc[0,0]=buffer_file
+                    control["BUFFER"].iloc[0]=self.name_buffer
                     control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
+                    
         except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
             pass
         except Exception as e:
@@ -2295,15 +2305,15 @@ class qannagnps():
     def vegetation_nombre(self):
         #Asignar en el control file de AGBUF el nombre del archivo que se ha seleccionado en el plugin como el vegetation   
         try:
-            if self.dlg.comboBox.currentIndex()>0:
+            if self.dlg.comboBox_3.currentIndex()>0:
                 if path.exists(self.direccion+"/AGBUF.csv"):
                     layers = QgsProject.instance().layerTreeRoot().children()
                     selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
                     selectedLayer = layers[selectedLayerIndex].layer()
-                    fichero_vegetation =  selectedLayer.dataProvider().dataSourceUri()
-                    vegetation_directory, vegetation_file = os.path.split(fichero_vegetation)
+                    self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
+                    vegetation_directory, self.name_vegetation  = os.path.split(self.fichero_veg)
                     control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-                    control.iloc[0,1]=vegetation_file
+                    control["VEGETATION"].iloc[0]=self.name_vegetation
                     control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
         except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
             pass
@@ -2418,33 +2428,36 @@ class qannagnps():
                 pass
             #Establecer el fichero de suelo escogido en el plugin
             selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
-            selectedLayer = layers[selectedLayerIndex].layer()
-            fichero_soil =  selectedLayer.dataProvider().dataSourceUri()
-            soil_directory, self.fichero_soil = os.path.split(fichero_soil)
+            if selectedLayerIndex>=0:
+                selectedLayer = layers[selectedLayerIndex].layer()
+                fichero_soil =  selectedLayer.dataProvider().dataSourceUri()
+                soil_directory, self.fichero_soil = os.path.split(fichero_soil)
             #Establecer el fichero de manejo escogido en el plugin 
             selectedLayerIndex = self.dlg.cbMan.currentIndex()-1
-            selectedLayer = layers[selectedLayerIndex].layer()
-            fichero_manag =  selectedLayer.dataProvider().dataSourceUri()
-            manag_directory, self.fichero_manag = os.path.split(fichero_manag)
+            if selectedLayerIndex>=0:
+                selectedLayer = layers[selectedLayerIndex].layer()
+                fichero_manag =  selectedLayer.dataProvider().dataSourceUri()
+                manag_directory, self.fichero_manag = os.path.split(fichero_manag)
             #Establecer el fichero de buffer escogido en el plugin y moverlo a la carpeta del proyecto
             selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
-            selectedLayer = layers[selectedLayerIndex].layer()
-            self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
-            buf_directory, nombre_buf = os.path.split(self.fichero_buf)
-            try: #si el origen y el destino son los mismos da error
-                shutil.copyfile(self.fichero_buf,self.direccion+"\\"+nombre_buf)
-            except:
-                pass
+            if selectedLayerIndex>=0:
+                selectedLayer = layers[selectedLayerIndex].layer()
+                self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
+                buf_directory, nombre_buf = os.path.split(self.fichero_buf)
+                try: #si el origen y el destino son los mismos da error
+                    shutil.copyfile(self.fichero_buf,self.direccion+"\\"+nombre_buf)
+                except:
+                    pass
             #Establecer el fichero de vegetation escogido en el plugin y moverlo a la carpeta del proyecto
             selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
-            selectedLayer = layers[selectedLayerIndex].layer()
-            self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
-            veg_directory, nombre_veg = os.path.split(self.fichero_veg)
-            try: #si el origen y el destino son los mismos da error
-                shutil.copyfile(self.fichero_veg,self.direccion+"\\"+nombre_veg)
-            except:
-                pass
-                
+            if selectedLayerIndex>=0:
+                selectedLayer = layers[selectedLayerIndex].layer()
+                self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
+                veg_directory, nombre_veg = os.path.split(self.fichero_veg)
+                try: #si el origen y el destino son los mismos da error
+                    shutil.copyfile(self.fichero_veg,self.direccion+"\\"+nombre_veg)
+                except:
+                    pass
             #Si el input output_global Glbl_All_V3_sim no se pone en T no se obtiene el archivo que se necesita para calcular la erosión por cárcavas efímeras (AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv) y por lo tanto no se puede hacer el análisis de sensibilidad
             #Esto se hace primero porque la dirección puede estar dada con el nombre del archivo o en dirección completa
             if os.path.isabs(r"{}".format(str(self.inputs.l_63.text()))):
@@ -2567,10 +2580,11 @@ class qannagnps():
                     return tipos_suelo_dic
 
                 #Pasar de shp a gpkg
-                processing.run("native:reprojectlayer", 
-                    {'INPUT':fichero_suelo,
-                    'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
-                    'OPERATION':'+proj=noop','OUTPUT':fichero("suelos{}.gpkg".format(numero))})
+                if self.numero_ejecucion==1: #esto solo es necesario hacerlo en la simulación clásica o en la primera ejecución del análisis de sensibilidad. Además daría error al intentar sobreescribirlo. 
+                    processing.run("native:reprojectlayer", 
+                        {'INPUT':fichero_suelo,
+                        'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
+                        'OPERATION':'+proj=noop','OUTPUT':fichero("suelos{}.gpkg".format(numero))})
                 #Reproyectar celdas al epsg del proyecto
                 processing.run("gdal:warpreproject", 
                     {'INPUT':fichero(fichero_cell),
@@ -2593,15 +2607,15 @@ class qannagnps():
                     'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
                     'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
                     'GRASS_VECTOR_EXPORT_NOCAT':False})
-                #Corregir geometrías porque luego sino en unión da error
+                #Corregir geometrías porque luego sino en unión da error 
                 processing.run("native:fixgeometries", 
                     {'INPUT':fichero("cell{}.gpkg".format(numero)),
-                    'OUTPUT':fichero("cell_cor{}.gpkg".format(numero))})    
+                    'OUTPUT':fichero("cell_cor{}_{}.gpkg".format(numero,self.numero_ejecucion))})    
                 #Se unen las capas de celdas de celdas con las de suelo/uso
                 processing.run("native:union", 
-                {'INPUT':fichero("cell_cor{}.gpkg".format(numero)),
+                {'INPUT':fichero("cell_cor{}_{}.gpkg".format(numero,self.numero_ejecucion)),
                 'OVERLAY':fichero("suelos{}.gpkg".format(numero)),
-                'OVERLAY_FIELDS_PREFIX':'','OUTPUT':fichero("union_capas{}.gpkg".format(numero))})
+                'OVERLAY_FIELDS_PREFIX':'','OUTPUT':fichero("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion))})
                 #Esta función es para crear una columna en una capa vectorial según la expresión que le pongas
                 def create_attribute(layer_name, expresion,nombre_columna):
                     layer = QgsVectorLayer(fichero(layer_name),"union")
@@ -2617,10 +2631,10 @@ class qannagnps():
                             layer.updateFeature(f)
                     layer.updateFields()
                 #De la capa de unión creada se calcula el área para cada zona
-                create_attribute("union_capas{}.gpkg".format(numero),"$area","area_zona")
+                create_attribute("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion),"$area","area_zona")
                 
                 #Ahora se ve qué área de suelo/uso es la mayor para cada celda y esa será la que se escoja
-                layer = QgsVectorLayer(fichero("union_capas{}.gpkg".format(numero)),"union")
+                layer = QgsVectorLayer(fichero("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion)),"union")
                 tres_valores = []
                 valores_unicos_celdas = []
                 valores_unicos_suelos=[]
@@ -2655,12 +2669,12 @@ class qannagnps():
                     self.end_execution = 1
                     return
                 #Se aplica el suelo al fichero de cells
-                try:
-                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
-                except:
+                #try:
+                suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
+                r'''except:
                     iface.messageBar().pushMessage("Error with soil layer","The DEM and the soil layer have to overlap.",level=Qgis.Warning, duration=20)
                     self.end_execution = 1
-                    return
+                    return'''
                 annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo AnnAGNPS_Ephemeral_Gully_Data_Section.csv
@@ -3172,7 +3186,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"TOPAGNPS.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the topagnps control file first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select project folder", "Please before creating the topagnps control file first select de project folder you are going to work with",level=Qgis.Warning, duration=10)
             return 
         self.ctopagnps.close()
         
@@ -4523,6 +4537,8 @@ class qannagnps():
     
     def run_sensitivity_analysis(self):
         #Metod to run sensitiviy analysis
+        #Error if the necessary inputs are not selected to obtain the required output
+        self.check_sensitivity_inputs()
         #Close dialogs
         self.sensitivity_dialog.close()
         self.dlg.close()
@@ -4582,21 +4598,21 @@ class qannagnps():
             
             
         self.resultados = []
-        numero_ejecucion = 0
+        self.numero_ejecucion = 0
         #Results are obtained
         for i in self.param_values:
-            numero_ejecucion+=1
+            self.numero_ejecucion+=1
             for j,k in enumerate(self.dic_data.keys()):
                 self.change_inputs_sensitivity(i,j,k)
             #Progress bar update
-            self.progress_metod(start = False,values = i,execution = numero_ejecucion)
+            self.progress_metod(start = False,values = i,execution = self.numero_ejecucion)
             self.ejecucion_completa()
+            #Se guardan los resultados
+            self.resultados.append(self.save_result())
             #Condición de error
             if self.end_execution:
                 iface.messageBar().pushMessage("Error in sensitivity analysis", "Please check the error in the opened file",level=Qgis.Warning, duration=10)
                 return
-            #Se guardan los resultados
-            self.resultados.append(self.save_result())
         #Se analizan los resultados
         if self.sensitivity_dialog.sobol.isChecked():
             self.Si = sobol.analyze(problem, np.array(self.resultados))
@@ -4627,26 +4643,28 @@ class qannagnps():
             else:
                 direccion = self.file_input(self.dic_name_column[k.split("__")[0]][0])
                 columna = self.dic_name_column[k.split("__")[0]][1]
-        df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
-        #Si el input es tamaño de pixel entonces se la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
+        
+        #Si el input es tamaño de pixel entonces la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
         if k =="Pixel Size":
-            df[columna].iloc[self.dic_data[k][2]] =str(self.nombre+f"_{i[j]}"+"."+self.extension)
+            self.change_control_files_pixel(i,j)
+            
         else:
+            df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
             df[columna].iloc[self.dic_data[k][2]] = i[j]
-        #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
-        def float_to_str(df,column):
-            #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
-            lista = []
-            for i in df[column]:
-                try:
-                    lista.append(str(int(i)))
-                except:
-                    lista.append("")
-            df[column] = lista
-        if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
-        if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
-        df.to_csv(direccion, index=False, float_format='%.5f')
-    
+            #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
+            def float_to_str(df,column):
+                #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
+                lista = []
+                for i in df[column]:
+                    try:
+                        lista.append(str(int(i)))
+                    except:
+                        lista.append("")
+                df[column] = lista
+            if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
+            if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
+            df.to_csv(direccion, index=False, float_format='%.5f')
+        
     def save_result(self):
         #Metod to save the results of the sensitivity analysis
         #Runoff
@@ -4655,7 +4673,13 @@ class qannagnps():
             df = self.import_df("Runoff",sensitivity=True)
             #Esto se hace porque la escorrentía de la cuenca es la media ponderada con el área de las escorrentías de las celdas
             df['Runoff_Ponderado'] = df['Runoff'] * df['Drainage']
-            result = df.groupby('Fecha').agg({'Runoff_Ponderado': 'sum', 'Drainage': 'sum'}).reset_index()
+            try:
+                result = df.groupby('Fecha').agg({'Runoff_Ponderado': 'sum', 'Drainage': 'sum'}).reset_index()
+            except:
+                self.end_execution =True
+                iface.messageBar().pushMessage("AnnAGNPS_SIM_Insitu_Soil_Moisture output not found. Insitu_Soil_Moisture_Daily column in OUTPUT OPTIONS DATA -SIM file must be set to T ",level=Qgis.Warning)
+                return
+                
             result['Runoff'] = result['Runoff_Ponderado'] / result['Drainage']
             df_graph = result[['Fecha', 'Runoff']]
             df_graph.set_index('Fecha', inplace=True)
@@ -4663,19 +4687,35 @@ class qannagnps():
         #Total erosion
         if self.sensitivity_dialog.total_erosion.isChecked():
             df = self.import_df("Subtotal",sensitivity=True)
-            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                iface.messageBar().pushMessage("AnnAGNPS_EV_Sediment_yield_(mass) output not found. EV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
+                self.end_execution =True
+                return
+                
             return df_graph.sum()       
             
         #Gully erosion
         if self.sensitivity_dialog.gully.isChecked():
             df = self.import_df("Gully",sensitivity=True)
-            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                iface.messageBar().pushMessage("AnnAGNPS_EV_Sediment_yield_(mass) output not found. EV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
+                self.end_execution =True
+                return
             return df_graph.sum()  
             
         #Ephemeral gully
         if self.sensitivity_dialog.ephemeral.isChecked():
             fichero = self.direccion+"\\INPUTS\\"+"AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv"
-            file = open(fichero)
+            try:
+                file = open(fichero)
+            except:
+                iface.messageBar().pushMessage("AnnAGNPS_EV_Sediment_yield_(mass) output not found. EV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
+                self.end_execution =True
+                return
             csvreader = csv.reader(file)
             rows = []
             for row in csvreader:
@@ -4697,31 +4737,57 @@ class qannagnps():
         #Pond erosion
         if self.sensitivity_dialog.pond.isChecked():
             df = self.import_df("Pond",sensitivity=True)
-            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                iface.messageBar().pushMessage("AnnAGNPS_EV_Sediment_yield_(mass) output not found. EV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
+                self.end_execution =True
+                return
             return df_graph.sum() 
             
         #Sheet and rill erosion
         if self.sensitivity_dialog.sheet.isChecked():
             df = self.import_df("Sheet & Rill",sensitivity=True)
-            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                iface.messageBar().pushMessage("AnnAGNPS_EV_Sediment_yield_(mass) output not found. EV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
+                self.end_execution =True
+                return
             return df_graph.sum() 
             
         #Nitrogen
         if self.sensitivity_dialog.nitrogen.isChecked():
             df = self.import_df("Nitrogen",sensitivity=True)
-            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                iface.messageBar().pushMessage("AnnAGNPS_EV_Nitrogen_yield_(mass) output not found. EV_N_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
+                self.end_execution =True
+                return
+                
             return df_graph.sum()
             
         #Organic carbon
         if self.sensitivity_dialog.organic.isChecked():
             df = self.import_df("Carbon",sensitivity=True)
-            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                iface.messageBar().pushMessage("AnnAGNPS_EV_Organic_Carbon_yield_(mass) output not found. EV_OC_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
+                self.end_execution =True
+                return
             return df_graph.sum()
             
         #Phosphorus
         if self.sensitivity_dialog.phosphorus.isChecked():
             df = self.import_df("Phosphorus",sensitivity=True)
-            df_graph = df.groupby(df.index).sum(numeric_only=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                iface.messageBar().pushMessage("AnnAGNPS_EV_Phosphorus_yield_(mass) output not found. EV_P_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
+                self.end_execution =True
+                return
             return df_graph.sum()
         
     def file_input(self,lineEdit):
@@ -4967,13 +5033,84 @@ class qannagnps():
         #Metod to resample rasters
         orden_pixel = list(self.dic_data.keys()).index("Pixel Size") #columna en la que están los valores de tamaño de pixel
         for pixel_size in np.unique(self.param_values[:,orden_pixel]):
-            self.nombre = self.name_mdt.rsplit(".", 1)[0] #nombre del archivo sin extensión
-            self.extension = self.name_mdt.split(".")[-1]
+            self.nombre_mdt = self.name_mdt.rsplit(".", 1)[0] #nombre del archivo sin extensión
+            self.extension_mdt = self.name_mdt.split(".")[-1] #extensión del archivo
             processing.run("gdal:warpreproject", 
                 {'INPUT':self.fichero_mdt,'SOURCE_CRS':QgsCoordinateReferenceSystem(self.epsg),'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
-                'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':float(pixel_size),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,
-                'MULTITHREADING':False,'EXTRA':'','OUTPUT':self.direccion+"\\"+self.nombre+f"_{pixel_size}"+"."+self.extension})
+                'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':round(float(pixel_size),2),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,
+                'MULTITHREADING':False,'EXTRA':'','OUTPUT':self.direccion+"\\"+self.nombre_mdt+f"_{round(pixel_size,2)}"+"."+self.extension_mdt})
+            
             #If buffer exists then resample
-            self.fichero_buf
+            if self.dlg.comboBox_2.currentIndex()>0:
+                self.nombre_buffer = self.name_buffer.rsplit(".", 1)[0] #nombre del archivo sin extensión
+                self.extension_buffer = self.name_buffer.split(".")[-1] #extensión del archivo
+                processing.run("gdal:warpreproject", 
+                    {'INPUT':self.fichero_buf,'SOURCE_CRS':QgsCoordinateReferenceSystem(self.epsg),'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
+                    'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':round(float(pixel_size),2),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,
+                    'MULTITHREADING':False,'EXTRA':'','OUTPUT':str(self.direccion+"\\"+self.nombre_buffer+f"_{round(pixel_size,2)}"+"."+self.extension_buffer)})
             #If vegetation exists then resample
-            self.fichero_veg
+            if self.dlg.comboBox_3.currentIndex()>0:
+                self.nombre_vegetation = self.name_vegetation.rsplit(".", 1)[0] #nombre del archivo sin extensión
+                self.extension_vegetation = self.name_vegetation.split(".")[-1] #extensión del archivo
+                processing.run("gdal:warpreproject", 
+                    {'INPUT':self.fichero_veg,'SOURCE_CRS':QgsCoordinateReferenceSystem(self.epsg),'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
+                    'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':round(float(pixel_size),2),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,
+                    'MULTITHREADING':False,'EXTRA':'','OUTPUT':self.direccion+"\\"+self.nombre_vegetation+f"_{round(pixel_size,2)}"+"."+self.extension_vegetation})
+        
+    def change_control_files_pixel(self,i,j):
+        #Metod to change control files if sensitivity analysis with pixel size is choosed
+        #First with mdt
+        df = pd.read_csv(self.direccion+"\\TOPAGNPS.csv",encoding = "ISO-8859-1",delimiter=",")
+        df["FILENAME"].iloc[0] = str(self.nombre_mdt+f"_{round(i[j],2)}"+"."+self.extension_mdt)
+        df.to_csv(self.direccion+"\\TOPAGNPS.csv", index=False, float_format='%.5f')
+        
+        
+        #If buffer exist then change name of buffer raster
+        if self.dlg.comboBox_2.currentIndex()>0:
+            df = pd.read_csv(self.direccion+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
+            df["BUFFER"].iloc[0] = str(self.nombre_buffer+f"_{round(i[j],2)}"+"."+self.extension_buffer)
+            df.to_csv(self.direccion+"\\AGBUF.csv", index=False, float_format='%.5f')
+        
+        #If vegetation exist then change name of vegetation raster
+        if self.dlg.comboBox_3.currentIndex()>0:
+            df = pd.read_csv(self.direccion+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
+            df["VEGETATION"].iloc[0] = str(self.nombre_vegetation+f"_{round(i[j],2)}"+"."+self.extension_vegetation)
+            df.to_csv(self.direccion+"\\AGBUF.csv", index=False, float_format='%.5f')
+            
+    def check_sensitivity_inputs(self):
+        #Metod to check if the required inputs are selected for the sensitivity analysis
+        #Runoff
+        if self.sensitivity_dialog.runoff.isChecked():
+            #Si da error al abrir el archivo o si no está la columna en T entonces dar error
+            try:
+                df = pd.read_csv(self.direccion+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
+        #Total erosion
+        if self.sensitivity_dialog.total_erosion.isChecked():
+    
+            
+        #Gully erosion
+        if self.sensitivity_dialog.gully.isChecked():
+ 
+            
+        #Ephemeral gully
+        if self.sensitivity_dialog.ephemeral.isChecked():
+
+        
+        #Pond erosion
+        if self.sensitivity_dialog.pond.isChecked():
+
+            
+        #Sheet and rill erosion
+        if self.sensitivity_dialog.sheet.isChecked():
+
+            
+        #Nitrogen
+        if self.sensitivity_dialog.nitrogen.isChecked():
+
+            
+        #Organic carbon
+        if self.sensitivity_dialog.organic.isChecked():
+
+            
+        #Phosphorus
+        if self.sensitivity_dialog.phosphorus.isChecked():
