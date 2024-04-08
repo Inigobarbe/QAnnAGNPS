@@ -597,6 +597,9 @@ class qannagnps():
         #Number of execution of sensitivity analysis
         self.numero_ejecucion = 1
         
+        #Variable that says that it is doing a sensitivity analysis
+        self.doing_sensitivity = False
+        
     def add_project_folder_text_changed(self):
         #Metod to add project folder if text was changed
         self.direccion = str(self.dlg.project.text())
@@ -2296,7 +2299,7 @@ class qannagnps():
                     self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
                     buffer_directory, self.name_buffer  = os.path.split(self.fichero_buf)
                     control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-                    control["BUFFER"].iloc[0]=self.name_buffer
+                    control["Buffer"].iloc[0]=self.name_buffer
                     control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
                     
         except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
@@ -2315,7 +2318,7 @@ class qannagnps():
                     self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
                     vegetation_directory, self.name_vegetation  = os.path.split(self.fichero_veg)
                     control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-                    control["VEGETATION"].iloc[0]=self.name_vegetation
+                    control["Vegetation"].iloc[0]=self.name_vegetation
                     control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
         except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
             pass
@@ -2487,6 +2490,11 @@ class qannagnps():
                 topagnps_control_file = pd.read_csv(fichero("TOPAGNPS.csv"),encoding = "ISO-8859-1",delimiter=",")
                 topagnps_control_file["DEMPROC"].iloc[0] = "2" #se pone en texto porque sino se guarda en decimal y da error.
                 topagnps_control_file.to_csv(fichero("TOPAGNPS.csv"), index=False, float_format='%.5f')
+            
+            #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs. El cambio se hace dentro de la carpeta del proyecto no la original!
+            if self.doing_sensitivity:
+                for j,k in enumerate(self.dic_data.keys()):
+                    self.change_inputs_sensitivity(self.param_values[self.numero_ejecucion-1],j,k,spatial =True) #cambio de los inputs espaciales
             
             #EJECUCIÓN DE TOPAGNPS            
             def main():
@@ -2893,156 +2901,155 @@ class qannagnps():
 
             #METER ARCHIVOS EN CARPETAS DE INPUTS CORRESPONDIENTES. Completar cuales van a cada carpeta con el input editor.
             #Primero se asigna la dirección, si es que se ha elegido la opción de que se obtengan de la ejecución de TopAGNPS
-            if self.numero_ejecucion>1: #solo se hace si no es análisis de sensibilidad o si es la primera ejecución del análisis de sensibilidad
-                checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
-                sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data]
-                names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
-                for i in range(len(checks_list)):
-                    if checks_list[i].isChecked():
-                        sections_list[i]=self.direccion+"\\"+names_list[i]
-                cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data = sections_list
-                #Función para que se le diga el nombre del archivo y te devuelva la dirección completa, en este caso para los inputs que usará AnnAGNPS
-                def fichero_input(file_name,direct):
-                    if os.path.isabs(file_name):
-                        return   self.direccion+"/"+ directory + "/" + direct + "/" +os.path.basename(file_name)
-                    else:
-                        return self.direccion+"/"+ directory + "/" + direct + "/" +file_name
-                
-                #Listas de los nombres de archivos para cada tipo de input. Se elminan aquellos que no han sido escogidos ("")
-                #Clima
-                climate_files = [EI_pct_data,climate_data_daily,climate_data_station,storm_type_rfd,storm_type_updrc]
-                climate_files = [x for x in climate_files if x !=""]
-                #General
-                general_files = [crop_data,crop_growth,fertilizer_application,fertilizer_reference,hydraulic_geometry,management_field,
-                                 management_operation,management_schedule_data,non_crop,riparian_buffer,runoff_curve,soil_data,soil_layer_data,
-                                 strip_crop,tile_drain,aquaculture_schedule_data,contour_data,feedlot_management,geology_data,
-                                 irrigation_application,pesticide_application,pesticide_reference,reach_nutrient,
-                                 ]
-                general_files = [x for x in general_files if x !=""]
-                #Simulation
-                simulation_files = [annagnps_id,global_id,simulation_period_data,output_global,output_options_aa,output_options_tbl,
-                                    global_error,pesticide_initial,pl_calibration,rcn_calibration,soil_initial_conditions,output_options_csv,
-                                    output_options_dpp,output_options_npt, output_options_sim,output_options_mn,rusle2_data,output_options_ev]
-                simulation_files = [x for x in simulation_files if x !=""]
-                #Watershed
-                watershed_files = [cell_data,ephemeral_gully,reach_data,watershed_data,wetland_data,aquaculture_pond_data,
-                                   classic_gully,feedlot_data,field_pond_data,impoundment_data,
-                                   point_source,output_options_cell,output_options_feedlot,output_options_field,
-                                   output_options_classic_gully,output_options_ephemeral_gully,output_options_impoundment,
-                                   output_options_point_source,output_options_reach,output_options_wetland,ricewq_data]
-                watershed_files = [x for x in watershed_files if x !=""]
-                #Lista de listas
-                tipes_of_files = [climate_files,general_files,simulation_files,watershed_files]
-                
-                #Bucle para mover los inputs desde donde se encontraba el arcivo mdt a las carpetas necesarias
-                #Función para tener la dirección completa dependiendo de la carpeta en la que se encuentra o de si está la dirección completa puesta
-                def origin_direction(input_path, section):
-                    if os.path.isabs(input_path):
-                        return input_path
-                    else:
-                        if section == "watershed":
-                            return self.inputs.l_1.text()+"/"+input_path
-                        elif section == "general":
-                            return self.inputs.l_23.text()+"/"+input_path
-                        elif section == "climate":
-                            return self.inputs.l_47.text()+"/"+input_path
-                        elif section == "simulation":
-                            return self.inputs.l_53.text()+"/"+input_path
-                #Bucle para mover los archivos inputs de AnnAGNPS
-                for t in tipes_of_files:
-                    for f in t:
-                        try:
-                            if t == climate_files and origin_direction(f,"climate")!=fichero_input(f,"climate"):#esta última condición es porque si no hay que mover el archivo, da error
-                                shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
-                        except:
-                            iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning, duration=10)
-                            self.end_execution = 1
-                            return
-                        try:
-                            if t == general_files and origin_direction(f,"general")!= fichero_input(f,"general"):
-                               shutil.copyfile(origin_direction(f,"general"),fichero_input(f,"general"))
-                        except:
-                            iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"general")),level=Qgis.Warning, duration=10)
-                            self.end_execution = 1
-                            return
-                        try:
-                            if t == simulation_files and origin_direction(f,"simulation")!=fichero_input(f,"simulation"):
-                               shutil.copyfile(origin_direction(f,"simulation"),fichero_input(f,"simulation"))
-                        except:
-                            iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"simulation")),level=Qgis.Warning, duration=10)
-                            self.end_execution = 1
-                            return
-                        try:
-                            if t == watershed_files and origin_direction(f,"watershed")!=fichero_input(f,"watershed"):
-                                shutil.copyfile(origin_direction(f,"watershed"),fichero_input(f,"watershed"))
-                        except:
-                            iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"watershed")),level=Qgis.Warning, duration=10)
-                            self.end_execution = 1
-                            return
-                            
-                #CREACIÓN DEL ARCHIVO annagnps_master.csv
-                def fichero_master(nombre):
+            checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
+            sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data]
+            names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
+            for i in range(len(checks_list)):
+                if checks_list[i].isChecked():
+                    sections_list[i]=self.direccion+"\\"+names_list[i]
+            cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data = sections_list
+            #Función para que se le diga el nombre del archivo y te devuelva la dirección completa, en este caso para los inputs que usará AnnAGNPS
+            def fichero_input(file_name,direct):
+                if os.path.isabs(file_name):
+                    return   self.direccion+"/"+ directory + "/" + direct + "/" +os.path.basename(file_name)
+                else:
+                    return self.direccion+"/"+ directory + "/" + direct + "/" +file_name
+            
+            #Listas de los nombres de archivos para cada tipo de input. Se elminan aquellos que no han sido escogidos ("")
+            #Clima
+            climate_files = [EI_pct_data,climate_data_daily,climate_data_station,storm_type_rfd,storm_type_updrc]
+            climate_files = [x for x in climate_files if x !=""]
+            #General
+            general_files = [crop_data,crop_growth,fertilizer_application,fertilizer_reference,hydraulic_geometry,management_field,
+                             management_operation,management_schedule_data,non_crop,riparian_buffer,runoff_curve,soil_data,soil_layer_data,
+                             strip_crop,tile_drain,aquaculture_schedule_data,contour_data,feedlot_management,geology_data,
+                             irrigation_application,pesticide_application,pesticide_reference,reach_nutrient,
+                             ]
+            general_files = [x for x in general_files if x !=""]
+            #Simulation
+            simulation_files = [annagnps_id,global_id,simulation_period_data,output_global,output_options_aa,output_options_tbl,
+                                global_error,pesticide_initial,pl_calibration,rcn_calibration,soil_initial_conditions,output_options_csv,
+                                output_options_dpp,output_options_npt, output_options_sim,output_options_mn,rusle2_data,output_options_ev]
+            simulation_files = [x for x in simulation_files if x !=""]
+            #Watershed
+            watershed_files = [cell_data,ephemeral_gully,reach_data,watershed_data,wetland_data,aquaculture_pond_data,
+                               classic_gully,feedlot_data,field_pond_data,impoundment_data,
+                               point_source,output_options_cell,output_options_feedlot,output_options_field,
+                               output_options_classic_gully,output_options_ephemeral_gully,output_options_impoundment,
+                               output_options_point_source,output_options_reach,output_options_wetland,ricewq_data]
+            watershed_files = [x for x in watershed_files if x !=""]
+            #Lista de listas
+            tipes_of_files = [climate_files,general_files,simulation_files,watershed_files]
+            
+            #Bucle para mover los inputs desde donde se encontraba el arcivo mdt a las carpetas necesarias
+            #Función para tener la dirección completa dependiendo de la carpeta en la que se encuentra o de si está la dirección completa puesta
+            def origin_direction(input_path, section):
+                if os.path.isabs(input_path):
+                    return input_path
+                else:
+                    if section == "watershed":
+                        return self.inputs.l_1.text()+"/"+input_path
+                    elif section == "general":
+                        return self.inputs.l_23.text()+"/"+input_path
+                    elif section == "climate":
+                        return self.inputs.l_47.text()+"/"+input_path
+                    elif section == "simulation":
+                        return self.inputs.l_53.text()+"/"+input_path
+            #Bucle para mover los archivos inputs de AnnAGNPS
+            for t in tipes_of_files:
+                for f in t:
                     try:
-                        if nombre in climate_files:
-                            directory = "climate"
-                        if nombre in general_files:
-                            directory = "general"
-                        if nombre in simulation_files:
-                            directory = "simulation"
-                        if nombre in watershed_files:
-                            directory = "watershed"
-                        if not os.path.isabs(nombre):
-                            return ".\\"+ directory + "\\" + nombre
-                        if os.path.isabs(nombre):
-                            return ".\\"+ directory + "\\" + os.path.basename(nombre)
+                        if t == climate_files and origin_direction(f,"climate")!=fichero_input(f,"climate"):#esta última condición es porque si no hay que mover el archivo, da error
+                            shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
                     except:
-                        return nombre 
-                master_dict = {"AnnAGNPS ID":annagnps_id,"Aquaculture Pond Data":aquaculture_pond_data,
-                               "Aquaculture Schedule Data":aquaculture_schedule_data,"Cell Data":cell_data,"Classic Gully Data":classic_gully,
-                               "Contour Data":contour_data,"Crop Data":crop_data,"Crop Growth Data":crop_growth,
-                               "Ephemeral Gully Data":ephemeral_gully,"Feedlot Data":feedlot_data,"Feedlot Management Data":feedlot_management,
-                               "Fertilizer Application Data":fertilizer_application,"Fertilizer Reference Data":fertilizer_reference,
-                               "Field Pond Data":field_pond_data,"Geology Data":geology_data,
-                               "Global Error and Warning Limits Data":global_error,"Global IDs Factors and Flags Data":global_id,
-                               "Hydraulic Geometry Data":hydraulic_geometry,"Impoundment Data":impoundment_data,
-                               "Irrigation Application Data":irrigation_application,"Management Field Data":management_field,
-                               "Management Operation Data":management_operation,"Management Schedule Data":management_schedule_data,
-                               "Non-Crop Data":non_crop,
-                               "Pesticide Application Data":pesticide_application,"Pesticide Initial Conditions Data":pesticide_initial,
-                               "Pesticide Reference Data":pesticide_reference,"PL Calibration Data":pl_calibration,
-                               "Point Source Data":point_source,"RCN Calibration Data":rcn_calibration,"Reach Data":reach_data,
-                               "Reach Nutrient Half-life Data":reach_nutrient,"Runoff Curve Number Data":runoff_curve,
-                               "Simulation Period Data":simulation_period_data,"Soil Data":soil_data,"Soil Layer Data":soil_layer_data,
-                               "Soil Initial Conditions Data":soil_initial_conditions,"Strip Crop Data":strip_crop,
-                               "Tile Drain Data":tile_drain,"Watershed Data":watershed_data,"EI Pct Data":EI_pct_data,
-                               "STORM TYPE DATA - RFD":storm_type_rfd,"STORM TYPE DATA - UPDRC":storm_type_updrc,
-                               "Output Options - Global":output_global,"Output Options - AA":output_options_aa, "Output Options - EV":output_options_ev,
-                               "Output Options - CSV":output_options_csv,"Output Options - DPP":output_options_dpp,
-                               "Output Options - NPT":output_options_npt,"Output Options - SIM":output_options_sim,
-                               "Output Options - TBL":output_options_tbl,"Output Options - MN/MX":output_options_mn,
-                               "Output Options - Cell":output_options_cell,"Output Options - Feedlot":output_options_feedlot,
-                               "Output Options - Field Pond":output_options_field,
-                               "Output Options - Classic Gully":output_options_classic_gully,
-                               "Output Options - Ephemeral Gully":output_options_ephemeral_gully,
-                               "Output Options - Impoundment":output_options_impoundment,
-                               "Output Options - Point Source":output_options_point_source,
-                               "Output Options - Reach":output_options_reach,
-                               "Output Options - Wetland":output_options_wetland,
-                               "CLIMATE DATA - STATION":climate_data_station,
-                               "CLIMATE DATA - DAILY":climate_data_daily,"Wetland Data":wetland_data,"Riparian Buffer Data":riparian_buffer,
-                               "RUSLE2 Data":rusle2_data,"RiceWQ Data":ricewq_data}
-                data_section = [list(master_dict)[x] for x in range(len(master_dict)) if master_dict[list(master_dict)[x]] !=""]
-                file_name = [fichero_master(master_dict[x]) for x in data_section]
-                master = pd.DataFrame(data = {"Data Section ID":data_section,"File Name":file_name})
-                master.to_csv(self.direccion + "\\" +directory + "\\" + "annagnps_master.csv", encoding='utf-8', index=False)
-                
-                #MOVER EL EJECUTABLE DE ANNAGNPS Y EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS 
-                shutil.copyfile(self.executable_directory + "\\" +"AnnAGNPS.fil" ,self.direccion + "\\"+directory+ "\\" +"AnnAGNPS.fil")
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
+                        return
+                    try:
+                        if t == general_files and origin_direction(f,"general")!= fichero_input(f,"general"):
+                           shutil.copyfile(origin_direction(f,"general"),fichero_input(f,"general"))
+                    except:
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"general")),level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
+                        return
+                    try:
+                        if t == simulation_files and origin_direction(f,"simulation")!=fichero_input(f,"simulation"):
+                           shutil.copyfile(origin_direction(f,"simulation"),fichero_input(f,"simulation"))
+                    except:
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"simulation")),level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
+                        return
+                    try:
+                        if t == watershed_files and origin_direction(f,"watershed")!=fichero_input(f,"watershed"):
+                            shutil.copyfile(origin_direction(f,"watershed"),fichero_input(f,"watershed"))
+                    except:
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"watershed")),level=Qgis.Warning, duration=10)
+                        self.end_execution = 1
+                        return
+                        
+            #CREACIÓN DEL ARCHIVO annagnps_master.csv
+            def fichero_master(nombre):
+                try:
+                    if nombre in climate_files:
+                        directory = "climate"
+                    if nombre in general_files:
+                        directory = "general"
+                    if nombre in simulation_files:
+                        directory = "simulation"
+                    if nombre in watershed_files:
+                        directory = "watershed"
+                    if not os.path.isabs(nombre):
+                        return ".\\"+ directory + "\\" + nombre
+                    if os.path.isabs(nombre):
+                        return ".\\"+ directory + "\\" + os.path.basename(nombre)
+                except:
+                    return nombre 
+            master_dict = {"AnnAGNPS ID":annagnps_id,"Aquaculture Pond Data":aquaculture_pond_data,
+                           "Aquaculture Schedule Data":aquaculture_schedule_data,"Cell Data":cell_data,"Classic Gully Data":classic_gully,
+                           "Contour Data":contour_data,"Crop Data":crop_data,"Crop Growth Data":crop_growth,
+                           "Ephemeral Gully Data":ephemeral_gully,"Feedlot Data":feedlot_data,"Feedlot Management Data":feedlot_management,
+                           "Fertilizer Application Data":fertilizer_application,"Fertilizer Reference Data":fertilizer_reference,
+                           "Field Pond Data":field_pond_data,"Geology Data":geology_data,
+                           "Global Error and Warning Limits Data":global_error,"Global IDs Factors and Flags Data":global_id,
+                           "Hydraulic Geometry Data":hydraulic_geometry,"Impoundment Data":impoundment_data,
+                           "Irrigation Application Data":irrigation_application,"Management Field Data":management_field,
+                           "Management Operation Data":management_operation,"Management Schedule Data":management_schedule_data,
+                           "Non-Crop Data":non_crop,
+                           "Pesticide Application Data":pesticide_application,"Pesticide Initial Conditions Data":pesticide_initial,
+                           "Pesticide Reference Data":pesticide_reference,"PL Calibration Data":pl_calibration,
+                           "Point Source Data":point_source,"RCN Calibration Data":rcn_calibration,"Reach Data":reach_data,
+                           "Reach Nutrient Half-life Data":reach_nutrient,"Runoff Curve Number Data":runoff_curve,
+                           "Simulation Period Data":simulation_period_data,"Soil Data":soil_data,"Soil Layer Data":soil_layer_data,
+                           "Soil Initial Conditions Data":soil_initial_conditions,"Strip Crop Data":strip_crop,
+                           "Tile Drain Data":tile_drain,"Watershed Data":watershed_data,"EI Pct Data":EI_pct_data,
+                           "STORM TYPE DATA - RFD":storm_type_rfd,"STORM TYPE DATA - UPDRC":storm_type_updrc,
+                           "Output Options - Global":output_global,"Output Options - AA":output_options_aa, "Output Options - EV":output_options_ev,
+                           "Output Options - CSV":output_options_csv,"Output Options - DPP":output_options_dpp,
+                           "Output Options - NPT":output_options_npt,"Output Options - SIM":output_options_sim,
+                           "Output Options - TBL":output_options_tbl,"Output Options - MN/MX":output_options_mn,
+                           "Output Options - Cell":output_options_cell,"Output Options - Feedlot":output_options_feedlot,
+                           "Output Options - Field Pond":output_options_field,
+                           "Output Options - Classic Gully":output_options_classic_gully,
+                           "Output Options - Ephemeral Gully":output_options_ephemeral_gully,
+                           "Output Options - Impoundment":output_options_impoundment,
+                           "Output Options - Point Source":output_options_point_source,
+                           "Output Options - Reach":output_options_reach,
+                           "Output Options - Wetland":output_options_wetland,
+                           "CLIMATE DATA - STATION":climate_data_station,
+                           "CLIMATE DATA - DAILY":climate_data_daily,"Wetland Data":wetland_data,"Riparian Buffer Data":riparian_buffer,
+                           "RUSLE2 Data":rusle2_data,"RiceWQ Data":ricewq_data}
+            data_section = [list(master_dict)[x] for x in range(len(master_dict)) if master_dict[list(master_dict)[x]] !=""]
+            file_name = [fichero_master(master_dict[x]) for x in data_section]
+            master = pd.DataFrame(data = {"Data Section ID":data_section,"File Name":file_name})
+            master.to_csv(self.direccion + "\\" +directory + "\\" + "annagnps_master.csv", encoding='utf-8', index=False)
+            
+            #MOVER EL EJECUTABLE DE ANNAGNPS Y EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS 
+            shutil.copyfile(self.executable_directory + "\\" +"AnnAGNPS.fil" ,self.direccion + "\\"+directory+ "\\" +"AnnAGNPS.fil")
             
             #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs. El cambio se hace dentro de la carpeta del proyecto no la original!
-            if se hace analisis de sensibilidad:
+            if self.doing_sensitivity:
                 for j,k in enumerate(self.dic_data.keys()):
-                    self.change_inputs_sensitivity(i,j,k)
+                    self.change_inputs_sensitivity(self.param_values[self.numero_ejecucion-1],j,k,spatial =False) #cambio de los inptus no espaciales
             
             #EJECUCIÓN DE ANNAGNPS
             os.chdir(self.direccion+"\\"+directory)
@@ -3539,7 +3546,7 @@ class qannagnps():
             control_file = pd.read_csv(self.direccion+"\\"+"AgBuf.csv",encoding = "ISO-8859-1",delimiter=",")
         except:
             pass
-        columnas =["BUFFER","VEGETATION","FOREST","GRASS","C_THRESHOLD","R_THRESHOLD","UNITS"]
+        columnas =["Buffer","Vegetation","Forest","Grass","C_Threshold","R_Threshold","Units"]
         dialogos = [self.cagbuf.lineEdit,self.cagbuf.lineEdit_2,self.cagbuf.lineEdit_3,self.cagbuf.lineEdit_4,self.cagbuf.lineEdit_5,self.cagbuf.lineEdit_6,self.cagbuf.lineEdit_7]
         #Primero se borra lo que haya previamente
         for i in dialogos:
@@ -4575,6 +4582,8 @@ class qannagnps():
         #Close dialogs
         self.sensitivity_dialog.close()
         self.dlg.close()
+        #Variable that says that it is doing a sensitivity analysis
+        self.doing_sensitivity = True
         #Start with the progress bar
         self.progress_metod(start = True)
         #Functions to convert user specified inputs into inputs that SALib can read
@@ -4614,7 +4623,7 @@ class qannagnps():
             #Obtain name of distribution and parameters
             dis,param = distribution_parameters_fun(i)
             if name in self.dic_data:name = name+"__1"
-            self.dic_data[name] = [dis,param,int(self.sensitivity_dialog.table.item(i, 3).text())]
+            self.dic_data[name] = [dis,param,self.sensitivity_dialog.table.item(i, 3).text()]
         #Hay que hacer algo para guardar los resultados originales y luego ponerlos después
         #Se crean las muestras
         #Problema
@@ -4631,6 +4640,9 @@ class qannagnps():
             
         self.resultados = []
         self.numero_ejecucion = 0
+        
+        #Esto borrar
+        df_save_sens = pd.DataFrame(columns = ["Parameters","Result"])
         #Results are obtained
         for i in self.param_values:
             self.numero_ejecucion+=1
@@ -4643,6 +4655,10 @@ class qannagnps():
             if self.end_execution:
                 iface.messageBar().pushMessage("Error in sensitivity analysis", "Please check the error in the opened file",level=Qgis.Warning, duration=10)
                 return
+            #ESTO BORRAR
+            df_conc = pd.DataFrame(data = {"Parameters":[i],"Result":[self.resultados[-1]]})
+            df_save_sens = pd.concat([df_save_sens,df_conc], ignore_index=True)
+            df_save_sens.to_csv(self.direccion+"\\"+'Sensibilidad_cont.csv', index=False, float_format='%.5f')
         #Se analizan los resultados
         if self.sensitivity_dialog.sobol.isChecked():
             self.Si = sobol.analyze(problem, np.array(self.resultados))
@@ -4652,48 +4668,53 @@ class qannagnps():
         self.create_sensitivity_graph()
         #Se cierra la barra de progreso
         self.progress_dialog.close()
+        #Variable that says that it is doing a sensitivity analysis
+        self.doing_sensitivity = False
         #MENSAJE DE ÉXITO
         self.iface.messageBar().pushMessage("Success", "Succes in the sensitiviy analysis ",level=Qgis.Success, duration=10)
         
-    def change_inputs_sensitivity(self,i,j,k):
+    def change_inputs_sensitivity(self,param_values,numero_parametro,nombre_parametro,spatial):
         #Metod to change the inputs of sensitivity analysis
         try: #este try es para cuando cuando de error si elige la misma columna pero distintas filas
-            if self.dic_name_column[k][0]=="Spatial":
+            if self.dic_name_column[nombre_parametro][0]=="Spatial" and spatial:
                 #Se hace check en que se ejecute TopAGNPS
                 self.dlg.cbTop.setChecked(True)
-                direccion = self.direccion+"\\"+self.dic_name_column[k][1]
-                columna = self.dic_name_column[k][2]
-            else:
-                direccion = self.file_input(self.dic_name_column[k][0])
-                columna = self.dic_name_column[k][1]
+                direccion = self.direccion+"\\"+self.dic_name_column[nombre_parametro][1]
+                columna = self.dic_name_column[nombre_parametro][2]
+            elif self.dic_name_column[nombre_parametro][0]!="Spatial" and not spatial:
+                direccion = self.file_input(self.dic_name_column[nombre_parametro][0])
+                columna = self.dic_name_column[nombre_parametro][1]
         except KeyError: #misma columna, distintas filas
-            if self.dic_name_column[k.split("__")[0]][0]=="Spatial":
-                direccion = self.direccion+"\\"+self.dic_name_column[k.split("__")[0]][1]
-                columna = self.dic_name_column[k.split("__")[0]][2]
+            if self.dic_name_column[nombre_parametro.split("__")[0]][0]=="Spatial" and spatial:
+                direccion = self.direccion+"\\"+self.dic_name_column[nombre_parametro.split("__")[0]][1]
+                columna = self.dic_name_column[nombre_parametro.split("__")[0]][2]
+            elif self.dic_name_column[nombre_parametro.split("__")[0]][0]!="Spatial" and not spatial:
+                direccion = self.file_input(self.dic_name_column[nombre_parametro.split("__")[0]][0])
+                columna = self.dic_name_column[nombre_parametro.split("__")[0]][1]
+        if 'direccion' in locals():
+            #Si el input es tamaño de pixel entonces la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
+            if nombre_parametro =="Pixel Size":
+                self.change_control_files_pixel(param_values,numero_parametro)
+                
             else:
-                direccion = self.file_input(self.dic_name_column[k.split("__")[0]][0])
-                columna = self.dic_name_column[k.split("__")[0]][1]
-        
-        #Si el input es tamaño de pixel entonces la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
-        if k =="Pixel Size":
-            self.change_control_files_pixel(i,j)
-            
-        else:
-            df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
-            df[columna].iloc[self.dic_data[k][2]] = i[j]
-            #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
-            def float_to_str(df,column):
-                #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
-                lista = []
-                for i in df[column]:
-                    try:
-                        lista.append(str(int(i)))
-                    except:
-                        lista.append("")
-                df[column] = lista
-            if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
-            if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
-            df.to_csv(direccion, index=False, float_format='%.5f')
+                df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
+                if self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
+                    df[columna] = [param_values[numero_parametro] for x in range(len(df))]
+                else:#si solo se ha elegido una fila entonces se cambia una única fila
+                    df[columna].iloc[int(self.dic_data[nombre_parametro][2])] = param_values[numero_parametro]
+                #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
+                def float_to_str(df,column):
+                    #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
+                    lista = []
+                    for param_values in df[column]:
+                        try:
+                            lista.append(str(int(param_values)))
+                        except:
+                            lista.append("")
+                    df[column] = lista
+                if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
+                if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
+                df.to_csv(direccion, index=False, float_format='%.5f')
         
     def save_result(self):
         #Metod to save the results of the sensitivity analysis
@@ -4743,7 +4764,7 @@ class qannagnps():
             try:
                 file = open(fichero)
             except:
-                iface.messageBar().pushMessage("AnnAGNPS_EV_Sediment_yield_(mass) output not found. EV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
+                iface.messageBar().pushMessage("AnnAGNPS_SIM_Ephemeral_Gully_Erosion output not found. Gully column in OUTPUT OPTIONS DATA -SIM file must be set to T ",level=Qgis.Warning)
                 self.end_execution =True
                 return
             csvreader = csv.reader(file)
@@ -4822,10 +4843,24 @@ class qannagnps():
         
     def file_input(self,lineEdit):
         #Metod to go from line edit to the final direction
+        #If input is topagnps provided then return correct path
+        if lineEdit == self.inputs.l_3 and lineEdit.text()=="-- Provided by TopAGNPS --": #cell data
+            return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Cell_Data_Section.csv"
+        elif lineEdit == self.inputs.l_5 and lineEdit.text()=="-- Provided by TopAGNPS --": #ephemeral gully
+            return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Ephemeral_Gully_Data_Section.csv"
+        elif lineEdit == self.inputs.l_10 and lineEdit.text()=="-- Provided by TopAGNPS --": #reach
+            return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Reach_Data_Section.csv"
+        elif lineEdit == self.inputs.l_13 and lineEdit.text()=="-- Provided by TopAGNPS --": #wetland
+            return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Wetland_Data_Section.csv"
+        elif lineEdit == self.inputs.l_41 and lineEdit.text()=="-- Provided by TopAGNPS --": #buffer
+            return self.direccion+"\\INPUTS\\general\\"+"AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv"
+   
+        #Else
         if os.path.isabs(lineEdit.text()):
             return lineEdit.text()
         else:
             return self.dic_folder[lineEdit].text()+"/"+lineEdit.text()
+        
     
     def progress_metod(self,start=False,values=None,execution=None,close = False):
         #Metod to add and update de progress bar
@@ -5033,12 +5068,22 @@ class qannagnps():
             df = pd.DataFrame(data = df_dic) 
             df.to_csv(self.direccion+"\\"+'Results_sobol.csv', index=False, float_format='%.5f')
             self.progress_metod(close = True)
+            print(self.Si)
+            
+            #Esto borrar
+            with open(self.direccion+"\\"+'Results_sobol.txt', "w") as archivo:
+                # Escribir cada clave y valor del diccionario en una línea
+                for clave, valor in self.Si.items():
+                    archivo.write(f"{clave}: {valor}\n")
+            
         elif self.sensitivity_dialog.morris.isChecked():
             plt.rcParams["figure.figsize"] = [10, 8]
             fig = plt.figure()
             ax0 = plt.subplot()
             # Graficar los puntos con color granate y agregar etiquetas
             for i, (x, y) in enumerate(zip(self.Si["mu_star"], self.Si["sigma"])):
+                if np.isnan(x):x = 0
+                if np.isnan(y):y = 0
                 ax0.scatter(x, y, marker="o", color="maroon")
                 ax0.annotate(f'{self.Si["names"][i]}', (x, y), textcoords="offset points", xytext=(10,10), ha='center', fontweight='bold')
             #Linea 1:1
@@ -5047,11 +5092,17 @@ class qannagnps():
 
             ax0.set_xlim(-1,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
             ax0.set_ylim(-1,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
-
+            #Separador de miles
+            def formato_con_separador(valor, pos):
+                return "{:,.0f}".format(valor)
+            ax0.xaxis.set_major_formatter(FuncFormatter(formato_con_separador))
+            ax0.yaxis.set_major_formatter(FuncFormatter(formato_con_separador))
+            #Labels
             ax0.set_xlabel("Mean of Elementary Effects ($\mu_{i}^{*}$)",size = 15,family="arial",weight = "bold",color = "black")
             ax0.set_ylabel("Standard Deviation of Elementary Effects ($\sigma_{i}$)",size = 15,family="arial",weight = "bold",color = "black")
             plt.savefig(self.direccion+"\\"+"Morris.png",transparent=False,bbox_inches = "tight",dpi=300)
             
+
             #Se guardan datos
             df_dic = {}
             for i,k in enumerate(self.dic_data.keys()):
@@ -5060,6 +5111,13 @@ class qannagnps():
             df = pd.DataFrame(data = df_dic) 
             df.to_csv(self.direccion+"\\"+'Results_morris.csv', index=False, float_format='%.5f')
             self.progress_metod(close = True)
+            print(self.Si)
+            
+            #Esto borrar
+            with open(self.direccion+"\\"+'Results_morris.txt', "w") as archivo:
+                # Escribir cada clave y valor del diccionario en una línea
+                for clave, valor in self.Si.items():
+                    archivo.write(f"{clave}: {valor}\n")
     
     def resample_rasters(self):
         #Metod to resample rasters
@@ -5100,12 +5158,12 @@ class qannagnps():
         #If buffer exist then change name of buffer raster
         if self.dlg.comboBox_2.currentIndex()>0:
             df = pd.read_csv(self.direccion+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-            df["BUFFER"].iloc[0] = str(self.nombre_buffer+f"_{round(i[j],2)}"+"."+self.extension_buffer)
+            df["Buffer"].iloc[0] = str(self.nombre_buffer+f"_{round(i[j],2)}"+"."+self.extension_buffer)
             df.to_csv(self.direccion+"\\AGBUF.csv", index=False, float_format='%.5f')
         
         #If vegetation exist then change name of vegetation raster
         if self.dlg.comboBox_3.currentIndex()>0:
             df = pd.read_csv(self.direccion+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-            df["VEGETATION"].iloc[0] = str(self.nombre_vegetation+f"_{round(i[j],2)}"+"."+self.extension_vegetation)
+            df["Vegetation"].iloc[0] = str(self.nombre_vegetation+f"_{round(i[j],2)}"+"."+self.extension_vegetation)
             df.to_csv(self.direccion+"\\AGBUF.csv", index=False, float_format='%.5f')
             
