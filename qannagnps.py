@@ -26,7 +26,7 @@ from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QFileDialog
 from qgis.core import QgsProject
 from PyQt5.QtCore import QVariant,QObject, QThread, pyqtSignal, QSize
-from qgis.PyQt import QtWidgets,QtGui
+from qgis.PyQt import QtWidgets,QtGui, uic
 from qgis.utils import iface
 from qgis.core import *
 from qgis.gui import QgsMapToolEmitPoint,QgsMessageBar
@@ -659,13 +659,38 @@ class qannagnps():
             resultado = chardet.detect(file.read())
         return resultado['encoding']
     
+    def instantiate_table(self):
+        #Metod to instantiate the dialog for the inputs of annagnps in a table
+        #Counter of number of table inputs. If they are removed we dont substract value. Its just to have diferente attributes names.
+        if hasattr(self,"cantidad_table_inputs"):
+            self.cantidad_table_inputs+=1
+        else:
+            self.cantidad_table_inputs = 0
+        
+        #Create class
+        FORM_CLASS, _ = uic.loadUiType(os.path.join(self.plugin_directory, "ui/table_inputs.ui"))
+        class TableDialog(QtWidgets.QDialog, FORM_CLASS):
+            def __init__(self, parent=None):
+                super(TableDialog, self).__init__(parent)
+                self.setupUi(self)
+        
+        return TableDialog()
+    
+    def table_inputs_front(self):
+        #To put AnnANGPS table inputs to the front
+        clases_table_inputs = [getattr(self, x) for x in self.__dict__.keys() if x[:12]=="table_input_" and x[12]!="o"]
+        for i in clases_table_inputs:
+            i.raise_()
+    
     def table_inputs(self,button):
         #Metod to add a dialog where inputs of AnnAGNPS can be modified
-        self.table_input = TableDialog()
+        #First we instantiate the dialog. If we do the classic way we could only choose one dialog and we want the possibility of obtaining many.
+        table_class = self.instantiate_table()
+        setattr(self,f"table_input_{self.cantidad_table_inputs}",table_class)
         self.button = button #for when we are in overwriting
         #Icons
-        self.table_input.add.setIcon(QIcon(os.path.join(self.plugin_directory, "images/add.svg")))
-        self.table_input.remove.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
+        table_class.add.setIcon(QIcon(os.path.join(self.plugin_directory, "images/add.svg")))
+        table_class.remove.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
         
         #Function to return the path depending if the file path is absolute or relative
         def file_input(boton):
@@ -673,27 +698,48 @@ class qannagnps():
                 return self.dic_line_table[button].text()
             else:
                 return self.dic_folder[self.dic_line_table[button]].text()+"/"+self.dic_line_table[button].text() 
-           
+        
+        
+        #Condition adding data to table when there is not a csv written. 
         if self.dic_line_table[button].text() =="":
             #If file exist then warning
             name_file = self.dic_table_filename[button]
             file_path = self.dic_folder[self.dic_line_table[button]].text()+"/"+name_file
-            if path.exists(file_path) and self.table_input_overwrite == False:
+            if path.exists(file_path) and self.table_input_overwrite == False and os.path.getsize(file_path)>0:
                 self.overwrite.show()
                 self.overwrite.label.setText(f"{file_path} exist. Do you want to overwrite the file?")
                 self.overwriting_input = True #to say to the button "Yes" that we are modifying with table and not with CSV file
                 return
-
             #Add files and columns
             #Add columns
             columnas = self.dic_table_button[button]
-            self.table_input.tableWidget.setColumnCount(len(columnas))
-            self.table_input.tableWidget.setHorizontalHeaderLabels(columnas)
+            table_class.tableWidget.setColumnCount(len(columnas))
+            table_class.tableWidget.setHorizontalHeaderLabels(columnas)
+            #Add name to dialog
+            table_class.setWindowTitle(" ".join([x.capitalize() for x in name_file.split("_")]))
             #Show dialog
-            self.table_input.show()
+            table_class.show()
+            #This is to put the annagnps inputs in the front
+            self.table_inputs_front()
+            
+        #Condition if we have csv written, exists and its size is 0
+        elif os.path.exists(file_input(button)) and os.path.getsize(file_input(button))==0:
+            name_file = self.dic_table_filename[button]
+            #Add files and columns
+            #Add columns
+            columnas = self.dic_table_button[button]
+            table_class.tableWidget.setColumnCount(len(columnas))
+            table_class.tableWidget.setHorizontalHeaderLabels(columnas)
+            #Add name to dialog
+            table_class.setWindowTitle(" ".join([x.capitalize() for x in name_file.split("_")]))
+            #Show dialog
+            table_class.show()
+            #This is to put the annagnps inputs in the front
+            self.table_inputs_front()
+            
         else:
             file_path = file_input(button)
-            if os.path.exists(file_path): 
+            if os.path.exists(file_path) and os.path.getsize(file_path)>0: 
                 #Add files and columns
                 #Add columns
                 def obtener_datos_filas(archivo_csv):
@@ -710,29 +756,38 @@ class qannagnps():
                     return nombres_columnas, datos_filas
                     
                 columnas, datos_filas = obtener_datos_filas(file_path)
-                self.table_input.tableWidget.setColumnCount(len(columnas))
-                self.table_input.tableWidget.setHorizontalHeaderLabels(columnas)
+                table_class.tableWidget.setColumnCount(len(columnas))
+                table_class.tableWidget.setHorizontalHeaderLabels(columnas)
                 #Add rows
-                self.table_input.tableWidget.setRowCount(len(datos_filas))
+                table_class.tableWidget.setRowCount(len(datos_filas))
                 for fila, datos in enumerate(datos_filas):
                     for columna, valor in enumerate(datos):
                         item = QTableWidgetItem(valor)
-                        self.table_input.tableWidget.setItem(fila, columna, item)
+                        table_class.tableWidget.setItem(fila, columna, item)
                         item.setTextAlignment(Qt.AlignCenter)
+                #Add name to dialog
+                table_class.setWindowTitle(" ".join([x.capitalize() for x in self.dic_table_filename[button].split("_")]))
                 #Show dialog
-                self.table_input.show()
-            elif self.dic_line_table[button].text() != "-- Provided by TopAGNPS --":
+                table_class.show()
+                #This is to put the annagnps inputs in the front
+                self.table_inputs_front()
+                    
+            elif not os.path.exists(file_path) and self.dic_line_table[button].text() != "-- Provided by TopAGNPS --":
                 self.existing.label.setText("{} does not exist".format(file_path))
                 self.existing.show()
         
         #Add the functionality to the dialog to add and remove rows and create document
-        self.table_input.add.clicked.connect(self.add_row)
-        self.table_input.remove.clicked.connect(self.remove_row)
-        self.table_input.accept.clicked.connect(lambda _,b = button:self.create_file_table(b))
+        table_class.add.clicked.connect(lambda _,b = self.cantidad_table_inputs:self.add_row(b))
+        table_class.remove.clicked.connect(lambda _,b = self.cantidad_table_inputs:self.remove_row(b))
+        table_class.accept.clicked.connect(lambda _,b = button, c=self.cantidad_table_inputs:self.create_file_table(b,c))
+        table_class.rejected.connect(self.table_inputs_front) #when dialog is closed put the rest of annagnps table inputs to the front
     
-    def create_file_table(self,button):
+    
+    def create_file_table(self,button,numero_table_input):
         #Metod to create or upload file when modifying AnnAGNPS input with the table
-        #Fist we determine the file path
+        #First we instantiate the variable of the dialog
+        table_input = getattr(self, f"table_input_{numero_table_input}")
+        #Then we determine the file path
         if os.path.isabs(self.dic_line_table[button].text()):
                 file_path =  self.dic_line_table[button].text()
         else:
@@ -745,19 +800,20 @@ class qannagnps():
             with open(file_path, 'w', newline='') as csv_file:
                 csv_writer = csv.writer(csv_file)
                 # Get column names from the table
-                column_names = [self.table_input.tableWidget.horizontalHeaderItem(col).text() for col in range(self.table_input.tableWidget.columnCount())]
+                column_names = [table_input.tableWidget.horizontalHeaderItem(col).text() for col in range(table_input.tableWidget.columnCount())]
                 csv_writer.writerow(column_names)
                 # Get row data from the table
-                for row in range(self.table_input.tableWidget.rowCount()):
+                for row in range(table_input.tableWidget.rowCount()):
                     row_data = []
-                    for col in range(self.table_input.tableWidget.columnCount()):
+                    for col in range(table_input.tableWidget.columnCount()):
                         try: #this is because if there is not data in the cell then it gives error
-                            row_data.append(self.table_input.tableWidget.item(row, col).text())
+                            row_data.append(table_input.tableWidget.item(row, col).text())
                         except:
                             row_data.append("")
                     csv_writer.writerow(row_data)
             self.dic_line_table[button].setText(name_file)
-            self.table_input.close()
+            table_input.close()
+            self.table_inputs_front()
         else:
             #Here we upload the file
             try:
@@ -765,32 +821,35 @@ class qannagnps():
                 with open(file_path, 'w', newline='',encoding=codificacion) as csv_file:
                     csv_writer = csv.writer(csv_file)
                     # Get column names from the table
-                    column_names = [self.table_input.tableWidget.horizontalHeaderItem(col).text() for col in range(self.table_input.tableWidget.columnCount())]
+                    column_names = [table_input.tableWidget.horizontalHeaderItem(col).text() for col in range(table_input.tableWidget.columnCount())]
                     csv_writer.writerow(column_names)
                     # Get row data from the table
-                    for row in range(self.table_input.tableWidget.rowCount()):
+                    for row in range(table_input.tableWidget.rowCount()):
                         row_data = []
-                        for col in range(self.table_input.tableWidget.columnCount()):
+                        for col in range(table_input.tableWidget.columnCount()):
                             try: #this is because if there is not data in the cell then it gives error
-                                row_data.append(self.table_input.tableWidget.item(row, col).text())
+                                row_data.append(table_input.tableWidget.item(row, col).text())
                             except:
                                 row_data.append("")
                         csv_writer.writerow(row_data)
-                self.table_input.close()
+                table_input.close()
+                self.table_inputs_front()
             except:
                 iface.messageBar().pushMessage(f"Please close {file_path} to update data",level=Qgis.Warning, duration=10)
                 return
     
-    def add_row(self):
+    def add_row(self,numero_table_input):
         #Metod to add rows in tables for AnnAGNPS inputs
-        row_position = self.table_input.tableWidget.rowCount()
-        self.table_input.tableWidget.insertRow(row_position)
-            
-    def remove_row(self):
+        table_input = getattr(self, f"table_input_{numero_table_input}")
+        row_position = table_input.tableWidget.rowCount()
+        table_input.tableWidget.insertRow(row_position)
+
+    def remove_row(self,numero_table_input):
         #Metod to remove rows in tables for AnnAGNPS inputs
-        selected_row = self.table_input.tableWidget.rowCount()
+        table_input = getattr(self, f"table_input_{numero_table_input}")
+        selected_row = table_input.tableWidget.rowCount()
         if selected_row >= 0:
-            self.table_input.tableWidget.removeRow(selected_row-1)
+            table_input.tableWidget.removeRow(selected_row-1)
         
     def general_output(self):
         #Método para añadir los outputs generales al diálogo
@@ -2094,22 +2153,38 @@ class qannagnps():
         self.output.spatial_run.setIcon(QIcon(icon))
         for i in [self.output.pushButton_11,self.output.pushButton_13,self.output.pushButton_14,self.output.pushButton_19,self.output.pushButton_22,self.output.pushButton_20,self.output.pushButton_21,self.output.pushButton_23,self.output.pushButton_24,self.output.pushButton_25,self.output.pushButton_26,self.output.pushButton_27,self.output.pushButton_28]:
             i.setIcon(QIcon(icon))
-        #Project folder
+        #Add remove row in sensitivity analysis table
+        self.sensitivity_dialog.add.setIcon(QIcon(os.path.join(self.plugin_directory, "images/add.svg")))
+        self.sensitivity_dialog.delete_row.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
         
         
     def url_upna(self,event):
         #Método para abrir las páginas web de la upna
-        webbrowser.open("https://www.unavarra.es/portada")
+        try:
+            webbrowser.open("https://www.unavarra.es/portada")
+        except:
+            pass
 
     def url_usda(self,event):
         #Método para abrir las páginas web de usda
-        webbrowser.open("https://www.usda.gov/")
+        try:
+            webbrowser.open("https://www.usda.gov/")
+        except:
+            pass
+            
     def url_github(self,event):
         #Método para abrir el repositorio de github
-        webbrowser.open("https://github.com/Inigobarbe/QGIS-AnnAGNPS")
+        try:
+            webbrowser.open("https://github.com/Inigobarbe/QGIS-AnnAGNPS")
+        except:
+            pass
+            
     def url_article(self,event):
         #Método para abrir el artículo 
-        webbrowser.open("https://www.sciencedirect.com/science/article/pii/S136481522400029X")
+        try:
+            webbrowser.open("https://www.sciencedirect.com/science/article/pii/S136481522400029X")
+        except:
+            pass
 
     def topagnps_provided(self,check):
         #Método para poner si se va a usar el output de topagnps para cell, EG, reach y riparian buffer data
@@ -2299,7 +2374,8 @@ class qannagnps():
                     self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
                     buffer_directory, self.name_buffer  = os.path.split(self.fichero_buf)
                     control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-                    control["Buffer"].iloc[0]=self.name_buffer
+                    nombre_buffer_control = control.columns[[x.lower() for x in control.columns].index("buffer")]#esto es para poner cómo se llama el buffer en el control file
+                    control[nombre_buffer_control].iloc[0]=self.name_buffer
                     control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
                     
         except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
@@ -2318,7 +2394,8 @@ class qannagnps():
                     self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
                     vegetation_directory, self.name_vegetation  = os.path.split(self.fichero_veg)
                     control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-                    control["Vegetation"].iloc[0]=self.name_vegetation
+                    nombre_veg_control = control.columns[[x.lower() for x in control.columns].index("vegetation")]#esto es para poner cómo se llama el vegetation en el control file
+                    control[nombre_veg_control].iloc[0]=self.name_vegetation
                     control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
         except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
             pass
