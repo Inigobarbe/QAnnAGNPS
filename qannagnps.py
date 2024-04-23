@@ -2648,7 +2648,7 @@ class qannagnps():
                 fichero_suelo = fichero_superponer
                 #Esta función devuelve un diccionario en donde a cada suelo/uso se le asigna un numero entero y luego en la capa (de suelos o uso) a cada suelo/uso se le añade el valor del diccionario
                 def create_fid(file_layer):
-                    layer = QgsVectorLayer(fichero(file_layer),"estadistica")
+                    layer = file_layer
                     tipos_suelo = []
                     for f in layer.getFeatures():
                         tipos_suelo.append(f[columna_tipo])
@@ -2667,41 +2667,40 @@ class qannagnps():
                     return tipos_suelo_dic
 
                 #Pasar de shp a gpkg
-                if self.numero_ejecucion==1: #esto solo es necesario hacerlo en la simulación clásica o en la primera ejecución del análisis de sensibilidad. Además daría error al intentar sobreescribirlo. 
-                    processing.run("native:reprojectlayer", 
-                        {'INPUT':fichero_suelo,
-                        'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
-                        'OPERATION':'+proj=noop','OUTPUT':fichero("suelos{}.gpkg".format(numero))})
+                e = processing.run("native:reprojectlayer", 
+                    {'INPUT':fichero_suelo,
+                    'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
+                    'OPERATION':'+proj=noop','OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
                 #Reproyectar celdas al epsg del proyecto
-                processing.run("gdal:warpreproject", 
+                a = processing.run("gdal:warpreproject", 
                     {'INPUT':fichero(fichero_cell),
                     'SOURCE_CRS':None,'TARGET_CRS':QgsCoordinateReferenceSystem('{}'.format(self.epsg)),
                     'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':None,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,
-                    'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':fichero("cell_1{}.asc".format(numero))})
+                    'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
                 #Con esto se tiene el diccionario que te asigna para cada suelo/uso un valor numérico
-                dic_conv = create_fid("suelos{}.gpkg".format(numero))
+                dic_conv = create_fid(e["OUTPUT"])
                 #Rasterizar la capa de suelos
                 processing.run("gdal:rasterize", 
-                    {'INPUT':fichero("suelos{}.gpkg".format(numero)),
+                    {'INPUT':e["OUTPUT"],
                     'FIELD':'id_prueba','BURN':0,'USE_Z':False,'UNITS':1,'WIDTH':pixelSizeX,
                     'HEIGHT':pixelSizeY,'EXTENT':None,'NODATA':0,'OPTIONS':'','DATA_TYPE':4,'INIT':None,
                     'INVERT':False,'EXTRA':'','OUTPUT':fichero("suelo_ras.tif")})
                 #Vectorizar la capa de celdas
-                processing.run("grass7:r.to.vect", {'input':fichero("cell_1{}.asc".format(numero)),
+                c = processing.run("grass7:r.to.vect", {'input':a["OUTPUT"],
                     'type':2,'column':'value','-s':False,
                     '-v':False,'-z':False,'-b':False,'-t':False,
-                    'output':fichero("cell{}.gpkg".format(numero)),'GRASS_REGION_PARAMETER':None,
+                    'output':QgsProcessing.TEMPORARY_OUTPUT,'GRASS_REGION_PARAMETER':None,
                     'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
                     'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
                     'GRASS_VECTOR_EXPORT_NOCAT':False})
                 #Corregir geometrías porque luego sino en unión da error 
-                processing.run("native:fixgeometries", 
-                    {'INPUT':fichero("cell{}.gpkg".format(numero)),
-                    'OUTPUT':fichero("cell_cor{}_{}.gpkg".format(numero,self.numero_ejecucion))})    
+                d = processing.run("native:fixgeometries", 
+                    {'INPUT':c["output"],
+                    'OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})    
                 #Se unen las capas de celdas de celdas con las de suelo/uso
                 processing.run("native:union", 
-                {'INPUT':fichero("cell_cor{}_{}.gpkg".format(numero,self.numero_ejecucion)),
-                'OVERLAY':fichero("suelos{}.gpkg".format(numero)),
+                {'INPUT':d["OUTPUT"],
+                'OVERLAY':e["OUTPUT"],
                 'OVERLAY_FIELDS_PREFIX':'','OUTPUT':fichero("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion))})
                 #Esta función es para crear una columna en una capa vectorial según la expresión que le pongas
                 def create_attribute(layer_name, expresion,nombre_columna):
@@ -2756,12 +2755,12 @@ class qannagnps():
                     self.end_execution = 1
                     return
                 #Se aplica el suelo al fichero de cells
-                try:
-                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
-                except:
+                #try:
+                suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
+                r'''except:
                     iface.messageBar().pushMessage("Error with soil layer","The DEM and the soil layer have to overlap.",level=Qgis.Warning, duration=20)
                     self.end_execution = 1
-                    return
+                    return'''
                 annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo AnnAGNPS_Ephemeral_Gully_Data_Section.csv
@@ -2808,12 +2807,12 @@ class qannagnps():
                         iface.messageBar().pushMessage("Error with soil management","There isn't any management information to use",level=Qgis.Warning, duration=10)
                         self.end_execution = 1
                         return 
-                try:
-                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
-                except:
+                #try:
+                manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
+                r'''except:
                     iface.messageBar().pushMessage("Error with soil use layer","The DEM and the soil use layer have to overlap.",level=Qgis.Warning, duration=20)
                     self.end_execution = 1
-                    return
+                    return'''
                 annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el uso al fichero de cárcavas efímeras
