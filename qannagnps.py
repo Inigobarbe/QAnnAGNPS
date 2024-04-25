@@ -835,7 +835,7 @@ class qannagnps():
                 table_input.close()
                 self.table_inputs_front()
             except:
-                iface.messageBar().pushMessage(f"Please close {file_path} to update data",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage(f"Please close {file_path} to update data",level=Qgis.Warning)
                 return
     
     def add_row(self,numero_table_input):
@@ -905,7 +905,7 @@ class qannagnps():
             return os.path.dirname(self.output.lineEdit.text())+f"\\{fich}"
         #Si no está el archivo AnnAGNPS_Cell_IDs.asc, entonces dar error
         if not path.exists(fichero("AnnAGNPS_Cell_IDs.asc")):
-            iface.messageBar().pushMessage(f"AnnAGNPS_Cell_IDs.asc not found: AnnAGNPS_Cell_IDs.asc file must be in {os.path.dirname(self.output.lineEdit.text())}",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage(f"AnnAGNPS_Cell_IDs.asc not found: AnnAGNPS_Cell_IDs.asc file must be in {os.path.dirname(self.output.lineEdit.text())}",level=Qgis.Warning)
             return
         #Función para cambiar de coordenadas
         def change_coordinates(filename,outputname):
@@ -936,7 +936,7 @@ class qannagnps():
         try:
             copiar_archivo(f"cell_runoff_all_{c}.gpkg",f"cell_runoff_all_out_{c}.gpkg")
         except:
-            iface.messageBar().pushMessage("Some error with CRS has ocurred: Please select another CRS for the project",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Some error with CRS has ocurred: Please select another CRS for the project",level=Qgis.Warning)
             return
         if self.data_type == "Runoff":
             name_layer = "Runoff(mm)"
@@ -1030,7 +1030,7 @@ class qannagnps():
             date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
             date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
         except:
-            iface.messageBar().pushMessage("Please select correct dates",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Please select correct dates",level=Qgis.Warning)
             self.error = True
             return
         #Se obtienen los datos ordenados
@@ -1039,7 +1039,7 @@ class qannagnps():
             try:
                 df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
             except:
-                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
                 self.error = True
                 return
             df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
@@ -1049,7 +1049,7 @@ class qannagnps():
             try:
                 df_raw = self.df_section_output(path,delete_second=False)
             except:
-                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
                 self.error = True
                 return
             if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
@@ -1183,7 +1183,7 @@ class qannagnps():
                 date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
                 date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
             except:
-                iface.messageBar().pushMessage("Please select correct dates",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Please select correct dates",level=Qgis.Warning)
                 self.error = True
                 return 
         #Primero si se ha elegido Runoff
@@ -1195,7 +1195,7 @@ class qannagnps():
             try:
                 df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
             except:
-                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
                 self.error = True
                 return
             df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"Drainage":df_raw["Drainage"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
@@ -1256,7 +1256,7 @@ class qannagnps():
                 try:
                     df = dataframe_creation(path,column_name,erosion = True, source = data_type)
                 except:
-                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
                     self.error = True
                     return
             if data_type == "Nitrogen":
@@ -1267,7 +1267,7 @@ class qannagnps():
                 try:
                     df = dataframe_creation(path,column_name)
                 except:
-                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
                     self.error = True
                     return
             if data_type == "Carbon":
@@ -1278,7 +1278,7 @@ class qannagnps():
                 try:
                     df = dataframe_creation(path,column_name)
                 except:
-                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
                     self.error = True
                     return
             if data_type == "Phosphorus":
@@ -1289,7 +1289,7 @@ class qannagnps():
                 try:
                     df = dataframe_creation(path,column_name)
                 except:
-                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
                     self.error = True
                     return
         return df
@@ -1771,7 +1771,7 @@ class qannagnps():
             try:
                 table = ax.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center', colColours=['#f5f5f5'] * len(table_df.columns))
             except:
-                iface.messageBar().pushMessage("No day with value higher than 0",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("No day with value higher than 0",level=Qgis.Warning)
                 return
             table.auto_set_font_size(False)
             table.set_fontsize(12)
@@ -2552,13 +2552,13 @@ class qannagnps():
             
             #Dar error si no existe el archivo TOPAGNPS.CSV
             if not os.path.exists(self.direccion+"\\TOPAGNPS.CSV"):
-                iface.messageBar().pushMessage("Error Input data", "Control file of TopAGNPS, TOPAGNPS.CSV, not found" ,level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Error Input data", "Control file of TopAGNPS, TOPAGNPS.CSV, not found" ,level=Qgis.Warning)
                 self.end_execution = 1
                 return
             #Si el formato de la columna FILENAME no es str entonces dar error
             topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
             if type(topagnps_control_file["FILENAME"].iloc[0])!=str:
-                iface.messageBar().pushMessage("Error Input data", "Please select a correct FILENAME in TOPAGNPS.CSV" ,level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Error Input data", "Please select a correct FILENAME in TOPAGNPS.CSV" ,level=Qgis.Warning)
                 self.end_execution = 1
                 return
             
@@ -2577,7 +2577,7 @@ class qannagnps():
             def main():
                 f = open(self.executable_directory+"\\"+"EjecutarTopagnps.bat","w+")
                 linea_uno = "CD {}".format(self.direccion)
-                linea_dos = r"CALL {}\TopAGNPS_v6.00.a.020_release_64-bit.exe".format(self.executable_directory)
+                linea_dos = r"CALL {}\TopAGNPS_v6.00.a.025_release_64-bit.exe".format(self.executable_directory)
                 f.write("{} \n".format(linea_uno))
                 f.write("{} \n".format(linea_dos))
                 f.close()
@@ -2590,7 +2590,7 @@ class qannagnps():
             if os.path.isfile("TOPAGNPS_err.CSV") and os.path.getsize("TOPAGNPS_err.CSV")>0 and (not self.dlg.checkBox_2.isChecked() or self.segunda_ronda):
                 self.end_execution = 1
                 error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
-                iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning)
                 #Se abre el archivo de errores
                 try:
                     os.startfile(self.direccion+"\\TopAGNPS_err.csv")
@@ -2612,7 +2612,7 @@ class qannagnps():
                     if not os.path.exists(self.direccion+"\\NETFUL.asc"):
                         self.end_execution = 1
                         error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
-                        iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning, duration=10)
+                        iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning)
                         #Se abre el archivo de errores
                         try:
                             os.startfile(self.direccion+"\\TopAGNPS_err.csv")
@@ -2751,19 +2751,20 @@ class qannagnps():
             #Dar error si no se ha elegido ni capa de suelos ni se ha puesto un suelo único
             if str(self.dlg.lineEdit.text())=="":
                 if self.dlg.cbSoil.currentIndex()==0:
-                    iface.messageBar().pushMessage("Error with soil layer","There isn't any soil information to use",level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage("Error with soil layer","There isn't any soil information to use",level=Qgis.Warning)
                     self.end_execution = 1
                     return
                 #Se aplica el suelo al fichero de cells
-                #try:
-                suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
-                r'''except:
-                    iface.messageBar().pushMessage("Error with soil layer","The DEM and the soil layer have to overlap.",level=Qgis.Warning, duration=20)
+                try:
+                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
+                except:
+                    iface.messageBar().pushMessage("Error with soil layer","The DEM and the soil layer have to overlap.",level=Qgis.Warning)
                     self.end_execution = 1
-                    return'''
+                    return
                 annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo AnnAGNPS_Ephemeral_Gully_Data_Section.csv
+                eg_path = fichero(self.ephemeral_gully_file()) #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
                 if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
                     summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
                     def create_layer():
@@ -2791,31 +2792,46 @@ class qannagnps():
                     capa = sampling["OUTPUT"]
                     dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
                     
-                    annagnps_eg_data = pd.read_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
+                    annagnps_eg_data = pd.read_csv(eg_path,encoding = "ISO-8859-1",delimiter=",")
                     suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
                     try:
                         annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
                     except:
-                        iface.messageBar().pushMessage("Error soil map","The soil type layer may not cover the full extent of the watershed",level=Qgis.Warning, duration=10)
+                        iface.messageBar().pushMessage("Error soil map","The soil type layer may not cover the full extent of the watershed",level=Qgis.Warning)
                         self.end_execution = 1
                         return 
-                    annagnps_eg_data.to_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"), index=False, float_format='%.5f')
+                    #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
+                    def float_to_str(column):
+                        lista = []
+                        for i in annagnps_eg_data[column]:
+                            try:
+                                lista.append(str(int(i)))
+                            except:
+                                lista.append("")
+                        annagnps_eg_data[column] = lista
+                    #Primero para la columna de celdas
+                    float_to_str("Cell_ID")
+                    #Ahora para la columna de reaches
+                    float_to_str("Reach_ID")
+                    annagnps_eg_data.to_csv(eg_path, index=False, float_format='%.5f')
+                    
                 
             #Dar error si no se ha elegido ni capa de usos ni se ha puesto un uso único
             if str(self.dlg.lineEdit_2.text())=="":
                 if self.dlg.cbMan.currentIndex()==0:
-                        iface.messageBar().pushMessage("Error with soil management","There isn't any management information to use",level=Qgis.Warning, duration=10)
+                        iface.messageBar().pushMessage("Error with soil management","There isn't any management information to use",level=Qgis.Warning)
                         self.end_execution = 1
                         return 
-                #try:
-                manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
-                r'''except:
+                try:
+                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
+                except:
                     iface.messageBar().pushMessage("Error with soil use layer","The DEM and the soil use layer have to overlap.",level=Qgis.Warning, duration=20)
                     self.end_execution = 1
-                    return'''
+                    return
                 annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el uso al fichero de cárcavas efímeras
+                eg_path = fichero(self.ephemeral_gully_file()) #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
                 if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
                     summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
                     def create_layer():
@@ -2842,9 +2858,20 @@ class qannagnps():
                         'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
                     capa = sampling["OUTPUT"]
                     dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
-                    annagnps_eg_data = pd.read_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
+                    annagnps_eg_data = pd.read_csv(eg_path,encoding = "ISO-8859-1",delimiter=",")
                     suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
-                    annagnps_eg_data["Mgmt_Field_ID"]= [dic_conv[x] for x in suelos_eg]
+                    try:
+                        lista_tipos = []
+                        for eg_soil_i,eg_soil_k in enumerate([dic_conv[x] for x in suelos_eg]):
+                            if annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i]=="BUFFER" or annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i]=="WETLAND":
+                                lista_tipos.append(annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i])
+                            else:
+                                lista_tipos.append(eg_soil_k)
+                        annagnps_eg_data["Mgmt_Field_ID"]= lista_tipos
+                    except:
+                        iface.messageBar().pushMessage("Error soil use map","The soil use layer may not cover the full extent of the watershed",level=Qgis.Warning)
+                        self.end_execution = 1
+                        return
                     #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
                     def float_to_str(column):
                         lista = []
@@ -2858,7 +2885,7 @@ class qannagnps():
                     float_to_str("Cell_ID")
                     #Ahora para la columna de reaches
                     float_to_str("Reach_ID")
-                    annagnps_eg_data.to_csv(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv"), index=False, float_format='%.5f')
+                    annagnps_eg_data.to_csv(eg_path, index=False, float_format='%.5f')
                 
             #Si se ha puesto un suelo único entonces se añade a todas las celdas
             if str(self.dlg.lineEdit.text())!="":
@@ -2874,7 +2901,7 @@ class qannagnps():
                 self.iface.messageBar().pushMessage("Success", "Succes in the modeling ",level=Qgis.Success, duration=5)
             #Mensaje para que selecciones las coordenadas
             if not self.dlg.cbAnn.isChecked() and self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 0:
-                self.iface.messageBar().pushMessage("Coordinate selection", "Please move the mouse to the outlet and click on it",level=Qgis.Info, duration=10)
+                self.iface.messageBar().pushMessage("Coordinate selection", "Please move the mouse to the outlet and click on it",level=Qgis.Info)
             
         #EJECUCIÓN DE ANNAGNPS
         if (self.dlg.cbAnn.isChecked() and not self.segunda_ronda and (self.ejecucion_condicion==1 or not self.dlg.checkBox_2.isChecked())):
@@ -2979,7 +3006,7 @@ class qannagnps():
             #Primero se asigna la dirección, si es que se ha elegido la opción de que se obtengan de la ejecución de TopAGNPS
             checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
             sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data]
-            names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
+            names_list = ["AnnAGNPS_Cell_Data_Section.csv",self.ephemeral_gully_file(),"AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
             for i in range(len(checks_list)):
                 if checks_list[i].isChecked():
                     sections_list[i]=self.direccion+"\\"+names_list[i]
@@ -3038,28 +3065,28 @@ class qannagnps():
                         if t == climate_files and origin_direction(f,"climate")!=fichero_input(f,"climate"):#esta última condición es porque si no hay que mover el archivo, da error
                             shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
                     except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning, duration=10)
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning)
                         self.end_execution = 1
                         return
                     try:
                         if t == general_files and origin_direction(f,"general")!= fichero_input(f,"general"):
                            shutil.copyfile(origin_direction(f,"general"),fichero_input(f,"general"))
                     except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"general")),level=Qgis.Warning, duration=10)
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"general")),level=Qgis.Warning)
                         self.end_execution = 1
                         return
                     try:
                         if t == simulation_files and origin_direction(f,"simulation")!=fichero_input(f,"simulation"):
                            shutil.copyfile(origin_direction(f,"simulation"),fichero_input(f,"simulation"))
                     except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"simulation")),level=Qgis.Warning, duration=10)
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"simulation")),level=Qgis.Warning)
                         self.end_execution = 1
                         return
                     try:
                         if t == watershed_files and origin_direction(f,"watershed")!=fichero_input(f,"watershed"):
                             shutil.copyfile(origin_direction(f,"watershed"),fichero_input(f,"watershed"))
                     except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"watershed")),level=Qgis.Warning, duration=10)
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"watershed")),level=Qgis.Warning)
                         self.end_execution = 1
                         return
                         
@@ -3155,7 +3182,7 @@ class qannagnps():
                         txt = texto[2].split(",")[-1]
                     except:
                         pass
-                    iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning)
                     self.end_execution = 1
                     #Se abre el archivo de errores
                     try:
@@ -3172,7 +3199,18 @@ class qannagnps():
             proc = subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             stdout, stderr = proc.communicate()
 
-                  
+    
+    def ephemeral_gully_file(self):
+        #Metod to select the file name containing ephemeral gully information depending on the presence of other control files
+        #Files that go from more to less information
+        if os.path.exists(self.direccion+"\\"+"AGWET.csv"):
+            return "AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgWet.csv"
+        if os.path.exists(self.direccion+"\\"+"Agbuf.csv"):
+            return "AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgBuf.csv"
+        if os.path.exists(self.direccion+"\\"+"PEG.csv"):
+            return "AnnAGNPS_Ephemeral_Gully_Data_Section.csv"
+        
+        
     def startCapturing(self):
         self.iface.mapCanvas().setMapTool(self.mapTool)
         
@@ -3273,11 +3311,13 @@ class qannagnps():
                                     "CELLSIZE":[self.ctopagnps.lineEdit.text()],"NODATA":[self.ctopagnps.lineEdit_11.text()],
                                     "OUTSNAP":[self.ctopagnps.lineEdit_17.text()],"DNMCNT":[self.ctopagnps.lineEdit_6.text()],
                                     "DEMEDGE":[self.ctopagnps.lineEdit_4.text()],"VERBOSE":[self.ctopagnps.lineEdit_21.text()],
-                                    "KEEPFILES":[self.ctopagnps.lineEdit_9.text()],"OPTIMIZE":[self.ctopagnps.lineEdit_12.text()]})
+                                    "KEEPFILES":[self.ctopagnps.lineEdit_9.text()],"OPTIMIZE":[self.ctopagnps.lineEdit_12.text()],
+                                    "MODULE":[self.ctopagnps.lineEdit_13.text()],"OUTPUT":[self.ctopagnps.lineEdit_16.text()],
+                                    "READOUT":[self.ctopagnps.lineEdit_23.text()],"READPATH":[self.ctopagnps.lineEdit_24.text()]})
         try:
             control_file.to_csv(self.direccion+"\\"+"TOPAGNPS.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select project folder", "Please before creating the topagnps control file first select de project folder you are going to work with",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select project folder", "Please before creating the topagnps control file first select de project folder you are going to work with",level=Qgis.Warning)
             return 
         self.ctopagnps.close()
         
@@ -3288,7 +3328,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"PEG.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the PEG control file first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the PEG control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cpeg.close()
         
@@ -3297,11 +3337,12 @@ class qannagnps():
         control_file = pd.DataFrame(data = {"Buffer":[self.cagbuf.lineEdit.text()],"Vegetation":[self.cagbuf.lineEdit_2.text()],
                                     "Forest":[self.cagbuf.lineEdit_3.text()],"Grass":[self.cagbuf.lineEdit_4.text()],
                                     "C_Threshold":[self.cagbuf.lineEdit_5.text()],"R_Threshold":[self.cagbuf.lineEdit_6.text()],
-                                    "Units":[self.cagbuf.lineEdit_7.text()]})
+                                    "Units":[self.cagbuf.lineEdit_7.text()],"ASC_PATH":[self.cagbuf.lineEdit_8.text()],
+                                    "CSV_PATH":[self.cagbuf.lineEdit_9.text()]})
         try:
             control_file.to_csv(self.direccion+"\\"+"AgBuf.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the AGBUF control file first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the AGBUF control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cagbuf.close()
         
@@ -3320,7 +3361,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"AgWet.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the AGWET control file first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the AGWET control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cagwet.close()
         
@@ -3330,7 +3371,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"CONCEPTS.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the CONCEPTS control file first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the CONCEPTS control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cconcepts.close()
         
@@ -3340,7 +3381,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"POTHOLE.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the POTHOLE control file first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the POTHOLE control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cpothole.close()
         
@@ -3358,7 +3399,7 @@ class qannagnps():
         try:
             output_format+1
         except:
-            iface.messageBar().pushMessage("Select Output Format Option", "please choose among the four output format options",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select Output Format Option", "please choose among the four output format options",level=Qgis.Warning)
             return
         #Inputs que se cogen de lo que haya elegido el usuario
         input_dem = int(self.crasfor.checkBox_6.isChecked())
@@ -3404,7 +3445,7 @@ class qannagnps():
         try:
             f = open(self.direccion+"\\"+"rasfor.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the RASFOR data first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the RASFOR data first select de DEM you are going to use",level=Qgis.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
@@ -3432,7 +3473,7 @@ class qannagnps():
         try:
             f = open(self.direccion+"\\"+"raspro.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the RASPRO data first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the RASPRO data first select de DEM you are going to use",level=Qgis.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
@@ -3493,7 +3534,7 @@ class qannagnps():
             subcatchment_area=int(self.dednm.checkBox_7.isChecked())
             subcatchment_window=int(self.dednm.checkBox_8.isChecked())
         except:
-            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning)
             return 
         #Se obteiene el texto de un archivo rasfor (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
         fichero = open(self.plugin_dir+"\Documentos\dednm.inp","r+")
@@ -3503,7 +3544,7 @@ class qannagnps():
         try:
             lista_parametros = [utm_zone,utm_e,utm_n,dem_r,dem_c,min_e,max_e,indet_el,dem_res,dem_or,out_row,out_col,dem_proc,dem_smooth,passes,center,cross,diagonal,perform_raster,partial,csa,mscl,depression,cal_options,progr_rep,inp_data,drainage_area,subcatchment_area,subcatchment_window]
         except:
-            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning)
             return 
         lista = [1101, 1377, 1657, 1871, 2088, 2249, 2411, 2765, 2879, 3258, 3632, 4012, 4480, 4817, 5096, 5346, 5830, 5834, 5838, 6202, 6740, 7506, 10873, 11034, 11419, 11498, 11568, 11639, 11714]
         texto_nuevo = texto
@@ -3514,7 +3555,7 @@ class qannagnps():
         try:
             f = open(self.direccion+"\\"+"dednm.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the DEDNM data first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the DEDNM data first select de DEM you are going to use",level=Qgis.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
@@ -3542,7 +3583,7 @@ class qannagnps():
             reas=int(self.agflow.checkBox_6.isChecked())
             path = str(self.agflow.lineEdit_8.text())
         except:
-            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning)
             return
         #Se obteiene el texto de un archivo rasfor (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
         fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
@@ -3559,7 +3600,7 @@ class qannagnps():
         try:
             f = open(self.direccion+"\\"+"agflow.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the DEDNM data first select de DEM you are going to use",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the DEDNM data first select de DEM you are going to use",level=Qgis.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
@@ -3573,15 +3614,15 @@ class qannagnps():
         if hasattr(self,"direccion"):
             pass
         else:
-            iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.Warning)
             return 
         #TOPAGNPS
         try:
             control_file = pd.read_csv(self.direccion+"\\"+"TOPAGNPS.csv",encoding = "ISO-8859-1",delimiter=",")
         except:
             pass 
-        columnas = ["FILENAME","FORMAT","DEMPROC","OUTFORMAT","CSA","MSCL","UTME","UTMN","ROWS","COLS","CELLSIZE","NODATA","OUTSNAP","DNMCNT","DEMEDGE","VERBOSE","KEEPFILES","OPTIMIZE","OUTCOL","OUTROW"]
-        dialogos = [self.ctopagnps.lineEdit_7,self.ctopagnps.lineEdit_8,self.ctopagnps.lineEdit_5,self.ctopagnps.lineEdit_14,self.ctopagnps.lineEdit_3,self.ctopagnps.lineEdit_10,self.ctopagnps.lineEdit_19,self.ctopagnps.lineEdit_20,self.ctopagnps.lineEdit_18,self.ctopagnps.lineEdit_2,self.ctopagnps.lineEdit,self.ctopagnps.lineEdit_11,self.ctopagnps.lineEdit_17,self.ctopagnps.lineEdit_6,self.ctopagnps.lineEdit_4,self.ctopagnps.lineEdit_21,self.ctopagnps.lineEdit_9,self.ctopagnps.lineEdit_12,self.ctopagnps.lineEdit_15,self.ctopagnps.lineEdit_22]
+        columnas = ["FILENAME","FORMAT","DEMPROC","OUTFORMAT","CSA","MSCL","UTME","UTMN","ROWS","COLS","CELLSIZE","NODATA","OUTSNAP","DNMCNT","DEMEDGE","VERBOSE","KEEPFILES","OPTIMIZE","OUTCOL","OUTROW","MODULE","OUTPUT","READOUT","READPATH"]
+        dialogos = [self.ctopagnps.lineEdit_7,self.ctopagnps.lineEdit_8,self.ctopagnps.lineEdit_5,self.ctopagnps.lineEdit_14,self.ctopagnps.lineEdit_3,self.ctopagnps.lineEdit_10,self.ctopagnps.lineEdit_19,self.ctopagnps.lineEdit_20,self.ctopagnps.lineEdit_18,self.ctopagnps.lineEdit_2,self.ctopagnps.lineEdit,self.ctopagnps.lineEdit_11,self.ctopagnps.lineEdit_17,self.ctopagnps.lineEdit_6,self.ctopagnps.lineEdit_4,self.ctopagnps.lineEdit_21,self.ctopagnps.lineEdit_9,self.ctopagnps.lineEdit_12,self.ctopagnps.lineEdit_15,self.ctopagnps.lineEdit_22,self.ctopagnps.lineEdit_13,self.ctopagnps.lineEdit_16,self.ctopagnps.lineEdit_23,self.ctopagnps.lineEdit_24]
         #Primero se borra lo que haya previamente
         for i in dialogos:
             i.setText("")
@@ -3622,8 +3663,8 @@ class qannagnps():
             control_file = pd.read_csv(self.direccion+"\\"+"AgBuf.csv",encoding = "ISO-8859-1",delimiter=",")
         except:
             pass
-        columnas =["Buffer","Vegetation","Forest","Grass","C_Threshold","R_Threshold","Units"]
-        dialogos = [self.cagbuf.lineEdit,self.cagbuf.lineEdit_2,self.cagbuf.lineEdit_3,self.cagbuf.lineEdit_4,self.cagbuf.lineEdit_5,self.cagbuf.lineEdit_6,self.cagbuf.lineEdit_7]
+        columnas =["Buffer","Vegetation","Forest","Grass","C_Threshold","R_Threshold","Units","ASC_PATH","CSV_PATH"]
+        dialogos = [self.cagbuf.lineEdit,self.cagbuf.lineEdit_2,self.cagbuf.lineEdit_3,self.cagbuf.lineEdit_4,self.cagbuf.lineEdit_5,self.cagbuf.lineEdit_6,self.cagbuf.lineEdit_7,self.cagbuf.lineEdit_8,self.cagbuf.lineEdit_9]
         #Primero se borra lo que haya previamente
         for i in dialogos:
             i.setText("")
@@ -3711,7 +3752,7 @@ class qannagnps():
         self.epsg = QgsProject.instance().crs().authid()
         #Primero se pone condición para que se haya elegido el DEM
         if self.output.lineEdit_2.text()=="":
-            iface.messageBar().pushMessage("Select a DEM", "To view the outputs first select the DEM that will be in the folder containing the results",level=Qgis.Warning, duration=10)
+            iface.messageBar().pushMessage("Select a DEM", "To view the outputs first select the DEM that will be in the folder containing the results",level=Qgis.Warning)
             return
         #Se pone una función para cambiar coordenadas y otra para la dirección de ficheros que será usada luego por varios
         def change_coordinates(filename,outputname):
@@ -3749,7 +3790,7 @@ class qannagnps():
         #CELDAS RASTER
         if output_type == "Cell_raster":
             if not os.path.exists(fichero("AnnAGNPS_Cell_IDs.asc")):
-                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.Warning)
                 return 
             change_coordinates("AnnAGNPS_Cell_IDs.asc","AnnAGNPS_Cell_IDs_EPSG.asc")
             layer = QgsRasterLayer(fichero("AnnAGNPS_Cell_IDs_EPSG.asc"),"Cells_ras")
@@ -3758,7 +3799,7 @@ class qannagnps():
         #CELDAS VECTORIAL
         elif output_type == "Cell_vectorial":
             if not os.path.exists(fichero("AnnAGNPS_Cell_IDs.asc")):
-                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.Warning)
                 return
             direccion = save_vectorials("cell")
             change_coordinates("AnnAGNPS_Cell_IDs.asc","cell_1.asc")
@@ -3800,7 +3841,7 @@ class qannagnps():
         #DELIMITACIÓN DE LA CUENCA RASTER
         elif output_type == "Boundary_raster":
             if not os.path.exists(fichero("BOUND.ASC")):
-                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.Warning)
                 return
             change_coordinates("BOUND.ASC","BOUND_EPSG.ASC")
             layer = QgsRasterLayer(fichero("BOUND_EPSG.ASC"),"Watershed_boundary_ras")
@@ -3809,7 +3850,7 @@ class qannagnps():
         #DELIMITACIÓN DE LA CUENCA VECTORIAL
         elif output_type == "Boundary_vectorial":
             if not os.path.exists(fichero("BOUND.ASC")):
-                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.Warning)
                 return
             direccion = save_vectorials("bound")
             change_coordinates("BOUND.ASC","BOUND_EPSG.ASC")
@@ -3826,7 +3867,7 @@ class qannagnps():
         #REACHES RASTER
         elif output_type == "Reaches_raster":
             if not os.path.exists(fichero("AnnAGNPS_Reach_IDs.asc")):
-                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.Warning)
                 return
             change_coordinates("AnnAGNPS_Reach_IDs.asc","AnnAGNPS_Reach_IDs_EPSG.asc")
             layer = QgsRasterLayer(fichero("AnnAGNPS_Reach_IDs_EPSG.asc"),"Reaches_ras")
@@ -3835,7 +3876,7 @@ class qannagnps():
         #REACHES VECTORIAL
         elif output_type == "Reaches_vectorial":
             if not os.path.exists(fichero("AnnAGNPS_Reach_IDs.asc")):
-                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.Warning)
                 return
             change_coordinates("AnnAGNPS_Reach_IDs.asc","AnnAGNPS_Reach_IDs_EPSG.asc")
             direccion = save_vectorials("reaches")
@@ -3888,7 +3929,7 @@ class qannagnps():
         #ACCUMULATED AREA
         elif output_type == "Accumulated":
             if not os.path.exists(fichero("UPAREA.asc")):
-                iface.messageBar().pushMessage("Output not found", "UPAREA.asc does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "UPAREA.asc does not exist",level=Qgis.Warning)
                 return
             layer = QgsRasterLayer(fichero("UPAREA.asc"),"Accumulated_area")
             QgsProject.instance().addMapLayer(layer)
@@ -3896,7 +3937,7 @@ class qannagnps():
         #TERRAIN SLOPE
         elif output_type == "Terrain_slope":
             if not os.path.exists(fichero("TSLOPE.ASC")):
-                iface.messageBar().pushMessage("Output not found", "TSLOPE.ASC does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "TSLOPE.ASC does not exist",level=Qgis.Warning)
                 return
             layer = QgsRasterLayer(fichero("TSLOPE.ASC"),"Terrain_slope")
             QgsProject.instance().addMapLayer(layer)
@@ -3904,7 +3945,7 @@ class qannagnps():
         #HYDRAULIC SLOPE
         elif output_type == "Hydraulic":
             if not os.path.exists(fichero("HSLOPE.ASC")):
-                iface.messageBar().pushMessage("Output not found", "HSLOPE.ASC does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "HSLOPE.ASC does not exist",level=Qgis.Warning)
                 return
             layer = QgsRasterLayer(fichero("HSLOPE.ASC"),"Hydraulic_slope")
             QgsProject.instance().addMapLayer(layer)
@@ -3912,7 +3953,7 @@ class qannagnps():
         #TERRAIN ASPECT
         elif output_type == "Terrain_aspect":
             if not os.path.exists(fichero("TASPEC.ASC")):
-                iface.messageBar().pushMessage("Output not found", "TASPEC.ASC does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "TASPEC.ASC does not exist",level=Qgis.Warning)
                 return
             layer = QgsRasterLayer(fichero("TASPEC.ASC"),"Terrain_aspect")
             QgsProject.instance().addMapLayer(layer)
@@ -3920,7 +3961,7 @@ class qannagnps():
         #RUSLE LS FACTOR
         elif output_type == "RUSLE":
             if not os.path.exists(fichero("AgFlow_LS_Factor.asc")):
-                iface.messageBar().pushMessage("Output not found", "AgFlow_LS_Factor.asc does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "AgFlow_LS_Factor.asc does not exist",level=Qgis.Warning)
                 return
             layer = QgsRasterLayer(fichero("AgFlow_LS_Factor.asc"),"RUSLE_LS_factor")
             QgsProject.instance().addMapLayer(layer)
@@ -3928,7 +3969,7 @@ class qannagnps():
         #CELL LONGEST FLOW PATH RASTER
         elif output_type == "Longest_raster":
             if not os.path.exists(fichero("AgFlow_Cell_Longest_Flow_Path.asc")):
-                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.Warning)
                 return
             layer = QgsRasterLayer(fichero("AgFlow_Cell_Longest_Flow_Path.asc"),"Cell_longest_flow_raster")
             QgsProject.instance().addMapLayer(layer)
@@ -3936,7 +3977,7 @@ class qannagnps():
         #CELL LONGEST FLOW PATH VECTORIAL
         elif output_type == "Longest_vectorial":
             if not os.path.exists(fichero("AgFlow_Cell_Longest_Flow_Path.asc")):
-                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.Warning)
                 return
             direccion = save_vectorials("longpath")
             change_coordinates("AgFlow_Cell_Longest_Flow_Path.asc","AgFlow_Cell_Longest_Flow_Path_epsg.asc")
@@ -4045,10 +4086,13 @@ class qannagnps():
                 except:
                     pass
             #Se pone el nombre de la carpeta que más se repite para cada sección
-            self.inputs.l_1.setText(statistics.mode([os.path.split(x)[0] for x in dic_watershed.values()]))
-            self.inputs.l_23.setText(statistics.mode([os.path.split(x)[0] for x in dic_general.values()]))
-            self.inputs.l_47.setText(statistics.mode([os.path.split(x)[0] for x in dic_climate.values()]))
-            self.inputs.l_53.setText(statistics.mode([os.path.split(x)[0] for x in dic_simulation.values()]))
+            try:
+                self.inputs.l_1.setText(statistics.mode([os.path.split(x)[0] for x in dic_watershed.values()]))
+                self.inputs.l_23.setText(statistics.mode([os.path.split(x)[0] for x in dic_general.values()]))
+                self.inputs.l_47.setText(statistics.mode([os.path.split(x)[0] for x in dic_climate.values()]))
+                self.inputs.l_53.setText(statistics.mode([os.path.split(x)[0] for x in dic_simulation.values()]))
+            except:
+                pass
             
             #Se añaden los nombres de los archivos. Si la carpeta que se ha puesto es la misma del archivo entonces se pone solo el nombre del archivo, sino toda la dirección. 
             #Watershed
@@ -4075,6 +4119,12 @@ class qannagnps():
                     i.setText(os.path.split(dic_simulation[i])[1])
                 else:
                     i.setText(dic_simulation[i])
+        
+        #Uncheck TopAGNPS provided
+        lista = [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
+        for i in lista:
+            i.setChecked(False)
+        
     def delete_lines(self, section):
         #Método para borrar las líneas de diálog en el annagnps input dialog
         #Borrar líneas de texto
@@ -4233,7 +4283,7 @@ class qannagnps():
                     for key, value in dic_save.items():
                         file.write(f"{key},{value}\n")
             except:
-                iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
     def load_project(self):
         #Método para cargar el proyecto
         #Se abre el archivo
@@ -4250,7 +4300,7 @@ class qannagnps():
                     "use":project_df[project_df.iloc[:,0]=="use_layer"].iloc[0,1],"buffer":project_df[project_df.iloc[:,0]=="buffer_layer"].iloc[0,1],
                     "vegetation":project_df[project_df.iloc[:,0]=="vegetation_layer"].iloc[0,1]}
             except:
-                iface.messageBar().pushMessage("Error Loading Project", "The file you have selected does not have the format or information necessary to upload a project. " ,level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Error Loading Project", "The file you have selected does not have the format or information necessary to upload a project. " ,level=Qgis.Warning)
                 return 
             #Bucle para añadir capas
             names = {"dem":"dem_name","buffer":"buffer_name","vegetation":"vegetation_name"}
@@ -4344,7 +4394,7 @@ class qannagnps():
                 self.inputs.checkBox_4.setChecked(retrieve_data("riparian_topagpns_provided"))
                 self.inputs.checkBox_5.setChecked(retrieve_data("wetland_topagpns_provided"))
             except:
-                iface.messageBar().pushMessage("Error Loading Project", "The file you have selected does not have the format or information necessary to upload a project. " ,level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Error Loading Project", "The file you have selected does not have the format or information necessary to upload a project. " ,level=Qgis.Warning)
                 return 
             #Inputs de AnnAGNPS
             load_dict = {"watershed_directory":self.inputs.l_1,"general_directory":self.inputs.l_23,"climate_directory":self.inputs.l_47,
@@ -4388,7 +4438,7 @@ class qannagnps():
                 try:
                     load_dict[i].setText(str(retrieve_data(i)))
                 except:
-                    iface.messageBar().pushMessage("Error Loading Project", "The file you have selected does not have the format or information necessary to upload a project. " ,level=Qgis.Warning, duration=10)
+                    iface.messageBar().pushMessage("Error Loading Project", "The file you have selected does not have the format or information necessary to upload a project. " ,level=Qgis.Warning)
                     return 
             
     def search_document(self,line):
@@ -4469,6 +4519,12 @@ class qannagnps():
         self.ctopagnps.label_20.setToolTip(self.tr("This keyword allows the user to specify the UTM Northing coordinate of the upper left corner of the DEM"))
         self.ctopagnps.label_21.setToolTip(self.tr("This keyword allows the user to request extended log messages produced during processing \n to be included in the log file. Optional; the default value of “0” will be assumed. \n 0 = produce more messages - (DEFAULT=0, if blank or keyword not used.) \n 1 = produce less messages"))
         self.ctopagnps.label_22.setToolTip(self.tr("This keyword allows the user to specify the outlet row or UTM “y” location to use for the channel network.\nOptional if “DEMPROC” = 1 or 2; required if “DEMPROC” = 0."))
+        self.ctopagnps.label_16.setToolTip(self.tr("This optional keyword allows the user to specify which modules are to be executed.\nOptions:\n“0” indicates that all modules are to be executed in sequence (DEDNM, RASPRO, RASFOR, AGFLOW, PEG,\nand AGBUF). This value supersedes all other options listed below.\n“1” indicates that only DEDNM is to be executed.\n“2” indicates that only DEDNM and RASPRO are to be executed.\n“3” indicates that only DEDNM, RASPRO, and RASFOR are to be executed.\n“4” indicates that only AGFLOW is to be executed.\n“5” indicates that only PEG is to be executed.\n“6” indicates that only AGBUF is to be executed.\n“7” indicates that only AGWET is to be executed.\n“8” indicates that only CONCEPTS is to be executed.\n“9” indicates that only POTHOLE is to be executed.\nMultiple options may be combined. For example:\n“56” (modules PEG and AGBUF will be executed.)\n“012” (all modules will be executed because “0” supersedes all other options.)"))
+        self.ctopagnps.label_23.setToolTip(self.tr("This optional keyword allows the user to specify whether all output files produced will be in a single folder or\nin an internally defined folder structure. If “OUTPUT” is used with a value of “0”, or the value is left blank,\nthen the output files will be written to the following relative path:\nIf “OUTPUT” is used with a value of “1”, or the value is left blank, then all of the output files will be written to\nfolder from which TopAGNPS was invoked\nThe default value of “1” will be assumed."))
+        self.ctopagnps.label_24.setToolTip(self.tr("This keyword allows the user to specify that the “intermediate” output files produced from a previous run will\nbe used as input rather than TopAGNPS having to regenerate them.\nOptional; the default value of “0” will be assumed.\n0 = do not use intermediate files - (DEFAULT=0, if blank or keyword not used.)\n1 = use intermediate output files from previous run as input"))
+        self.ctopagnps.label_25.setToolTip(self.tr("This optional keyword allows the user to specify the location to the “intermediate” output files produced from a\nprevious run that will be used as input to TopAGNPS.\nThe default path will be the path associated with the “OUTPUT” keyword (see the “OUTPUT” keyword\ndescription above)."))
+        
+        
         #PEG
         self.cpeg.label.setToolTip(self.tr("csv-formatted input file containing PEG point locations to be read in and processed."))
         self.cpeg.label_2.setToolTip(self.tr("Threshold based on a CTI value"))
@@ -4481,6 +4537,9 @@ class qannagnps():
         self.cagbuf.label_5.setToolTip(self.tr("Threshold value for the cells in number of rasters"))
         self.cagbuf.label_6.setToolTip(self.tr("Threshold value for the reaches"))
         self.cagbuf.label_7.setToolTip(self.tr("Output units, SI or English, for the “AGBUF_AnnAGNPS.csv” file. \n A value of “1” indicates SI units and a value of “0” indicates English units"))
+        self.cagbuf.label_9.setToolTip(self.tr("This optional keyword allows the user to specify the path to where the spatial files created by\nDEDNM, RASPRO, RASFOR, and AgFlow are located. This path will also be used for spatial output\nfiles created by AGBUF."))
+        self.cagbuf.label_10.setToolTip(self.tr("This optional keyword allows the user to specify the path to where any csv-formatted input files\nand the csv-formatted output files created by AGBUF will be written."))
+        
         #AGWET
         self.cagwet.label.setToolTip(self.tr("Name and location of a barrier input file that is to be used for determining barriers and related wetland extents. \n If left blank, then the WIF is invoked"))
         self.cagwet.label_2.setToolTip(self.tr("This optional keyword allows the user to designate a raster grid input file containing buffers. \n Each buffer must have a unique integer ID."))
@@ -4729,7 +4788,7 @@ class qannagnps():
             self.resultados.append(self.save_result())
             #Condición de error
             if self.end_execution:
-                iface.messageBar().pushMessage("Error in sensitivity analysis", "Please check the error in the opened file",level=Qgis.Warning, duration=10)
+                iface.messageBar().pushMessage("Error in sensitivity analysis", "Please check the error in the opened file",level=Qgis.Warning)
                 return
             #ESTO BORRAR
             df_conc = pd.DataFrame(data = {"Parameters":[i],"Result":[self.resultados[-1]]})
@@ -4747,7 +4806,7 @@ class qannagnps():
         #Variable that says that it is doing a sensitivity analysis
         self.doing_sensitivity = False
         #MENSAJE DE ÉXITO
-        self.iface.messageBar().pushMessage("Success", "Succes in the sensitiviy analysis ",level=Qgis.Success, duration=10)
+        self.iface.messageBar().pushMessage("Success", "Succes in the sensitiviy analysis ",level=Qgis.Success)
         
     def change_inputs_sensitivity(self,param_values,numero_parametro,nombre_parametro,spatial):
         #Metod to change the inputs of sensitivity analysis
