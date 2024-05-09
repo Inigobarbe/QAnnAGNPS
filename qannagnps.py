@@ -533,7 +533,7 @@ class qannagnps():
         self.file_exist = False
         
         #Función para los outputs de TopAGNPS
-        dic = {self.output.pushButton_11:"Cell_raster",self.output.pushButton_13:"Cell_vectorial",self.output.pushButton_14:"Boundary_raster",self.output.pushButton_19:"Boundary_vectorial",self.output.pushButton_22:"Reaches_raster",self.output.pushButton_20:"Reaches_vectorial",self.output.pushButton_21:"Accumulated",self.output.pushButton_23:"Terrain_slope",self.output.pushButton_24:"Hydraulic",self.output.pushButton_25:"Terrain_aspect",self.output.pushButton_26:"RUSLE",self.output.pushButton_27:"Longest_raster",self.output.pushButton_28:"Longest_vectorial"}
+        dic = {self.output.pushButton_11:"Cell_raster",self.output.pushButton_13:"Cell_vectorial",self.output.pushButton_14:"Boundary_raster",self.output.pushButton_19:"Boundary_vectorial",self.output.pushButton_22:"Reaches_raster",self.output.pushButton_20:"Reaches_vectorial",self.output.pushButton_21:"Accumulated",self.output.pushButton_23:"Terrain_slope",self.output.pushButton_24:"Hydraulic",self.output.pushButton_25:"Terrain_aspect",self.output.pushButton_26:"RUSLE",self.output.pushButton_27:"Longest_raster",self.output.pushButton_28:"Longest_vectorial",self.output.pushButton_29:"PEG_points"}
         for i in dic.keys():
             i.clicked.connect(lambda _,b = dic[i]:self.output_topagnps(b))
             
@@ -2151,7 +2151,7 @@ class qannagnps():
         #Datos espaciales
         icon = os.path.join(self.plugin_directory, "images/spatial_graph.svg")
         self.output.spatial_run.setIcon(QIcon(icon))
-        for i in [self.output.pushButton_11,self.output.pushButton_13,self.output.pushButton_14,self.output.pushButton_19,self.output.pushButton_22,self.output.pushButton_20,self.output.pushButton_21,self.output.pushButton_23,self.output.pushButton_24,self.output.pushButton_25,self.output.pushButton_26,self.output.pushButton_27,self.output.pushButton_28]:
+        for i in [self.output.pushButton_11,self.output.pushButton_13,self.output.pushButton_14,self.output.pushButton_19,self.output.pushButton_22,self.output.pushButton_20,self.output.pushButton_21,self.output.pushButton_23,self.output.pushButton_24,self.output.pushButton_25,self.output.pushButton_26,self.output.pushButton_27,self.output.pushButton_28,self.output.pushButton_29]:
             i.setIcon(QIcon(icon))
         #Add remove row in sensitivity analysis table
         self.sensitivity_dialog.add.setIcon(QIcon(os.path.join(self.plugin_directory, "images/add.svg")))
@@ -3324,7 +3324,9 @@ class qannagnps():
     def create_control_file_peg(self):
         #Función para que cuando se le de al botón de aceptar en el control file de peg se cree el control file PEG.csv con los datos que se han puesto
         control_file = pd.DataFrame(data = {"Input":[self.cpeg.lineEdit.text()],"CTI_value":[self.cpeg.lineEdit_2.text()],
-                                    "Accum_pct":[self.cpeg.lineEdit_3.text()]})
+                                    "Accum_pct":[self.cpeg.lineEdit_3.text()],"Display_Drainage_Option":[self.cpeg.lineEdit_4.text()],
+                                    "Display_Location_Option":[self.cpeg.lineEdit_5.text()],"ASC_Path":[self.cpeg.lineEdit_6.text()],
+                                    "CSV_Path":[self.cpeg.lineEdit_7.text()]})
         try:
             control_file.to_csv(self.direccion+"\\"+"PEG.csv", index=False, float_format='%.5f')
         except:
@@ -3367,7 +3369,7 @@ class qannagnps():
         
     def create_control_file_concepts(self):
         #Función para que cuando se le de al botón de aceptar en el control file de concepts se cree el control file CONCEPTS.csv con los datos que se han puesto
-        control_file = pd.DataFrame(data = {"UPSTREAM_REACH_ID":[self.cconcepts.lineEdit.text()],"DOWNSTREAM_REACH_ID":[self.cconcepts.lineEdit_2.text()]})
+        control_file = pd.DataFrame(data = {"UPSTREAM_REACH_ID":[self.cconcepts.lineEdit.text()],"DOWNSTREAM_REACH_ID":[self.cconcepts.lineEdit_2.text()],"ASC_Path":[self.cconcepts.lineEdit_3.text()],"CSV_Path":[self.cconcepts.lineEdit_4.text()]})
         try:
             control_file.to_csv(self.direccion+"\\"+"CONCEPTS.csv", index=False, float_format='%.5f')
         except:
@@ -3377,7 +3379,8 @@ class qannagnps():
         
     def create_control_file_pothole(self):
         #Función para que cuando se le de al botón de aceptar en el control file de pothole se cree el control file POTHOLE.csv con los datos que se han puesto
-        control_file = pd.DataFrame(data = {"POTHOLE_OPTION":[self.cpothole.lineEdit.text()],"POTHOLE_SURFACE_AREA":[self.cpothole.lineEdit_2.text()]})
+        control_file = pd.DataFrame(data = {"POTHOLE_OPTION":[self.cpothole.lineEdit.text()],"POTHOLE_SURFACE_AREA":[self.cpothole.lineEdit_2.text()],
+                                            "ASC_Path":[self.cpothole.lineEdit_3.text()],"CSV_Path":[self.cpothole.lineEdit_4.text()]})
         try:
             control_file.to_csv(self.direccion+"\\"+"POTHOLE.csv", index=False, float_format='%.5f')
         except:
@@ -3598,9 +3601,9 @@ class qannagnps():
             texto_nuevo = texto_nuevo[0:lista[i]+contador]+str(lista_parametros[i])+texto_nuevo[lista[i]+contador+1:]
             contador += len(str(lista_parametros[i]))-1
         try:
-            f = open(self.direccion+"\\"+"agflow.inp","w+")
+            f = open(self.direccion+"\\"+"AGFCNT.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the DEDNM data first select de DEM you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
@@ -3752,7 +3755,7 @@ class qannagnps():
         self.epsg = QgsProject.instance().crs().authid()
         #Primero se pone condición para que se haya elegido el DEM
         if self.output.lineEdit_2.text()=="":
-            iface.messageBar().pushMessage("Select a DEM", "To view the outputs first select the DEM that will be in the folder containing the results",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.Warning)
             return
         #Se pone una función para cambiar coordenadas y otra para la dirección de ficheros que será usada luego por varios
         def change_coordinates(filename,outputname):
@@ -3997,6 +4000,55 @@ class qannagnps():
             renderer = QgsSingleSymbolRenderer(symbol)
             layer.setRenderer(renderer)
             layer.triggerRepaint()
+            
+        #PEG points
+        elif output_type == "PEG_points":
+            try:
+                #Se importa el fichero donde se tienen las coordenadas de los puntos PEG
+                fichero_summary = self.direccion+"\\"+"PEG_Summary.txt"
+                summary = pd.read_csv(fichero_summary,encoding = "ISO-8859-1",delimiter=",")
+                #Función para crear la capa con los puntos PEG
+                def create_layer():
+                    layer = QgsVectorLayer("Point?crs={}".format(self.epsg), "PEG_Points", "memory")
+                    layer.dataProvider().addAttributes([QgsField("id", QVariant.String), 
+                                                        QgsField("Drainage_area", QVariant.Double),
+                                                        QgsField("Luparea", QVariant.Double),
+                                                        QgsField("Subarea", QVariant.Double),
+                                                        QgsField("Slope", QVariant.Double),
+                                                        QgsField("CTI", QVariant.Double),
+                                                        QgsField("Headcut_barrier", QVariant.Double),
+                                                        QgsField("Stream_order", QVariant.Double),
+                                                        QgsField("Cell_ID", QVariant.Double),
+                                                        QgsField("Reach_ID", QVariant.Double),
+                                                        QgsField("StreamCNT", QVariant.Double)])
+                    layer.updateFields()
+                    features = []
+                    for i in range(len(summary)):
+                        feature = QgsFeature()
+                        feature.setFields(layer.fields())
+                        x = summary.X.iloc[i]
+                        y = summary.Y.iloc[i]
+                        pt = QgsPointXY(x, y)
+                        geom = QgsGeometry.fromPointXY(pt)
+                        feature.setGeometry(geom)
+                        feature.setAttribute("id", summary['GULLY_ID'].iloc[i])
+                        feature.setAttribute("Drainage_area", float(summary.UPAREA.iloc[i]))
+                        feature.setAttribute("Luparea", float(summary.LUPAREA.iloc[i]))
+                        feature.setAttribute("Subarea", float(summary.SUBAREA.iloc[i]))
+                        feature.setAttribute("Slope", float(summary.SLOPE.iloc[i]))
+                        feature.setAttribute("CTI", float(summary.CTINDEX.iloc[i]))
+                        feature.setAttribute("Headcut_barrier", float(summary.HCUT_B.iloc[i]))
+                        feature.setAttribute("Stream_order", float(summary.STREAM_ORDER.iloc[i]))
+                        feature.setAttribute("Cell_ID", float(summary.CELL_ID.iloc[i]))
+                        feature.setAttribute("Reach_ID", float(summary.REACH_ID.iloc[i]))
+                        feature.setAttribute("StreamCNT", float(summary.STREAMCNT.iloc[i]))
+                        features.append(feature)
+                    layer.dataProvider().addFeatures(features)
+                    return layer
+                summary_layer = create_layer()
+                QgsProject.instance().addMapLayer(summary_layer)
+            except:
+                pass
 
     def files_directory(self):
         #Método para añadir la dirección de la carpeta del mdt a la interfaz de los inputs de AnnAGNPS
@@ -4120,10 +4172,10 @@ class qannagnps():
                 else:
                     i.setText(dic_simulation[i])
         
-        #Uncheck TopAGNPS provided
-        lista = [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
-        for i in lista:
-            i.setChecked(False)
+            #Uncheck TopAGNPS provided
+            lista = [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
+            for i in lista:
+                i.setChecked(False)
         
     def delete_lines(self, section):
         #Método para borrar las líneas de diálog en el annagnps input dialog
@@ -4529,6 +4581,10 @@ class qannagnps():
         self.cpeg.label.setToolTip(self.tr("csv-formatted input file containing PEG point locations to be read in and processed."))
         self.cpeg.label_2.setToolTip(self.tr("Threshold based on a CTI value"))
         self.cpeg.label_3.setToolTip(self.tr("Threshold based on a percent value"))
+        self.cpeg.label_5.setToolTip(self.tr("This keyword allows the user to select how drainage area to the PEG points are displayed.\nThis keyword is optional. The acceptable values are '0' and '1'. A value of '0' indicates that the\n display of peg point drainage areas may overlap other peg points and their associated drainage\n areas. A value of '1' indicates that the display of peg point drainage areas may not overlap other\n peg points and their associated drainage areas.\nOptions: 0 or 1; DEFAULT = 0"))
+        self.cpeg.label_6.setToolTip(self.tr("This keyword allows the user to select which PEG point drainage areas are to be displayed.\nThis keyword is optional. The acceptable values are '0', '1', or '2'. A value of '0' indicates that\n all valid peg point drainage areas will be displayed. A value of '1' indicates that only valid cell-\n located peg point drainage areas will be displayed. A value of '2' indicates that only valid reach-\n located peg point drainage areas will be displayed.\nOptions: 0, 1, or 2; DEFAULT = 0."))
+        self.cpeg.label_7.setToolTip(self.tr("This optional keyword allows the user to specify the path to where the spatial files created by\n DEDNM, RASPRO, RASFOR, and AgFlow are located. This path will also be used for spatial\n output files created by PEG."))
+        self.cpeg.label_8.setToolTip(self.tr("This optional keyword allows the user to specify the path to where the csv-formatted output files\ncreated by PEG will be written."))
         #AGBUF
         self.cagbuf.label.setToolTip(self.tr("Name and location of the spatial buffer layer that is to be used"))
         self.cagbuf.label_2.setToolTip(self.tr("Name and location of the spatial vegetation layer that is to be used"))
@@ -4539,6 +4595,12 @@ class qannagnps():
         self.cagbuf.label_7.setToolTip(self.tr("Output units, SI or English, for the “AGBUF_AnnAGNPS.csv” file. \n A value of “1” indicates SI units and a value of “0” indicates English units"))
         self.cagbuf.label_9.setToolTip(self.tr("This optional keyword allows the user to specify the path to where the spatial files created by\nDEDNM, RASPRO, RASFOR, and AgFlow are located. This path will also be used for spatial output\nfiles created by AGBUF."))
         self.cagbuf.label_10.setToolTip(self.tr("This optional keyword allows the user to specify the path to where any csv-formatted input files\nand the csv-formatted output files created by AGBUF will be written."))
+        
+        #AGFLOW
+        self.agflow.label_4.setToolTip(self.tr("It's the code for which TopAGNPS output slope file is to be used for calculating each\nrasters LS-factor. A '1' will use the flow vector slope file (FVSLOP.ASC); a '2' will use the terrain slope file\n(TSLOPE.ASC); and a '3' will use the hydraulic slope file (HSLOPE.ASC). A 'blank' defaults to '1'"))
+        self.agflow.label_5.setToolTip(self.tr("It's a real number for the maximum drainage area before concentrated flow begins\n(and accumulated sheet & rill erosion cease). A “blank” defaults to 0.99 ha"))
+        self.agflow.label_6.setToolTip(self.tr("It's a real number for the maximum profile length before deposition begins and\nsheet & rill erosion along this particular profile path ceases. A “blank” defaults to 300 m."))
+        self.agflow.label_7.setToolTip(self.tr("It's a real number for the maximum profile slope-angle which is meant to be used along with those structural conservation\npractices that actually decrease the slope-angle such as terraces. A “blank” defaults to “no limit” which should be\nused for most alternatives especially for natural conditions."))
         
         #AGWET
         self.cagwet.label.setToolTip(self.tr("Name and location of a barrier input file that is to be used for determining barriers and related wetland extents. \n If left blank, then the WIF is invoked"))
@@ -4564,9 +4626,13 @@ class qannagnps():
         #CONCEPTS
         self.cconcepts.label.setToolTip(self.tr("This required keyword allows the user to specify the upstream end reach ID as the \n beginning point of the CONCEPTS corridor. This reach ID value must be a valid AnnAGNPS reach ID. \n If this keyword’s value is left blank then the default that will be used is the reach ID of the reach that \n contains the hydraulically most distant point to the watershed outlet."))
         self.cconcepts.label_2.setToolTip(self.tr("This required keyword allows the user to specify the downstream end reach ID as \n the ending point of the CONCEPTS corridor. This reach ID value must be a valid AnnAGNPS reach ID. \n If this keyword’s value is left blank then the default that will be used is the reach ID of “2” which is the reach flowing into the watershed outlet."))
+        self.cconcepts.label_4.setToolTip(self.tr("This optional keyword allows the user to specify the path to where the spatial files created by \nDEDNM, RASPRO, RASFOR, and AgFlow are located."))
+        self.cconcepts.label_5.setToolTip(self.tr("This optional keyword allows the user to specify the path to where the csv-formatted output files \ncreated by CONCEPTS will be written."))
         #POTHOLE
         self.cpothole.label.setToolTip(self.tr("This optional keyword allows the user to designate if potholes will be identified and processed. \n If this parameter is not present in the control file or if the value for this parameter is blank then the default \n value is 0 meaning that potholes will be identified."))
         self.cpothole.label_2.setToolTip(self.tr("This optional keyword allows the user to designate the minimum area in hectares that is required \n for a pothole to be considered valid and processed for reporting purposes; that is, \n the minimum surface area threshold has been met."))
+        self.cpothole.label_4.setToolTip(self.tr("This optional keyword allows the user to specify the path to where the spatial files created by\n DEDNM, RASPRO, RASFOR, and AgFlow are located. This path will also be used for spatial\noutput files created by POTHOLE"))
+        self.cpothole.label_5.setToolTip(self.tr("This optional keyword allows the user to specify the path to where the csv-formatted output files\n created by POTHOLE will be written."))
 
         #Searcher of documents in AnnAGNPS inputs
         for i in self.dic_lines_search.values():
@@ -4830,7 +4896,7 @@ class qannagnps():
             #Si el input es tamaño de pixel entonces la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
             if nombre_parametro =="Pixel Size":
                 self.change_control_files_pixel(param_values,numero_parametro)
-                
+            
             else:
                 df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
                 if self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
@@ -4974,8 +5040,8 @@ class qannagnps():
                 iface.messageBar().pushMessage("AnnAGNPS_EV_Phosphorus_yield_(mass) output not found. EV_P_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ",level=Qgis.Warning)
                 self.end_execution =True
                 return
-            return df_graph.sum()
-        
+            return df_graph.sum()    
+    
     def file_input(self,lineEdit):
         #Metod to go from line edit to the final direction
         #If input is topagnps provided then return correct path
@@ -5237,7 +5303,6 @@ class qannagnps():
             ax0.set_ylabel("Standard Deviation of Elementary Effects ($\sigma_{i}$)",size = 15,family="arial",weight = "bold",color = "black")
             plt.savefig(self.direccion+"\\"+"Morris.png",transparent=False,bbox_inches = "tight",dpi=300)
             
-
             #Se guardan datos
             df_dic = {}
             for i,k in enumerate(self.dic_data.keys()):

@@ -60,7 +60,7 @@
                  </font>
                 </property>
                 <property name="text">
-                 <string>Import form master file </string>
+                 <string>Import from master file </string>
                 </property>
                </widget>
               </item>

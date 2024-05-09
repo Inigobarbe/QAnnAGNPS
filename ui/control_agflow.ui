@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>409</width>
+    <width>270</width>
     <height>368</height>
    </rect>
   </property>
@@ -48,7 +48,17 @@
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="lineEdit_4"/>
+            <widget class="QLineEdit" name="lineEdit_4">
+             <property name="font">
+              <font>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
@@ -68,7 +78,17 @@
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="lineEdit_5"/>
+            <widget class="QLineEdit" name="lineEdit_5">
+             <property name="font">
+              <font>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
@@ -88,7 +108,17 @@
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="lineEdit_6"/>
+            <widget class="QLineEdit" name="lineEdit_6">
+             <property name="font">
+              <font>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
@@ -108,7 +138,17 @@
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="lineEdit_7"/>
+            <widget class="QLineEdit" name="lineEdit_7">
+             <property name="font">
+              <font>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
@@ -175,7 +215,8 @@ QCheckBox::indicator:unchecked {
 }</string>
            </property>
            <property name="text">
-            <string>Create New Subwatershed Grid File (subwta.arc)</string>
+            <string>Create New Subwatershed 
+Grid File (subwta.arc)</string>
            </property>
           </widget>
          </item>
@@ -196,7 +237,8 @@ QCheckBox::indicator:unchecked {
 }</string>
            </property>
            <property name="text">
-            <string>Create New Subwatershed Grid File (subwta.dat)</string>
+            <string>Create New Subwatershed 
+Grid File (subwta.dat)</string>
            </property>
           </widget>
          </item>
@@ -217,7 +259,8 @@ QCheckBox::indicator:unchecked {
 }</string>
            </property>
            <property name="text">
-            <string>Use File for Temporary Storage Rather than Internal Arrays</string>
+            <string>Use File for Temporary Storage 
+Rather than Internal Arrays</string>
            </property>
           </widget>
          </item>
@@ -262,7 +305,17 @@ QCheckBox::indicator:unchecked {
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="lineEdit_8"/>
+        <widget class="QLineEdit" name="lineEdit_8">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
        </item>
       </layout>
      </item>
