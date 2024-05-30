@@ -57,10 +57,12 @@ import itertools
 from matplotlib.ticker import FuncFormatter
 import sys
 import chardet
-from SALib.analyze import sobol
-from SALib.sample import saltelli
-from SALib.sample.morris import sample as sample_morris 
-from SALib.analyze.morris import analyze as analyze_morris
+
+#Local libraries
+from .libraries.SALib.sample import saltelli
+from .libraries.SALib.analyze import sobol
+from .libraries.SALib.sample.morris import sample as sample_morris 
+from .libraries.SALib.analyze.morris import analyze as analyze_morris
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -246,6 +248,13 @@ class qannagnps():
         self.craspro.pushButton.clicked.connect(self.create_control_file_raspro)
         self.dednm.pushButton.clicked.connect(self.create_control_file_dednm)
         self.agflow.pushButton.clicked.connect(self.create_control_file_agflow)
+        
+        #Seleccionar las capas una vez se hayan seleccionado en el combobox
+        self.dlg.comboBox_2.currentIndexChanged.connect(self.instantiate_buffer)
+        self.dlg.comboBox_3.currentIndexChanged.connect(self.instantiate_vegetation)
+        self.dlg.cbSoil.currentIndexChanged.connect(self.instantiate_soil)
+        self.dlg.cbMan.currentIndexChanged.connect(self.instantiate_management)
+        
         
         #Cambiar el nombre en el control file de AGBUF.csv de las columnas Buffer y Vegetation al seleccionar una capa
         self.dlg.comboBox_2.currentIndexChanged.connect(self.buffer_nombre)
@@ -599,7 +608,43 @@ class qannagnps():
         
         #Variable that says that it is doing a sensitivity analysis
         self.doing_sensitivity = False
+       
+
+    def instantiate_buffer(self):
+        #Metod to select the layer of buffer that is going to be used
+        layers = QgsProject.instance().layerTreeRoot().children()
+        selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
+        if selectedLayerIndex>=0:
+            selectedLayer = layers[selectedLayerIndex].layer()
+            self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
+            buf_directory, self.nombre_buf = os.path.split(self.fichero_buf)
         
+    def instantiate_vegetation(self):
+        #Metod to select the layer of vegetation that is going to be used
+        layers = QgsProject.instance().layerTreeRoot().children()
+        selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
+        if selectedLayerIndex>=0:
+            selectedLayer = layers[selectedLayerIndex].layer()
+            self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
+            veg_directory, self.nombre_veg = os.path.split(self.fichero_veg)
+        
+    def instantiate_soil(self):
+        #Metod to select the layer of soil that is going to be used
+        layers = QgsProject.instance().layerTreeRoot().children()
+        selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
+        if selectedLayerIndex>=0:
+            selectedLayer = layers[selectedLayerIndex].layer()
+            self.fichero_soil =  selectedLayer.dataProvider().dataSourceUri()
+        
+    def instantiate_management(self):
+        #Metod to select the layer of management that is going to be used
+        layers = QgsProject.instance().layerTreeRoot().children()
+        selectedLayerIndex = self.dlg.cbMan.currentIndex()-1
+        if selectedLayerIndex>=0:
+            selectedLayer = layers[selectedLayerIndex].layer()
+            self.fichero_manag =  selectedLayer.dataProvider().dataSourceUri()
+    
+    
     def add_project_folder_text_changed(self):
         #Metod to add project folder if text was changed
         self.direccion = str(self.dlg.project.text())
@@ -866,18 +911,18 @@ class qannagnps():
             self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} mm")
             self.output.lineEdit_11.setText(f"{int(self.lowest_anual[0])}")
         elif self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
-            self.output.lineEdit_6.setText(f"{round(float(self.average_total),2)} Mg")
-            self.output.lineEdit_7.setText(f"{round(float(self.average_anual),2)} Mg")
-            self.output.lineEdit_8.setText(f"{round(float(self.highest_anual[1]),2)} Mg")
+            self.output.lineEdit_6.setText(f"{round(float(self.average_total),2)} {self.units}")
+            self.output.lineEdit_7.setText(f"{round(float(self.average_anual),2)} {self.units}")
+            self.output.lineEdit_8.setText(f"{round(float(self.highest_anual[1]),2)} {self.units}")
             self.output.lineEdit_10.setText(f"{int(self.highest_anual[0])}")
-            self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} Mg")
+            self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} {self.units}")
             self.output.lineEdit_11.setText(f"{int(self.lowest_anual[0])}")
         else:
-            self.output.lineEdit_6.setText(f"{round(float(self.average_total),2)} kg")
-            self.output.lineEdit_7.setText(f"{round(float(self.average_anual),2)} kg")
-            self.output.lineEdit_8.setText(f"{round(float(self.highest_anual[1]),2)} kg")
+            self.output.lineEdit_6.setText(f"{round(float(self.average_total),2)} {self.units}")
+            self.output.lineEdit_7.setText(f"{round(float(self.average_anual),2)} {self.units}")
+            self.output.lineEdit_8.setText(f"{round(float(self.highest_anual[1]),2)} {self.units}")
             self.output.lineEdit_10.setText(f"{int(self.highest_anual[0])}")
-            self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} kg")
+            self.output.lineEdit_9.setText(f"{round(float(self.lowest_anual[1]),2)} {self.units}")
             self.output.lineEdit_11.setText(f"{int(self.lowest_anual[0])}")
     
     def spatial_output(self):
@@ -1044,7 +1089,7 @@ class qannagnps():
                 return
             df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
         else:
-            dic_outputs = {"Subtotal":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Gully":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Pond":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Sheet & Rill":["AnnAGNPS_EV_Sediment_yield_(mass).csv","Subtotals [Mg]"],"Nitrogen":["AnnAGNPS_EV_Nitrogen_yield_(mass).csv","Subtotal N [kg]"],"Carbon":["AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv","Subtotal C [kg]"],"Phosphorus":["AnnAGNPS_EV_Phosphorus_yield_(mass).csv","Subtotal P [kg]"]}
+            dic_outputs = {"Subtotal":["AnnAGNPS_EV_Sediment_yield_(mass).csv"],"Gully":["AnnAGNPS_EV_Sediment_yield_(mass).csv"],"Pond":["AnnAGNPS_EV_Sediment_yield_(mass).csv"],"Sheet & Rill":["AnnAGNPS_EV_Sediment_yield_(mass).csv"],"Nitrogen":["AnnAGNPS_EV_Nitrogen_yield_(mass).csv"],"Carbon":["AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv"],"Phosphorus":["AnnAGNPS_EV_Phosphorus_yield_(mass).csv"]}
             path = self.output.lineEdit.text()+f"\\{dic_outputs[self.data_type][0]}"
             try:
                 df_raw = self.df_section_output(path,delete_second=False)
@@ -1052,6 +1097,10 @@ class qannagnps():
                 iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
                 self.error = True
                 return
+            self.units = df_raw.columns[-1][-4:]
+            dic_outputs = {"Subtotal":["AnnAGNPS_EV_Sediment_yield_(mass).csv",f"Subtotals {self.units}"],"Gully":["AnnAGNPS_EV_Sediment_yield_(mass).csv",f"Subtotals {self.units}"],"Pond":["AnnAGNPS_EV_Sediment_yield_(mass).csv",f"Subtotals {self.units}"],"Sheet & Rill":["AnnAGNPS_EV_Sediment_yield_(mass).csv",f"Subtotals {self.units}"],"Nitrogen":["AnnAGNPS_EV_Nitrogen_yield_(mass).csv",f"Subtotal N {self.units}"],"Carbon":["AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv",f"Subtotal C {self.units}"],"Phosphorus":["AnnAGNPS_EV_Phosphorus_yield_(mass).csv",f"Subtotal P {self.units}"]}
+            
+                
             if self.data_type == "Gully" or self.data_type == "Pond" or self.data_type == "Sheet & Rill" or self.data_type == "Subtotal":
                 df = pd.DataFrame(data = {"Year":[int(x) for x in df_raw["Year"]],"Month":[int(x) for x in df_raw["Month"]],"Day":[int(x) for x in df_raw["Day"]],"Cell":[str(x) for x in df_raw["Cell ID"]],"Source":[str(x) for x in df_raw["Source"]],"Runoff":[float(x) for x in df_raw[dic_outputs[self.data_type][1]]]})
             else:
@@ -2508,38 +2557,18 @@ class qannagnps():
                 shutil.copyfile(self.fichero_mdt,self.direccion+"\\"+self.name_mdt)
             except:
                 pass
-            #Establecer el fichero de suelo escogido en el plugin
-            selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
-            if selectedLayerIndex>=0:
-                selectedLayer = layers[selectedLayerIndex].layer()
-                fichero_soil =  selectedLayer.dataProvider().dataSourceUri()
-                soil_directory, self.fichero_soil = os.path.split(fichero_soil)
-            #Establecer el fichero de manejo escogido en el plugin 
-            selectedLayerIndex = self.dlg.cbMan.currentIndex()-1
-            if selectedLayerIndex>=0:
-                selectedLayer = layers[selectedLayerIndex].layer()
-                fichero_manag =  selectedLayer.dataProvider().dataSourceUri()
-                manag_directory, self.fichero_manag = os.path.split(fichero_manag)
-            #Establecer el fichero de buffer escogido en el plugin y moverlo a la carpeta del proyecto
-            selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
-            if selectedLayerIndex>=0:
-                selectedLayer = layers[selectedLayerIndex].layer()
-                self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
-                buf_directory, nombre_buf = os.path.split(self.fichero_buf)
-                try: #si el origen y el destino son los mismos da error
-                    shutil.copyfile(self.fichero_buf,self.direccion+"\\"+nombre_buf)
-                except:
-                    pass
-            #Establecer el fichero de vegetation escogido en el plugin y moverlo a la carpeta del proyecto
-            selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
-            if selectedLayerIndex>=0:
-                selectedLayer = layers[selectedLayerIndex].layer()
-                self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
-                veg_directory, nombre_veg = os.path.split(self.fichero_veg)
-                try: #si el origen y el destino son los mismos da error
-                    shutil.copyfile(self.fichero_veg,self.direccion+"\\"+nombre_veg)
-                except:
-                    pass
+            
+            
+            #Mover el fichero de buffer la carpeta del proyecto
+            try: #si el origen y el destino son los mismos da error
+                shutil.copyfile(self.fichero_buf,self.direccion+"\\"+self.nombre_buf)
+            except:
+                pass
+            #Mover el fichero de vegetation la carpeta del proyecto
+            try: #si el origen y el destino son los mismos da error
+                shutil.copyfile(self.fichero_veg,self.direccion+"\\"+self.nombre_veg)
+            except:
+                pass
             #Si el input output_global Glbl_All_V3_sim no se pone en T no se obtiene el archivo que se necesita para calcular la erosión por cárcavas efímeras (AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv) y por lo tanto no se puede hacer el análisis de sensibilidad
             #Esto se hace primero porque la dirección puede estar dada con el nombre del archivo o en dirección completa
             if os.path.isabs(r"{}".format(str(self.inputs.l_63.text()))):
@@ -2756,7 +2785,7 @@ class qannagnps():
                     return
                 #Se aplica el suelo al fichero de cells
                 try:
-                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
+                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
                 except:
                     iface.messageBar().pushMessage("Error with soil layer","The DEM and the soil layer have to overlap.",level=Qgis.Warning)
                     self.end_execution = 1
@@ -2764,8 +2793,8 @@ class qannagnps():
                 annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo AnnAGNPS_Ephemeral_Gully_Data_Section.csv
-                eg_path = fichero(self.ephemeral_gully_file()) #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
                 if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
+                    eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
                     summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
                     def create_layer():
                         layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
@@ -2823,7 +2852,7 @@ class qannagnps():
                         self.end_execution = 1
                         return 
                 try:
-                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
+                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
                 except:
                     iface.messageBar().pushMessage("Error with soil use layer","The DEM and the soil use layer have to overlap.",level=Qgis.Warning, duration=20)
                     self.end_execution = 1
@@ -2831,8 +2860,8 @@ class qannagnps():
                 annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el uso al fichero de cárcavas efímeras
-                eg_path = fichero(self.ephemeral_gully_file()) #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
                 if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
+                    eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
                     summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
                     def create_layer():
                         layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
@@ -2904,9 +2933,10 @@ class qannagnps():
                 self.iface.messageBar().pushMessage("Coordinate selection", "Please move the mouse to the outlet and click on it",level=Qgis.Info)
             
         #EJECUCIÓN DE ANNAGNPS
-        if (self.dlg.cbAnn.isChecked() and not self.segunda_ronda and (self.ejecucion_condicion==1 or not self.dlg.checkBox_2.isChecked())):
+        if self.dlg.cbAnn.isChecked():
             #CREACIÓN DE LA CARPETA QUE CONTENDRÁ LOS INPUTS DE ANNAGNPS
             directory = "INPUTS"
+            
             parent_dir = self.direccion
             path_file = os.path.join(parent_dir, directory)
             mode = 0o666
@@ -3006,7 +3036,7 @@ class qannagnps():
             #Primero se asigna la dirección, si es que se ha elegido la opción de que se obtengan de la ejecución de TopAGNPS
             checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
             sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data]
-            names_list = ["AnnAGNPS_Cell_Data_Section.csv",self.ephemeral_gully_file(),"AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
+            names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
             for i in range(len(checks_list)):
                 if checks_list[i].isChecked():
                     sections_list[i]=self.direccion+"\\"+names_list[i]
@@ -3155,7 +3185,7 @@ class qannagnps():
                     self.change_inputs_sensitivity(self.param_values[self.numero_ejecucion-1],j,k,spatial =False) #cambio de los inptus no espaciales
             
             #EJECUCIÓN DE ANNAGNPS
-            os.chdir(self.direccion+"\\"+directory)
+            #os.chdir(self.direccion+"\\"+directory)
             def execute_bat():
                def main():
                    f = open(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
@@ -3166,7 +3196,15 @@ class qannagnps():
                    f.close()
                main()
             execute_bat()
+            r'''env = os.environ.copy()
+            env['PATH'] = f'{self.executable_directory};' + env['PATH']
+            command = self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat"
+            result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='latin-1', env=env)'''
+
+
             subprocess.call(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
+
+
             #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             #stdout, stderr = proc.communicate()
             
@@ -3199,18 +3237,7 @@ class qannagnps():
             proc = subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             stdout, stderr = proc.communicate()
 
-    
-    def ephemeral_gully_file(self):
-        #Metod to select the file name containing ephemeral gully information depending on the presence of other control files
-        #Files that go from more to less information
-        if os.path.exists(self.direccion+"\\"+"AGWET.csv"):
-            return "AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgWet.csv"
-        if os.path.exists(self.direccion+"\\"+"Agbuf.csv"):
-            return "AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgBuf.csv"
-        if os.path.exists(self.direccion+"\\"+"PEG.csv"):
-            return "AnnAGNPS_Ephemeral_Gully_Data_Section.csv"
-        
-        
+
     def startCapturing(self):
         self.iface.mapCanvas().setMapTool(self.mapTool)
         
@@ -5259,6 +5286,7 @@ class qannagnps():
             try:
                 self.Si.plot()
                 plt.savefig(self.direccion+"\\Sobol.png",transparent=False,bbox_inches = "tight",dpi=300)
+                os.startfile(self.direccion+"\\Sobol.png")
             except:
                 pass
             #Se guardan datos
@@ -5302,6 +5330,7 @@ class qannagnps():
             ax0.set_xlabel("Mean of Elementary Effects ($\mu_{i}^{*}$)",size = 15,family="arial",weight = "bold",color = "black")
             ax0.set_ylabel("Standard Deviation of Elementary Effects ($\sigma_{i}$)",size = 15,family="arial",weight = "bold",color = "black")
             plt.savefig(self.direccion+"\\"+"Morris.png",transparent=False,bbox_inches = "tight",dpi=300)
+            os.startfile(self.direccion+"\\"+"Morris.png")
             
             #Se guardan datos
             df_dic = {}

@@ -559,7 +559,7 @@ QCheckBox::indicator:unchecked {
 </string>
                     </property>
                     <property name="text">
-                     <string>Add Outlet in canvas</string>
+                     <string>Add Outlet in the map</string>
                     </property>
                    </widget>
                   </item>
@@ -1027,8 +1027,8 @@ QCheckBox::indicator:unchecked {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>496</width>
-            <height>365</height>
+            <width>469</width>
+            <height>242</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_3">
@@ -1304,8 +1304,8 @@ QCheckBox::indicator:unchecked {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>496</width>
-            <height>365</height>
+            <width>413</width>
+            <height>94</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_11">
