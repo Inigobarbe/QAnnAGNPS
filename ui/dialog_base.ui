@@ -1027,8 +1027,8 @@ QCheckBox::indicator:unchecked {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>469</width>
-            <height>242</height>
+            <width>496</width>
+            <height>365</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_3">
@@ -1304,8 +1304,8 @@ QCheckBox::indicator:unchecked {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>413</width>
-            <height>94</height>
+            <width>496</width>
+            <height>365</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_11">
@@ -1318,6 +1318,13 @@ QCheckBox::indicator:unchecked {
               <enum>QFrame::Raised</enum>
              </property>
              <layout class="QGridLayout" name="gridLayout_15">
+              <item row="1" column="0">
+               <widget class="Line" name="line_8">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+               </widget>
+              </item>
               <item row="0" column="0">
                <widget class="QLabel" name="label_20">
                 <property name="font">
@@ -1332,7 +1339,7 @@ QCheckBox::indicator:unchecked {
                 </property>
                </widget>
               </item>
-              <item row="1" column="0">
+              <item row="2" column="0">
                <layout class="QHBoxLayout" name="horizontalLayout">
                 <item>
                  <widget class="QLabel" name="label_21">
@@ -1343,20 +1350,43 @@ QCheckBox::indicator:unchecked {
                    </font>
                   </property>
                   <property name="text">
-                   <string>Set sensitivity analysis parameters</string>
+                   <string>Design sensitivity analysis</string>
                   </property>
                  </widget>
                 </item>
                 <item>
                  <widget class="QPushButton" name="sensitivity">
+                  <property name="styleSheet">
+                   <string notr="true">QPushButton {
+    background-color: #becbd1;
+    color: black;
+}
+
+QPushButton:hover {
+    color: white;
+}</string>
+                  </property>
                   <property name="text">
                    <string/>
                   </property>
                  </widget>
                 </item>
+                <item>
+                 <spacer name="horizontalSpacer_6">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
                </layout>
               </item>
-              <item row="2" column="0">
+              <item row="3" column="0">
                <spacer name="verticalSpacer_5">
                 <property name="orientation">
                  <enum>Qt::Vertical</enum>
@@ -1397,10 +1427,13 @@ QCheckBox::indicator:unchecked {
               <item row="2" column="0">
                <widget class="QLabel" name="label_19">
                 <property name="text">
-                 <string>Poner aqui el texto</string>
+                 <string>In this section it is possible to perform a sensitivity analysis of most of the quantitative variables of AnnAGNPS using the Sobol and Morris methods.</string>
                 </property>
                 <property name="alignment">
-                 <set>Qt::AlignCenter</set>
+                 <set>Qt::AlignJustify|Qt::AlignVCenter</set>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
                 </property>
                </widget>
               </item>

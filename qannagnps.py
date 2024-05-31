@@ -693,10 +693,12 @@ class qannagnps():
         #Make project directory
         self.direccion = str(self.dlg.project.text())
         #Poner el nombre de la carpeta en los outputs
-        self.output.lineEdit.setText(self.direccion)
+        self.output.lineEdit.setText(self.direccion+"/INPUTS")
         self.output.lineEdit_2.setText(self.direccion)
         #Pone la dirección del proyecto en las direcciones de las carpetas de los inputs de annagnps
         self.files_directory()
+        #Put the epsg of the project
+        self.epsg = QgsProject.instance().crs().authid()
         
     def obtener_codificacion(self,archivo_csv):
         #Metod to detect code type of csv. If I dont do this ' character gives an error for example in Global IDs, Factors and Flags. 
@@ -2205,6 +2207,8 @@ class qannagnps():
         #Add remove row in sensitivity analysis table
         self.sensitivity_dialog.add.setIcon(QIcon(os.path.join(self.plugin_directory, "images/add.svg")))
         self.sensitivity_dialog.delete_row.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
+        #Sensitivity analysis
+        self.dlg.sensitivity.setIcon(QIcon(os.path.join(self.plugin_directory, "images/balance.svg")))
         
         
     def url_upna(self,event):
@@ -2337,11 +2341,21 @@ class qannagnps():
                 selectedLayer = layers[selectedLayerIndex].layer()
                 self.fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
                 dir_mdt, self.name_mdt = os.path.split(self.fichero_mdt)
-                topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
-                topagnps_control_file["FILENAME"].iloc[0]=self.name_mdt
-                topagnps_control_file.to_csv(self.direccion+"\\TOPAGNPS.CSV", index=False, float_format='%.5f')
+                #Add name of DEM to Topagnps.csv if this file exists
+                if os.path.exists(self.direccion+"\\TOPAGNPS.CSV"):
+                    topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
+                    topagnps_control_file["FILENAME"].iloc[0]=self.name_mdt
+                    topagnps_control_file.to_csv(self.direccion+"\\TOPAGNPS.CSV", index=False, float_format='%.5f')
+                else:
+                    control_file = pd.DataFrame(data = {"FILENAME":[self.name_mdt],"FORMAT":"",
+                                    "DEMPROC":"","OUTFORMAT":"","OUTROW":"","OUTCOL":"","CSA":"","MSCL":"",
+                                    "UTME":"","UTMN":"","ROWS":"","COLS":"","CELLSIZE":"","NODATA":"",
+                                    "OUTSNAP":"","DNMCNT":"","DEMEDGE":"","VERBOSE":"",
+                                    "KEEPFILES":"","OPTIMIZE":"","MODULE":"","OUTPUT":"",
+                                    "READOUT":"","READPATH":""})
+                    control_file.to_csv(self.direccion+"\\"+"TOPAGNPS.csv", index=False, float_format='%.5f')
             except:
-                pass     
+                pass
 
         
     def set_coordinates(self):
