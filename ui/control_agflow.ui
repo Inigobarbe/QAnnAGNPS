@@ -331,6 +331,13 @@ QCheckBox::indicator:unchecked {
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="info">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
@@ -349,7 +356,17 @@ QCheckBox::indicator:unchecked {
         <string notr="true">background-color: #becbd1;</string>
        </property>
        <property name="text">
-        <string>Accept</string>
+        <string>Create</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="delete_2">
+       <property name="styleSheet">
+        <string notr="true">background-color: #becbd1;</string>
+       </property>
+       <property name="text">
+        <string>Delete</string>
        </property>
       </widget>
      </item>

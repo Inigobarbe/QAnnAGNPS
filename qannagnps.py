@@ -608,8 +608,136 @@ class qannagnps():
         
         #Variable that says that it is doing a sensitivity analysis
         self.doing_sensitivity = False
+        
+        #Metod to open documentation
+        lineEdits = [self.ctopagnps.info,self.cpeg.info,self.cagbuf.info,self.cagwet.info,self.cconcepts.info,self.cpothole.info,self.agflow.info]
+        for i in lineEdits:
+            i.clicked.connect(lambda _,b = i:self.show_documentation(b))
+        
+        #Metod to delete control file
+        lineEdits = [self.ctopagnps.delete_2,self.cpeg.delete_2,self.cagbuf.delete_2,self.cagwet.delete_2,self.cconcepts.delete_2,self.cpothole.delete_2,self.agflow.delete_2,self.dednm.delete_2,self.crasfor.delete_2,self.craspro.delete_2]
+        for i in lineEdits:
+            i.clicked.connect(lambda _,b = i:self.delete_control_file(b))
+        
+        #Coloreate buttons depending on existence of control files
+        self.dlg.pbControl.clicked.connect(self.show_existing_control_files)
+        
+    def show_existing_control_files(self):
+        #Metod to show existing control files
+        try:
+            if os.path.exists(self.direccion+"\TOPAGNPS.csv"):
+                self.cgeneral.pushButton.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton.setStyleSheet("background-color: #becbd1;")
+                
+            if os.path.exists(self.direccion+"\PEG.csv"):
+                self.cgeneral.pushButton_2.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton_2.setStyleSheet("background-color: #becbd1;")
+            
+            if os.path.exists(self.direccion+"\AGBUF.csv"):
+                self.cgeneral.pushButton_3.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton_3.setStyleSheet("background-color: #becbd1;")
+            
+            if os.path.exists(self.direccion+"\AGWET.csv"):
+                self.cgeneral.pushButton_4.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton_4.setStyleSheet("background-color: #becbd1;")
+            
+            if os.path.exists(self.direccion+"\CONCEPTS.csv"):
+                self.cgeneral.pushButton_5.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton_5.setStyleSheet("background-color: #becbd1;")
+            
+            if os.path.exists(self.direccion+"\POTHOLE.csv"):
+                self.cgeneral.pushButton_6.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton_6.setStyleSheet("background-color: #becbd1;")
+            
+            if os.path.exists(self.direccion+"\AGFLOW.csv") or os.path.exists(self.direccion+"\AGFCNT.inp"):
+                self.cgeneral.pushButton_9.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton_9.setStyleSheet("background-color: #becbd1;")
+            
+            if os.path.exists(self.direccion+"\dednm.inp"):
+                self.cgeneral.pushButton_10.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton_10.setStyleSheet("background-color: #becbd1;")
+            
+            if os.path.exists(self.direccion+"\rasfor.inp"):
+                self.cgeneral.pushButton_8.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton_8.setStyleSheet("background-color: #becbd1;")
+            
+            if os.path.exists(self.direccion+"\raspro.inp"):
+                self.cgeneral.pushButton_7.setStyleSheet("background-color: green; color: white;")
+            else:
+                self.cgeneral.pushButton_7.setStyleSheet("background-color: #becbd1;")
+            
+        except:
+            pass
+    
+    def delete_control_file(self,doc):
+        #Metod to delete control file
+        try:
+            if doc==self.ctopagnps.delete_2:
+                os.remove(self.direccion+"\TOPAGNPS.csv")
+                self.ctopagnps.close()
+            if doc==self.cpeg.delete_2:
+                os.remove(self.direccion+"\PEG.csv")
+                self.cpeg.close()
+            if doc==self.cagbuf.delete_2:
+                os.remove(self.direccion+"\AGBUF.csv")
+                self.cagbuf.close()
+            if doc==self.cagwet.delete_2:
+                os.remove(self.direccion+"\AGWET.csv")
+                self.cagwet.close()
+            if doc==self.cconcepts.delete_2:
+                os.remove(self.direccion+"\CONCEPTS.csv")
+                self.cconcepts.close()
+            if doc==self.cpothole.delete_2:
+                os.remove(self.direccion+"\POTHOLE.csv")
+                self.cpothole.close()
+            if doc==self.agflow.delete_2:
+                os.remove(self.direccion+"\AGFLOW.csv")
+                os.remove(self.direccion+"\AGFCNT.inp")
+                self.agflow.close()
+            if doc==self.dednm.delete_2:
+                os.remove(self.direccion+"\dednm.inp")
+                self.dednm.close()
+            if doc==self.crasfor.delete_2:
+                os.remove(self.direccion+"/rasfor.inp")
+                self.crasfor.close()
+            if doc==self.craspro.delete_2:
+                os.remove(self.direccion+"/raspro.inp")
+                self.craspro.close()
+        except:
+            pass
+        
+        #Update use of control files
+        self.show_existing_control_files()
+        
+    def show_documentation(self,doc):
+        #Metod to show documentation file
+        try:
+            if doc==self.ctopagnps.info:
+                os.startfile(self.plugin_directory+"\Documentation\TopAGNPS_User_Manual.pdf")
+            if doc==self.cpeg.info:
+                os.startfile(self.plugin_directory+"\Documentation\PEG_User_Manual.pdf")
+            if doc==self.cagbuf.info:
+                os.startfile(self.plugin_directory+"\Documentation\AGBUF_User_Manual.pdf")
+            if doc==self.cagwet.info:
+                os.startfile(self.plugin_directory+"\Documentation\AGWET_User_Manual.pdf")
+            if doc==self.cconcepts.info:
+                os.startfile(self.plugin_directory+"\Documentation\CONCEPTS_User_Manual.pdf")
+            if doc==self.cpothole.info:
+                os.startfile(self.plugin_directory+"\Documentation\POTHOLE_User_Manual.pdf")
+            if doc==self.agflow.info:
+                os.startfile(self.plugin_directory+"\Documentation\AGFLOW_User_Manual.pdf")
+        except:
+            pass
        
-
     def instantiate_buffer(self):
         #Metod to select the layer of buffer that is going to be used
         layers = QgsProject.instance().layerTreeRoot().children()
@@ -2209,6 +2337,14 @@ class qannagnps():
         self.sensitivity_dialog.delete_row.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
         #Sensitivity analysis
         self.dlg.sensitivity.setIcon(QIcon(os.path.join(self.plugin_directory, "images/balance.svg")))
+        #Information of control files
+        self.ctopagnps.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
+        self.cpeg.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
+        self.cagbuf.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
+        self.cagwet.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
+        self.cconcepts.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
+        self.cpothole.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
+        self.agflow.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
         
         
     def url_upna(self,event):
@@ -2808,7 +2944,7 @@ class qannagnps():
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
                 #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo AnnAGNPS_Ephemeral_Gully_Data_Section.csv
                 if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
-                    eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
+                    eg_path = fichero(self.ephemeral_gully_file()) #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
                     summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
                     def create_layer():
                         layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
@@ -3050,7 +3186,7 @@ class qannagnps():
             #Primero se asigna la dirección, si es que se ha elegido la opción de que se obtengan de la ejecución de TopAGNPS
             checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
             sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data]
-            names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
+            names_list = ["AnnAGNPS_Cell_Data_Section.csv",self.ephemeral_gully_file(),"AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
             for i in range(len(checks_list)):
                 if checks_list[i].isChecked():
                     sections_list[i]=self.direccion+"\\"+names_list[i]
@@ -3251,6 +3387,15 @@ class qannagnps():
             proc = subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             stdout, stderr = proc.communicate()
 
+    def ephemeral_gully_file(self):
+        #Metod to select the file name containing ephemeral gully information depending on the presence of other control files
+        #Files that go from more to less information
+        if os.path.exists(self.direccion+"\\"+"AGWET.csv"):
+            return "AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgWet.csv"
+        if os.path.exists(self.direccion+"\\"+"Agbuf.csv"):
+            return "AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgBuf.csv"
+        if os.path.exists(self.direccion+"\\"+"PEG.csv"):
+            return "AnnAGNPS_Ephemeral_Gully_Data_Section.csv"
 
     def startCapturing(self):
         self.iface.mapCanvas().setMapTool(self.mapTool)
@@ -3361,6 +3506,8 @@ class qannagnps():
             iface.messageBar().pushMessage("Select project folder", "Please before creating the topagnps control file first select de project folder you are going to work with",level=Qgis.Warning)
             return 
         self.ctopagnps.close()
+        #Update use of control files
+        self.show_existing_control_files()
         
     def create_control_file_peg(self):
         #Función para que cuando se le de al botón de aceptar en el control file de peg se cree el control file PEG.csv con los datos que se han puesto
@@ -3374,6 +3521,8 @@ class qannagnps():
             iface.messageBar().pushMessage("Select DEM", "Please before creating the PEG control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cpeg.close()
+        #Update use of control files
+        self.show_existing_control_files()
         
     def create_control_file_agbuf(self):
         #Función para que cuando se le de al botón de aceptar en el control file de agbuf se cree el control file Agbuf.csv con los datos que se han puesto
@@ -3388,6 +3537,8 @@ class qannagnps():
             iface.messageBar().pushMessage("Select DEM", "Please before creating the AGBUF control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cagbuf.close()
+        #Update use of control files
+        self.show_existing_control_files()
         
     def create_control_file_agwet(self):
         #Función para que cuando se le de al botón de aceptar en el control file de agwet se cree el control file Agwet.csv con los datos que se han puesto
@@ -3407,6 +3558,8 @@ class qannagnps():
             iface.messageBar().pushMessage("Select DEM", "Please before creating the AGWET control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cagwet.close()
+        #Update use of control files
+        self.show_existing_control_files()
         
     def create_control_file_concepts(self):
         #Función para que cuando se le de al botón de aceptar en el control file de concepts se cree el control file CONCEPTS.csv con los datos que se han puesto
@@ -3417,6 +3570,8 @@ class qannagnps():
             iface.messageBar().pushMessage("Select DEM", "Please before creating the CONCEPTS control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cconcepts.close()
+        #Update use of control files
+        self.show_existing_control_files()
         
     def create_control_file_pothole(self):
         #Función para que cuando se le de al botón de aceptar en el control file de pothole se cree el control file POTHOLE.csv con los datos que se han puesto
@@ -3428,6 +3583,8 @@ class qannagnps():
             iface.messageBar().pushMessage("Select DEM", "Please before creating the POTHOLE control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
         self.cpothole.close()
+        #Update use of control files
+        self.show_existing_control_files()
         
     def create_control_file_rasfor(self):
         #Función para que cuando se le de al botón de aceptar en el control file de rasfor se cree el control file rasfor.inp con los datos que se han puesto
@@ -3489,11 +3646,13 @@ class qannagnps():
         try:
             f = open(self.direccion+"\\"+"rasfor.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the RASFOR data first select de DEM you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select Project Folder", "Please before creating the RASFOR data first select de project folder you are going to use",level=Qgis.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
         self.crasfor.close()
+        #Update use of control files
+        self.show_existing_control_files()
         
     def create_control_file_raspro(self):
         #Función para que cuando se le de al botón de aceptar en el control file de raspro se cree el control file raspro.inp con los datos que se han puesto
@@ -3517,11 +3676,13 @@ class qannagnps():
         try:
             f = open(self.direccion+"\\"+"raspro.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the RASPRO data first select de DEM you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select Project Folder", "Please before creating the RASPRO data first select de project folder you are going to use",level=Qgis.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
         self.craspro.close()
+        #Update use of control files
+        self.show_existing_control_files()
         
     def create_control_file_dednm(self):
         #Función para que cuando se le de al botón de aceptar en el control file de dednm se cree el control file dednm.inp con los datos que se han puesto
@@ -3604,6 +3765,8 @@ class qannagnps():
         f.write(texto_nuevo)
         f.close()
         self.dednm.close()
+        #Update use of control files
+        self.show_existing_control_files()
     
     def create_control_file_agflow(self):
         #Función para que cuando se le de al botón de aceptar en el control file de agflow se cree el control file dednm.inp con los datos que se han puesto
@@ -3651,6 +3814,8 @@ class qannagnps():
         self.agflow.close()
         df = pd.DataFrame(data = {"REASSIGN":[reas],"ASC_PATH":[path]})
         df.to_csv(self.direccion+"\\"+"agflow.csv", index=False, float_format='%.5f')
+        #Update use of control files
+        self.show_existing_control_files()
         
     def asignar_valores_control_dialogo(self):
         #Añadir los valores del control file al plugin
@@ -3658,7 +3823,7 @@ class qannagnps():
         if hasattr(self,"direccion"):
             pass
         else:
-            iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.Warning,duration = 10)
             return 
         #TOPAGNPS
         try:

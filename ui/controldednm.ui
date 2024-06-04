@@ -1069,7 +1069,17 @@ QCheckBox::indicator:unchecked {
           <string notr="true">background-color: #becbd1;</string>
          </property>
          <property name="text">
-          <string>Accept</string>
+          <string>Create</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="delete_2">
+         <property name="styleSheet">
+          <string notr="true">background-color: #becbd1;</string>
+         </property>
+         <property name="text">
+          <string>Delete</string>
          </property>
         </widget>
        </item>
