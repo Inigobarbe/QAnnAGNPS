@@ -247,7 +247,8 @@ class qannagnps():
         self.crasfor.pushButton.clicked.connect(self.create_control_file_rasfor)
         self.craspro.pushButton.clicked.connect(self.create_control_file_raspro)
         self.dednm.pushButton.clicked.connect(self.create_control_file_dednm)
-        self.agflow.pushButton.clicked.connect(self.create_control_file_agflow)
+        self.agflow.create_csv.clicked.connect(lambda _, b="csv": self.create_control_file_agflow(b))
+        self.agflow.create_inp.clicked.connect(lambda _, b="inp": self.create_control_file_agflow(b))
         
         #Seleccionar las capas una vez se hayan seleccionado en el combobox
         self.dlg.comboBox_2.currentIndexChanged.connect(self.instantiate_buffer)
@@ -615,7 +616,7 @@ class qannagnps():
             i.clicked.connect(lambda _,b = i:self.show_documentation(b))
         
         #Metod to delete control file
-        lineEdits = [self.ctopagnps.delete_2,self.cpeg.delete_2,self.cagbuf.delete_2,self.cagwet.delete_2,self.cconcepts.delete_2,self.cpothole.delete_2,self.agflow.delete_2,self.dednm.delete_2,self.crasfor.delete_2,self.craspro.delete_2]
+        lineEdits = [self.ctopagnps.delete_2,self.cpeg.delete_2,self.cagbuf.delete_2,self.cagwet.delete_2,self.cconcepts.delete_2,self.cpothole.delete_2,self.agflow.delete_2,self.agflow.delete_inp,self.dednm.delete_2,self.crasfor.delete_2,self.craspro.delete_2]
         for i in lineEdits:
             i.clicked.connect(lambda _,b = i:self.delete_control_file(b))
         
@@ -626,52 +627,52 @@ class qannagnps():
         #Metod to show existing control files
         try:
             if os.path.exists(self.direccion+"\TOPAGNPS.csv"):
-                self.cgeneral.pushButton.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton.setStyleSheet("background-color: #becbd1;")
                 
             if os.path.exists(self.direccion+"\PEG.csv"):
-                self.cgeneral.pushButton_2.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton_2.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_2.setStyleSheet("background-color: #becbd1;")
             
             if os.path.exists(self.direccion+"\AGBUF.csv"):
-                self.cgeneral.pushButton_3.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton_3.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_3.setStyleSheet("background-color: #becbd1;")
             
             if os.path.exists(self.direccion+"\AGWET.csv"):
-                self.cgeneral.pushButton_4.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton_4.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_4.setStyleSheet("background-color: #becbd1;")
             
             if os.path.exists(self.direccion+"\CONCEPTS.csv"):
-                self.cgeneral.pushButton_5.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton_5.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_5.setStyleSheet("background-color: #becbd1;")
             
             if os.path.exists(self.direccion+"\POTHOLE.csv"):
-                self.cgeneral.pushButton_6.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton_6.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_6.setStyleSheet("background-color: #becbd1;")
             
             if os.path.exists(self.direccion+"\AGFLOW.csv") or os.path.exists(self.direccion+"\AGFCNT.inp"):
-                self.cgeneral.pushButton_9.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton_9.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_9.setStyleSheet("background-color: #becbd1;")
             
             if os.path.exists(self.direccion+"\dednm.inp"):
-                self.cgeneral.pushButton_10.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton_10.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_10.setStyleSheet("background-color: #becbd1;")
             
             if os.path.exists(self.direccion+"\rasfor.inp"):
-                self.cgeneral.pushButton_8.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton_8.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_8.setStyleSheet("background-color: #becbd1;")
             
             if os.path.exists(self.direccion+"\raspro.inp"):
-                self.cgeneral.pushButton_7.setStyleSheet("background-color: green; color: white;")
+                self.cgeneral.pushButton_7.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_7.setStyleSheet("background-color: #becbd1;")
             
@@ -682,36 +683,38 @@ class qannagnps():
         #Metod to delete control file
         try:
             if doc==self.ctopagnps.delete_2:
-                os.remove(self.direccion+"\TOPAGNPS.csv")
                 self.ctopagnps.close()
+                os.remove(self.direccion+"\TOPAGNPS.csv")
             if doc==self.cpeg.delete_2:
-                os.remove(self.direccion+"\PEG.csv")
                 self.cpeg.close()
+                os.remove(self.direccion+"\PEG.csv")
             if doc==self.cagbuf.delete_2:
-                os.remove(self.direccion+"\AGBUF.csv")
                 self.cagbuf.close()
+                os.remove(self.direccion+"\AGBUF.csv")
             if doc==self.cagwet.delete_2:
-                os.remove(self.direccion+"\AGWET.csv")
                 self.cagwet.close()
+                os.remove(self.direccion+"\AGWET.csv")
             if doc==self.cconcepts.delete_2:
-                os.remove(self.direccion+"\CONCEPTS.csv")
                 self.cconcepts.close()
+                os.remove(self.direccion+"\CONCEPTS.csv")
             if doc==self.cpothole.delete_2:
-                os.remove(self.direccion+"\POTHOLE.csv")
                 self.cpothole.close()
+                os.remove(self.direccion+"\POTHOLE.csv")
             if doc==self.agflow.delete_2:
-                os.remove(self.direccion+"\AGFLOW.csv")
-                os.remove(self.direccion+"\AGFCNT.inp")
                 self.agflow.close()
+                os.remove(self.direccion+"\AGFLOW.csv")
+            if doc==self.agflow.delete_inp:
+                self.agflow.close()
+                os.remove(self.direccion+"\AGFCNT.inp")
             if doc==self.dednm.delete_2:
-                os.remove(self.direccion+"\dednm.inp")
                 self.dednm.close()
+                os.remove(self.direccion+"\dednm.inp")
             if doc==self.crasfor.delete_2:
-                os.remove(self.direccion+"/rasfor.inp")
                 self.crasfor.close()
+                os.remove(self.direccion+"/rasfor.inp")
             if doc==self.craspro.delete_2:
-                os.remove(self.direccion+"/raspro.inp")
                 self.craspro.close()
+                os.remove(self.direccion+"/raspro.inp")
         except:
             pass
         
@@ -740,25 +743,66 @@ class qannagnps():
        
     def instantiate_buffer(self):
         #Metod to select the layer of buffer that is going to be used
-        layers = QgsProject.instance().layerTreeRoot().children()
+        all_layers = QgsProject.instance().layerTreeRoot().children()
+        layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
         selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
         if selectedLayerIndex>=0:
             selectedLayer = layers[selectedLayerIndex].layer()
             self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
             buf_directory, self.nombre_buf = os.path.split(self.fichero_buf)
+            #Create file if it doesn't exist
+            if not os.path.exists(self.direccion+"\\AGBUF.CSV"):
+                control_file = pd.DataFrame(data = {"BUFFER":[self.nombre_buf],"VEGETATION":"",
+                                    "FOREST":"","GRASS":"",
+                                    "C_THRESHOLD":"","R_THRESHOLD":"",
+                                    "UNITS":"","ASC_PATH":"",
+                                    "CSV_PATH":""})
+                control_file.to_csv(self.direccion+"\\"+"AGBUF.csv", index=False, float_format='%.5f')
+            
+        #Add name of Buffer to AGBUF.csv if this file exists
+        try: #when opening the plugin self.direccion doesnt exist
+            if os.path.exists(self.direccion+"\\AGBUF.CSV"):
+                if selectedLayerIndex==-1:self.nombre_buf=""
+                topagnps_control_file = pd.read_csv(self.direccion+"\\AGBUF.CSV",encoding = "ISO-8859-1",delimiter=",")
+                topagnps_control_file["BUFFER"].iloc[0]=self.nombre_buf
+                topagnps_control_file.to_csv(self.direccion+"\\AGBUF.CSV", index=False, float_format='%.5f')
+        except:
+            pass
+        
         
     def instantiate_vegetation(self):
         #Metod to select the layer of vegetation that is going to be used
-        layers = QgsProject.instance().layerTreeRoot().children()
+        all_layers = QgsProject.instance().layerTreeRoot().children()
+        layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
         selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
         if selectedLayerIndex>=0:
             selectedLayer = layers[selectedLayerIndex].layer()
             self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
             veg_directory, self.nombre_veg = os.path.split(self.fichero_veg)
-        
+            #Create file if it doesn't exist
+            if not os.path.exists(self.direccion+"\\AGBUF.CSV"):
+                control_file = pd.DataFrame(data = {"BUFFER":"","VEGETATION":[self.nombre_veg],
+                                    "FOREST":"","GRASS":"",
+                                    "C_THRESHOLD":"","R_THRESHOLD":"",
+                                    "UNITS":"","ASC_PATH":"",
+                                    "CSV_PATH":""})
+                control_file.to_csv(self.direccion+"\\"+"AGBUF.csv", index=False, float_format='%.5f')
+                
+        #Add name of Buffer to AGBUF.csv if this file exists
+        try: #when opening the plugin self.direccion doesnt exist
+            if os.path.exists(self.direccion+"\\AGBUF.CSV"):
+                if selectedLayerIndex==-1:self.nombre_veg=""
+                topagnps_control_file = pd.read_csv(self.direccion+"\\AGBUF.CSV",encoding = "ISO-8859-1",delimiter=",")
+                topagnps_control_file["VEGETATION"].iloc[0]=self.nombre_veg
+                topagnps_control_file.to_csv(self.direccion+"\\AGBUF.CSV", index=False, float_format='%.5f')
+        except:
+            pass
+            
+                
     def instantiate_soil(self):
         #Metod to select the layer of soil that is going to be used
-        layers = QgsProject.instance().layerTreeRoot().children()
+        all_layers = QgsProject.instance().layerTreeRoot().children()
+        layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
         selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
         if selectedLayerIndex>=0:
             selectedLayer = layers[selectedLayerIndex].layer()
@@ -766,7 +810,8 @@ class qannagnps():
         
     def instantiate_management(self):
         #Metod to select the layer of management that is going to be used
-        layers = QgsProject.instance().layerTreeRoot().children()
+        all_layers = QgsProject.instance().layerTreeRoot().children()
+        layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
         selectedLayerIndex = self.dlg.cbMan.currentIndex()-1
         if selectedLayerIndex>=0:
             selectedLayer = layers[selectedLayerIndex].layer()
@@ -778,6 +823,9 @@ class qannagnps():
         self.direccion = str(self.dlg.project.text())
         #Asignar los valores de los control files a los diálogos
         self.asignar_valores_control_dialogo()
+        #Poner el nombre de la carpeta en los outputs
+        self.output.lineEdit.setText(self.direccion+"/INPUTS")
+        self.output.lineEdit_2.setText(self.direccion)
     
     def add_topagnps_input(self,type_input):
         #Metod to add topagnps inputs with pushbutton
@@ -795,7 +843,8 @@ class qannagnps():
             root.insertLayer(0, layer)
             #QgsProject.instance().addMapLayer(layer)
             #Se obtienen las capas que hay en el canvas
-            layers = QgsProject.instance().layerTreeRoot().children()
+            all_layers = QgsProject.instance().layerTreeRoot().children()
+            layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
             project_layers=[layer.name() for layer in layers]
             project_layers.insert(0,"")
             #Se actualizan las capas
@@ -2471,8 +2520,9 @@ class qannagnps():
         if self.dlg.comboBox.currentIndex() >=1:
             try:
                 self.epsg = QgsProject.instance().crs().authid()
-                #Se pone el nombre del mdt en TOPAGNPS.csv
-                layers = QgsProject.instance().layerTreeRoot().children()
+                #Se crean las variables con los datos de la capa
+                all_layers = QgsProject.instance().layerTreeRoot().children()
+                layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
                 selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
                 selectedLayer = layers[selectedLayerIndex].layer()
                 self.fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
@@ -2567,7 +2617,8 @@ class qannagnps():
         try:
             if self.dlg.comboBox_2.currentIndex()>0:
                 if path.exists(self.direccion+"/AGBUF.csv"):
-                    layers = QgsProject.instance().layerTreeRoot().children()
+                    all_layers = QgsProject.instance().layerTreeRoot().children()
+                    layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
                     selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
                     selectedLayer = layers[selectedLayerIndex].layer()
                     self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
@@ -2587,7 +2638,8 @@ class qannagnps():
         try:
             if self.dlg.comboBox_3.currentIndex()>0:
                 if path.exists(self.direccion+"/AGBUF.csv"):
-                    layers = QgsProject.instance().layerTreeRoot().children()
+                    all_layers = QgsProject.instance().layerTreeRoot().children()
+                    layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
                     selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
                     selectedLayer = layers[selectedLayerIndex].layer()
                     self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
@@ -2622,7 +2674,8 @@ class qannagnps():
             self.first_start = False
             self.dlg = Dialog_Base()
         # Fetch the currently loaded layers
-        layers = QgsProject.instance().layerTreeRoot().children()
+        all_layers = QgsProject.instance().layerTreeRoot().children()
+        layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
         self.layers = layers
         
         #Hacer que el desplegable de las columnas se quede vacío después de las ejecuciones anteriores
@@ -2685,7 +2738,8 @@ class qannagnps():
         self.direccion = str(self.dlg.project.text())
         
         #Primero se establece la variable que contiene las capas del proyecto
-        layers = QgsProject.instance().layerTreeRoot().children()
+        all_layers = QgsProject.instance().layerTreeRoot().children()
+        layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
         
         #Establecer directorio de DEM y EPSG del proyecto
         #Solo se hace una vez. Es decir, si elijo outlet solo se elige en la primera ronda. Sino el selected layer puede cambiar de DEM a los reaches y da error después.
@@ -3526,11 +3580,14 @@ class qannagnps():
         
     def create_control_file_agbuf(self):
         #Función para que cuando se le de al botón de aceptar en el control file de agbuf se cree el control file Agbuf.csv con los datos que se han puesto
-        control_file = pd.DataFrame(data = {"Buffer":[self.cagbuf.lineEdit.text()],"Vegetation":[self.cagbuf.lineEdit_2.text()],
-                                    "Forest":[self.cagbuf.lineEdit_3.text()],"Grass":[self.cagbuf.lineEdit_4.text()],
-                                    "C_Threshold":[self.cagbuf.lineEdit_5.text()],"R_Threshold":[self.cagbuf.lineEdit_6.text()],
-                                    "Units":[self.cagbuf.lineEdit_7.text()],"ASC_PATH":[self.cagbuf.lineEdit_8.text()],
+        control_file = pd.DataFrame(data = {"BUFFER":[self.cagbuf.lineEdit.text()],"VEGETATION":[self.cagbuf.lineEdit_2.text()],
+                                    "FOREST":[self.cagbuf.lineEdit_3.text()],"GRASS":[self.cagbuf.lineEdit_4.text()],
+                                    "C_THRESHOLD":[self.cagbuf.lineEdit_5.text()],"R_THRESHOLD":[self.cagbuf.lineEdit_6.text()],
+                                    "UNITS":[self.cagbuf.lineEdit_7.text()],"ASC_PATH":[self.cagbuf.lineEdit_8.text()],
                                     "CSV_PATH":[self.cagbuf.lineEdit_9.text()]})
+        #If Forest keyword is not used, then delete the column
+        if str(self.cagbuf.lineEdit_3.text())=="":control_file.drop("FOREST",axis = 1,inplace = True)
+        
         try:
             control_file.to_csv(self.direccion+"\\"+"AgBuf.csv", index=False, float_format='%.5f')
         except:
@@ -3768,7 +3825,7 @@ class qannagnps():
         #Update use of control files
         self.show_existing_control_files()
     
-    def create_control_file_agflow(self):
+    def create_control_file_agflow(self,control_type):
         #Función para que cuando se le de al botón de aceptar en el control file de agflow se cree el control file dednm.inp con los datos que se han puesto
         #Función para pasar de 1 a T y de 0 a F
         def funcion_t(numero):
@@ -3777,43 +3834,48 @@ class qannagnps():
             elif numero ==0:
                 return "F"
         #Inputs
-        try:
-            slope= int(self.agflow.lineEdit_4.text())
-            maxim_d=float(self.agflow.lineEdit_5.text())
-            maxim_pl=float(self.agflow.lineEdit_6.text())
-            maxim_ps=float(self.agflow.lineEdit_7.text())
-            use=funcion_t(int(self.agflow.checkBox.isChecked()))
-            write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
-            arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
-            dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
-            use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
+        #Create inp
+        if control_type=="inp":
+            try:
+                slope= str(self.agflow.lineEdit_4.text())
+                maxim_d=str(self.agflow.lineEdit_5.text())
+                maxim_pl=str(self.agflow.lineEdit_6.text())
+                maxim_ps=str(self.agflow.lineEdit_7.text())
+                use=funcion_t(int(self.agflow.checkBox.isChecked()))
+                write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
+                arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
+                dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
+                use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
+            except:
+                iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning)
+                return
+            #Se obtiene el texto de un archivo rasfor (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
+            fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
+            texto = fichero.read()
+            fichero.close()
+            #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
+            lista_parametros = [slope,maxim_d,maxim_pl,maxim_ps,use,write,arc,dat,use_file]
+            lista = [237,244,250,260,265,270,275,280,285]
+            texto_nuevo = texto
+            contador = 0
+            for i in range(len(lista_parametros)):
+                texto_nuevo = texto_nuevo[0:lista[i]+contador]+str(lista_parametros[i])+texto_nuevo[lista[i]+contador+1:]
+                contador += len(str(lista_parametros[i]))-1
+            try:
+                f = open(self.direccion+"\\"+"AGFCNT.inp","w+")
+            except:
+                iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
+                return 
+            f.write(texto_nuevo)
+            f.close()
+        #Create csv
+        if control_type=="csv":
             reas=int(self.agflow.checkBox_6.isChecked())
             path = str(self.agflow.lineEdit_8.text())
-        except:
-            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning)
-            return
-        #Se obteiene el texto de un archivo rasfor (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
-        fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
-        texto = fichero.read()
-        fichero.close()
-        #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
-        lista_parametros = [slope,maxim_d,maxim_pl,maxim_ps,use,write,arc,dat,use_file]
-        lista = [237,244,250,260,265,270,275,280,285]
-        texto_nuevo = texto
-        contador = 0
-        for i in range(len(lista_parametros)):
-            texto_nuevo = texto_nuevo[0:lista[i]+contador]+str(lista_parametros[i])+texto_nuevo[lista[i]+contador+1:]
-            contador += len(str(lista_parametros[i]))-1
-        try:
-            f = open(self.direccion+"\\"+"AGFCNT.inp","w+")
-        except:
-            iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
-            return 
-        f.write(texto_nuevo)
-        f.close()
+            df = pd.DataFrame(data = {"REASSIGN":[reas],"ASC_PATH":[path]})
+            df.to_csv(self.direccion+"\\"+"AGFLOW.csv", index=False, float_format='%.5f')
+            
         self.agflow.close()
-        df = pd.DataFrame(data = {"REASSIGN":[reas],"ASC_PATH":[path]})
-        df.to_csv(self.direccion+"\\"+"agflow.csv", index=False, float_format='%.5f')
         #Update use of control files
         self.show_existing_control_files()
         
@@ -3872,7 +3934,7 @@ class qannagnps():
             control_file = pd.read_csv(self.direccion+"\\"+"AgBuf.csv",encoding = "ISO-8859-1",delimiter=",")
         except:
             pass
-        columnas =["Buffer","Vegetation","Forest","Grass","C_Threshold","R_Threshold","Units","ASC_PATH","CSV_PATH"]
+        columnas =["BUFFER","VEGETATION","FOREST","GRASS","C_THRESHOLD","R_THRESHOLD","UNITS","ASC_PATH","CSV_PATH"]
         dialogos = [self.cagbuf.lineEdit,self.cagbuf.lineEdit_2,self.cagbuf.lineEdit_3,self.cagbuf.lineEdit_4,self.cagbuf.lineEdit_5,self.cagbuf.lineEdit_6,self.cagbuf.lineEdit_7,self.cagbuf.lineEdit_8,self.cagbuf.lineEdit_9]
         #Primero se borra lo que haya previamente
         for i in dialogos:
@@ -4446,7 +4508,8 @@ class qannagnps():
         file_dialog.setDefaultSuffix("csv")
         
         #Se obtienen los datos de los inputs
-        layers = QgsProject.instance().layerTreeRoot().children()
+        all_layers = QgsProject.instance().layerTreeRoot().children()
+        layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
         if self.dlg.comboBox.currentIndex()>0:
             dem_layer = layers[self.dlg.comboBox.currentIndex() - 1].layer().dataProvider().dataSourceUri()
             dem_name = layers[self.dlg.comboBox.currentIndex() - 1].layer().name()
@@ -4586,7 +4649,9 @@ class qannagnps():
             self.dlg.comboBox_2.clear()
             self.dlg.comboBox_3.clear()
             #Añadir al desplegable las capas que están en el proyecto
-            combo_lista = [layer.name() for layer in QgsProject.instance().layerTreeRoot().children()]
+            all_layers = QgsProject.instance().layerTreeRoot().children()
+            l = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
+            combo_lista = [layer.name() for layer in l]
             combo_lista.insert(0,"")
             try:
                 self.dlg.comboBox.addItems(combo_lista)
@@ -4601,7 +4666,8 @@ class qannagnps():
             self.dlg.comboBox_3.addItems(combo_lista)
         
             #Se añaden las capas a los combobox
-            layers_l = QgsProject.instance().layerTreeRoot().children()
+            all_layers = QgsProject.instance().layerTreeRoot().children()
+            layers_l = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
             sources = [x.layer().source() for x in layers_l]
             comboboxes = [self.dlg.comboBox,self.dlg.cbSoil,self.dlg.cbMan,self.dlg.comboBox_2,self.dlg.comboBox_3]
             names = ["dem", "soil","use","buffer","vegetation"]
@@ -5566,12 +5632,12 @@ class qannagnps():
         #If buffer exist then change name of buffer raster
         if self.dlg.comboBox_2.currentIndex()>0:
             df = pd.read_csv(self.direccion+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-            df["Buffer"].iloc[0] = str(self.nombre_buffer+f"_{round(i[j],2)}"+"."+self.extension_buffer)
+            df["BUFFER"].iloc[0] = str(self.nombre_buffer+f"_{round(i[j],2)}"+"."+self.extension_buffer)
             df.to_csv(self.direccion+"\\AGBUF.csv", index=False, float_format='%.5f')
         
         #If vegetation exist then change name of vegetation raster
         if self.dlg.comboBox_3.currentIndex()>0:
             df = pd.read_csv(self.direccion+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
-            df["Vegetation"].iloc[0] = str(self.nombre_vegetation+f"_{round(i[j],2)}"+"."+self.extension_vegetation)
+            df["VEGETATION"].iloc[0] = str(self.nombre_vegetation+f"_{round(i[j],2)}"+"."+self.extension_vegetation)
             df.to_csv(self.direccion+"\\AGBUF.csv", index=False, float_format='%.5f')
             
