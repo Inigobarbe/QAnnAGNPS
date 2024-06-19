@@ -410,7 +410,7 @@ class qannagnps():
         rusle2_col = ["RUSLE2_ID","RUSLE2_Filename","RUSLE2_Erosion_Flag"]
         out_global_col =["Glbl_All_V3_csv", "Glbl_All_V3_dpp", "Glbl_All_V3_npt", "Glbl_All_V3_sim", "Glbl_All_V3_txt", "Log_to_File", "Log_to_Screen", "Warning_File", "V1/2_Output_Files", "Reserved", "Glbl_All_Cells", "Glbl_All_Feedlots", "Glbl_All_Fld_Ponds", "Glbl_All_Gullies", "Glbl_All_Pt_Srcs", "Glbl_All_Reaches", "Glbl_All_Impound", "Glbl_All_Wetlands", "Glbl_All_AA_Nutr", "Glbl_All_AA_Pest", "Reserved", "Reserved", "Glbl_All_AA_Sed", "Glbl_All_AA_Wtr", "Glbl_All_EV_Nutr", "Glbl_All_EV_Pest", "Glbl_All_EV_Sed", "Glbl_All_EV_Wtr", "Reserved", "Reserved", "Glbl_All_V2/3_Mass", "Glbl_All_V2/3_Ratio", "Glbl_All_V2/3_UA", "Reserved", "V2_Concepts", "Reserved", "V2_AA", "V2_EV", "V1_AA", "V1_EV"]
         out_csv_col =  ["All_Evt_Lds_Cell_to_DS_Rchs", "All_AA", "All_Events", "All_N", "All_OC", "All_Pesticides", "All_P", "All_Sediment", "All_Water", "AA_N_Ld_Cel_to_DS_Rchs", "AA_N_Ld_in_Rchs", "AA_N_Yld_Cel_to_Rcv_Rch", "AA_OC_Ld_Cel_to_DS_Rchs", "AA_OC_Ld_in_Rchs", "AA_OC_Yld_Cel_to_Rc_v_Rch", "AA_Pest_Ld_Cel_to_DS_Rchs", "AA_Pest_Ld_in_Rchs", "AA_Pest_Yld_Cel_to_Rcv_Rch", "AA_P_Ld_Cel_to_DS_Rchs", "AA_P_Ld_in_Rchs", "AA_P_Yld_Cel_to_Rcv_Rch", "AA_BB_Eros_in_Rch", "AA_BB_Ld_in_DS_Rchs", "AA_Eros_in_Cels", "AA_Gly_Yld_Cel_to_Rcv_Rch", "AA_LS_Eros_in_Cels", "AA_LS_Ld_Cels_to_DS_Rchs", "AA_LS_Ld_in_DS_Rchs", "AA_LS_Yld_Cel_to_Rc_v_Rch", "AA_Rill_Eros_in_Cels", "AA_SR_Yld_Cel_to_Rc_v_Rch", "AA_Wtr_Ld_Cel_to_DS_Rchs", "AA_Wtr_Ld_in_DS_Rc_hs", "AA_Wtr_Yld_Cel_to_Rcv_Rch", "N_Evt_Ld_Cel_to_DS_Rchs", "N_Evt_Ld_in_Rchs", "N_Evt_Yld_Cel_to_Rcv_Rch", "OC_Evt_Ld_Cel_to_DS_Rchs", "OC_Evt_Ld_in_Rchs", "OC_Evt_Yld_Cel_to_Rc_v_Rch", "Pest_Evt_Ld_Cel_to_DS_Rchs", "Pest_Evt_Ld_in_Rchs", "Pest_Evt_Yld_Cel_to_Rcv_Rch", "P_Evt_Ld_Cel_to_DS_Rchs", "P_Evt_Ld_in_Rchs", "P_Evt_Yld_Cel_to_Rcv_Rch", "Sed_Evt_BB_Eros_in_Rch", "Sed_Evt_BB_Ld_in_DS_Rchs", "Sed_Evt_Gly_Eros_in_Cels", "Sed_Evt_Gly_Yld_Cel_to_Rcv_Rch", "Sed_Evt_LS_Eros_in_Cels", "Sed_Evt_LS_Ld_Cel_to_DS_Rchs", "Sed_Evt_LS_Ld_in_Rc_hs", "Sed_Evt_LS_Yld_Cel_to_Rcv_Rch", "Sed_Evt_SR_Eros_in_C_els", "Sed_Evt_SR_Yld_Cel_to_Rcv_Rch", "Wtr_Evt_Ld_Cel_to_DS_Rchs", "Wtr_Evt_Ld_in_DS_Rc_hs", "Wtr_Evt_Pk_Disch_in_DS_Rch", "Wtr_Evt_Yld_Cel_to_Rcv_Rch","Wtr_Evt_Baseflow"]
-        out_dpp_col =["Acc_Setup", "Cell_Initial", "Cell_TOC", "Crp_Grwth", "Data_Prep_Pointers", "Weather", "Opr_Rotation", "Pest_Metabolite", "Process_Flag", "Quadrature", "Hydraulic_Geom", "Rch_Routing", "Rch_TOC", "RUSLE_C_Fctr", "RUSLE_C_Fctr_SC", "Canopy_Cover", "Crp_Residue", "Dead_Roots", "PreProc_C_Fctr", "Dom_Contour", "EI_Pcts", "RUSLE_Grwth_Days", "RUSLE_Init_Loc_Oprs", "RUSLE_K_Fctr", "Reserved", "RUSLE_Non-,crp_C_Fctr", "RUSLE_Num_SLyr_SR es", "RUSLE_P_Fctr", "RUSLE_P_Fctr_Cntrs", "RUSLE_P_Fctr_Strp", "RUSLE_P_Fctr_Strp_R ot", "RUSLE_Prior_LU", "RUSLE_Res_Coef", "RUSLE_Seg_Res", "RUSLE_Setup_Prd_Seg", "RUSLE_Soil_Moisture", "RUSLE_Surf_Cover", "RUSLE_Surf_Rough", "RUSLE_Unique_Res", "Sed_Part_Distrib", "Seg_EI_Prcp", "Setup_Seg", "Soil_Comp_Surf", "Soil_Comp_Lyrs", "Storm_Types", "Climate_Daily_Wthr", "Eph_Gully_Info", "RUSLE2_Info"]
+        out_dpp_col =["Acc_Setup", "Cell_Initial", "Cell_TOC", "Crp_Grwth", "Data_Prep_Pointers", "Weather", "Opr_Rotation", "Pest_Metabolite", "Process_Flag", "Quadrature", "Hydraulic_Geom", "Rch_Routing", "Rch_TOC", "RUSLE_C_Fctr", "RUSLE_C_Fctr_SC", "Canopy_Cover", "Crp_Residue", "Dead_Roots", "PreProc_C_Fctr", "Dom_Contour", "EI_Pcts", "RUSLE_Grwth_Days", "RUSLE_Init_Loc_Oprs", "RUSLE_K_Fctr", "Reserved", "RUSLE_Non-crp_C_Fctr", "RUSLE_Num_SLyr_SR es", "RUSLE_P_Fctr", "RUSLE_P_Fctr_Cntrs", "RUSLE_P_Fctr_Strp", "RUSLE_P_Fctr_Strp_R ot", "RUSLE_Prior_LU", "RUSLE_Res_Coef", "RUSLE_Seg_Res", "RUSLE_Setup_Prd_Seg", "RUSLE_Soil_Moisture", "RUSLE_Surf_Cover", "RUSLE_Surf_Rough", "RUSLE_Unique_Res", "Sed_Part_Distrib", "Seg_EI_Prcp", "Setup_Seg", "Soil_Comp_Surf", "Soil_Comp_Lyrs", "Storm_Types", "Climate_Daily_Wthr", "Eph_Gully_Info", "RUSLE2_Info"]
         out_inver_col = ["AnnAGNPS_ID","Cell","Climate_Station","Contour","Crop","Feedlot","Fertilizer","Mgmt_Seq","Field_Pond","Glbl_Output_Opts","Gully","Hydraulic_Geom","Impoundment","Irrigation","Landuse_Ref","Reserved","Output_Options","Pesticide","Point_Source","Reach","Runoff_Curve_Num","Simulation_Period","Soil_Actual_Surface","Strip_Crop","Tile_Drain","Mgmt_Field","Mgmt_Sched","Mgmt_Opr","Soil_Actual_Layers","Aquaculture_Pond","Aquaculture_Pond_Mg mt_Schd_A","Glbl_Err/Wrn","Soil_Init_Cond","Pest_Init_Cond","Wetland","Riparian_Buffers","RUSLE2"]
         out_sim_col = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily ","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
         out_aa_col = ["Reserved", "Reserved", "Reserved", "Reserved", "Reserved", "Reserved", "AA_Gullies(erosion)", "Reserved", "Reserved", "AA_N_Ld_Mass", "AA_N_Ld_Ratio", "AA_N_Ld_UA", "AA_N_Yld_Mass", "AA_N_Yld_Ratio", "AA_N_Yld_UA", "AA_OC_Ld_Mass", "AA_OC_Ld_Ratio", "AA_OC_Ld_UA", "AA_OC_Yld_Mass", "AA_OC_Yld_Ratio", "AA_OC_Yld_UA", "Reserved", "Reserved", "Reserved", "Reserved", "Reserved", "Reserved", "AA_P_Ld_Mass", "AA_P_Ld_Ratio", "AA_P_Ld_UA", "AA_P_Yld_Mass", "AA_P_Yld_Ratio", "AA_P_Yld_UA", "Reserved", "Reserved", "Reserved", "AA_Sed_Eros_Mass", "AA_Sed_Eros_Ratio", "AA_Sed_Eros_UA", "AA_Sed_Ld_Mass", "AA_Sed_Ld_Ratio", "AA_Sed_Ld_UA", "AA_Sed_Yld_Mass", "AA_Sed_Yld_Ratio", "AA_Sed_Yld_UA", "AA_Wtr_Ld_Mass", "AA_Wtr_Ld_Ratio", "AA_Wtr_Ld_UA", "AA_Wtr_Yld_Mass", "AA_Wtr_Yld_Ratio", "AA_Wtr_Yld_UA"]
@@ -611,7 +611,7 @@ class qannagnps():
         self.doing_sensitivity = False
         
         #Metod to open documentation
-        lineEdits = [self.ctopagnps.info,self.cpeg.info,self.cagbuf.info,self.cagwet.info,self.cconcepts.info,self.cpothole.info,self.agflow.info]
+        lineEdits = [self.ctopagnps.info,self.cpeg.info,self.cagbuf.info,self.cagwet.info,self.cconcepts.info,self.cpothole.info,self.agflow.info,self.inputs.pushButton]
         for i in lineEdits:
             i.clicked.connect(lambda _,b = i:self.show_documentation(b))
         
@@ -622,6 +622,13 @@ class qannagnps():
         
         #Coloreate buttons depending on existence of control files
         self.dlg.pbControl.clicked.connect(self.show_existing_control_files)
+        
+        #Open AnnAGNPS output folder
+        self.output.open_folder.clicked.connect(self.open_annagnps_folder)
+    
+    def open_annagnps_folder(self):
+        #Metod to open AnnAGNPS output folder
+        os.startfile(self.output.lineEdit.text())
         
     def show_existing_control_files(self):
         #Metod to show existing control files
@@ -738,6 +745,8 @@ class qannagnps():
                 os.startfile(self.plugin_directory+"\Documentation\POTHOLE_User_Manual.pdf")
             if doc==self.agflow.info:
                 os.startfile(self.plugin_directory+"\Documentation\AGFLOW_User_Manual.pdf")
+            if doc==self.inputs.pushButton:
+                os.startfile(self.plugin_directory+"\Documentation\Input_Specifications.pdf")
         except:
             pass
        
@@ -826,6 +835,8 @@ class qannagnps():
         #Poner el nombre de la carpeta en los outputs
         self.output.lineEdit.setText(self.direccion+"/INPUTS")
         self.output.lineEdit_2.setText(self.direccion)
+        #Update existing control files
+        self.show_existing_control_files()
     
     def add_topagnps_input(self,type_input):
         #Metod to add topagnps inputs with pushbutton
@@ -2394,6 +2405,9 @@ class qannagnps():
         self.cconcepts.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
         self.cpothole.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
         self.agflow.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
+        self.inputs.pushButton.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
+        #Open AnnAGNPS folder
+        self.output.open_folder.setIcon(QIcon(os.path.join(self.plugin_directory, "images/folder.svg")))
         
         
     def url_upna(self,event):
@@ -2820,10 +2834,10 @@ class qannagnps():
             #stdout, stderr = proc.communicate()
 
             #Cuando se eligen coordenadas automáticamente con el plugin primero se ejecuta Topagnps y da error (se ejecuta la primera para poner el reaches en QGIS) osea que no queremos que python salte si hay error en la primera ronda. Queremos que salte python cuando hay error y si se ha seleccionado que no se elige automaticamente. O sino cuando hay error y se ha elegido automáticamente pero la segunda ejecución de Topagnps da error. 
-            if os.path.isfile("TOPAGNPS_err.CSV") and os.path.getsize("TOPAGNPS_err.CSV")>0 and (not self.dlg.checkBox_2.isChecked() or self.segunda_ronda):
+            if os.path.isfile(self.direccion+"\\TOPAGNPS_err.CSV") and os.path.getsize(self.direccion+"\\TOPAGNPS_err.CSV")>0 and (not self.dlg.checkBox_2.isChecked() or self.segunda_ronda):
                 self.end_execution = 1
                 error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
-                iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning)
+                iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning,duration = 10)
                 #Se abre el archivo de errores
                 try:
                     os.startfile(self.direccion+"\\TopAGNPS_err.csv")
@@ -3299,7 +3313,7 @@ class qannagnps():
                         if t == climate_files and origin_direction(f,"climate")!=fichero_input(f,"climate"):#esta última condición es porque si no hay que mover el archivo, da error
                             shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
                     except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning)
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning,duration = 10)
                         self.end_execution = 1
                         return
                     try:
@@ -3414,17 +3428,18 @@ class qannagnps():
             
             #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
             time.sleep(1)
-            if path.exists("AnnAGNPS_LOG_Error.csv"):
-                if os.stat("AnnAGNPS_LOG_Error.csv").st_size>0:
-                    text = open("AnnAGNPS_LOG_Error.csv", "r")
-                    text = ''.join([i for i in text]) 
-                    text = text.replace("\"", "/") 
-                    texto = text.splitlines()
+            if path.exists(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv"):
+                if os.stat(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv").st_size>0:
+                    self.end_execution =1
                     try:
+                        text = open(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv", "r")
+                        text = ''.join([i for i in text]) 
+                        text = text.replace("\"", "/") 
+                        texto = text.splitlines()
                         txt = texto[2].split(",")[-1]
                     except:
-                        pass
-                    iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning)
+                        return
+                    iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning,duration = 10)
                     self.end_execution = 1
                     #Se abre el archivo de errores
                     try:
@@ -3836,31 +3851,35 @@ class qannagnps():
         #Inputs
         #Create inp
         if control_type=="inp":
-            try:
-                slope= str(self.agflow.lineEdit_4.text())
-                maxim_d=str(self.agflow.lineEdit_5.text())
-                maxim_pl=str(self.agflow.lineEdit_6.text())
-                maxim_ps=str(self.agflow.lineEdit_7.text())
-                use=funcion_t(int(self.agflow.checkBox.isChecked()))
-                write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
-                arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
-                dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
-                use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
-            except:
-                iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning)
-                return
             #Se obtiene el texto de un archivo rasfor (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
             fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
             texto = fichero.read()
             fichero.close()
             #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
-            lista_parametros = [slope,maxim_d,maxim_pl,maxim_ps,use,write,arc,dat,use_file]
-            lista = [237,244,250,260,265,270,275,280,285]
-            texto_nuevo = texto
-            contador = 0
-            for i in range(len(lista_parametros)):
-                texto_nuevo = texto_nuevo[0:lista[i]+contador]+str(lista_parametros[i])+texto_nuevo[lista[i]+contador+1:]
-                contador += len(str(lista_parametros[i]))-1
+            try:
+                if self.agflow.lineEdit_4.text() =="":slope="1"
+                else:slope= str(int(self.agflow.lineEdit_4.text()))
+
+                if self.agflow.lineEdit_5.text()=="":maxim_d="0.99"
+                else:maxim_d=float(self.agflow.lineEdit_5.text())
+
+                if self.agflow.lineEdit_6.text()=="":maxim_pl="300.0"
+                else:maxim_pl=float(self.agflow.lineEdit_6.text())
+
+                if self.agflow.lineEdit_7.text()=="":maxim_ps="100.0"
+                else:maxim_ps=float(self.agflow.lineEdit_7.text())
+                
+                use=funcion_t(int(self.agflow.checkBox.isChecked()))
+                write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
+                arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
+                dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
+                use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
+            
+            except:
+                iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning,duration = 10)
+                return
+            
+            texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
             try:
                 f = open(self.direccion+"\\"+"AGFCNT.inp","w+")
             except:
@@ -3888,130 +3907,178 @@ class qannagnps():
             iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.Warning,duration = 10)
             return 
         #TOPAGNPS
-        try:
-            control_file = pd.read_csv(self.direccion+"\\"+"TOPAGNPS.csv",encoding = "ISO-8859-1",delimiter=",")
-        except:
-            pass 
-        columnas = ["FILENAME","FORMAT","DEMPROC","OUTFORMAT","CSA","MSCL","UTME","UTMN","ROWS","COLS","CELLSIZE","NODATA","OUTSNAP","DNMCNT","DEMEDGE","VERBOSE","KEEPFILES","OPTIMIZE","OUTCOL","OUTROW","MODULE","OUTPUT","READOUT","READPATH"]
-        dialogos = [self.ctopagnps.lineEdit_7,self.ctopagnps.lineEdit_8,self.ctopagnps.lineEdit_5,self.ctopagnps.lineEdit_14,self.ctopagnps.lineEdit_3,self.ctopagnps.lineEdit_10,self.ctopagnps.lineEdit_19,self.ctopagnps.lineEdit_20,self.ctopagnps.lineEdit_18,self.ctopagnps.lineEdit_2,self.ctopagnps.lineEdit,self.ctopagnps.lineEdit_11,self.ctopagnps.lineEdit_17,self.ctopagnps.lineEdit_6,self.ctopagnps.lineEdit_4,self.ctopagnps.lineEdit_21,self.ctopagnps.lineEdit_9,self.ctopagnps.lineEdit_12,self.ctopagnps.lineEdit_15,self.ctopagnps.lineEdit_22,self.ctopagnps.lineEdit_13,self.ctopagnps.lineEdit_16,self.ctopagnps.lineEdit_23,self.ctopagnps.lineEdit_24]
         #Primero se borra lo que haya previamente
+        dialogos = [self.ctopagnps.lineEdit_7,self.ctopagnps.lineEdit_8,self.ctopagnps.lineEdit_5,self.ctopagnps.lineEdit_14,self.ctopagnps.lineEdit_3,self.ctopagnps.lineEdit_10,self.ctopagnps.lineEdit_19,self.ctopagnps.lineEdit_20,self.ctopagnps.lineEdit_18,self.ctopagnps.lineEdit_2,self.ctopagnps.lineEdit,self.ctopagnps.lineEdit_11,self.ctopagnps.lineEdit_17,self.ctopagnps.lineEdit_6,self.ctopagnps.lineEdit_4,self.ctopagnps.lineEdit_21,self.ctopagnps.lineEdit_9,self.ctopagnps.lineEdit_12,self.ctopagnps.lineEdit_15,self.ctopagnps.lineEdit_22,self.ctopagnps.lineEdit_13,self.ctopagnps.lineEdit_16,self.ctopagnps.lineEdit_23,self.ctopagnps.lineEdit_24]
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        for i in range(len(columnas)):
-            try:
-                if str(control_file[columnas[i]].iloc[0]) == "nan":
-                    texto = ""
-                else:
-                    texto = str(control_file[columnas[i]].iloc[0])
-                dialogos[i].setText(texto)
-            except:
-                pass
+        if os.path.exists(self.direccion+"\TOPAGNPS.csv"):
+            control_file = pd.read_csv(self.direccion+"\\"+"TOPAGNPS.csv",encoding = "ISO-8859-1",delimiter=",")
+            columnas = ["FILENAME","FORMAT","DEMPROC","OUTFORMAT","CSA","MSCL","UTME","UTMN","ROWS","COLS","CELLSIZE","NODATA","OUTSNAP","DNMCNT","DEMEDGE","VERBOSE","KEEPFILES","OPTIMIZE","OUTCOL","OUTROW","MODULE","OUTPUT","READOUT","READPATH"]
+            for i in range(len(columnas)):
+                try:
+                    if str(control_file[columnas[i]].iloc[0]) == "nan":
+                        texto = ""
+                    else:
+                        texto = str(control_file[columnas[i]].iloc[0])
+                    dialogos[i].setText(texto)
+                except:
+                    pass
         
         #PEG
-        try:
-            control_file = pd.read_csv(self.direccion+"\\"+"PEG.csv",encoding = "ISO-8859-1",delimiter=",")
-        except:
-            pass
-        columnas =["Input","CTI_value","Accum_pct"]
-        dialogos = [self.cpeg.lineEdit,self.cpeg.lineEdit_2,self.cpeg.lineEdit_3]
         #Primero se borra lo que haya previamente
+        dialogos = [self.cpeg.lineEdit,self.cpeg.lineEdit_2,self.cpeg.lineEdit_3]
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        for i in range(len(columnas)):
-            try:
-                if str(control_file[columnas[i]].iloc[0]) == "nan":
-                    texto = ""
-                else:
-                    texto = str(control_file[columnas[i]].iloc[0])
-                dialogos[i].setText(texto)
-            except:
-                pass
+        if os.path.exists(self.direccion+"\PEG.csv"):
+            control_file = pd.read_csv(self.direccion+"\\"+"PEG.csv",encoding = "ISO-8859-1",delimiter=",")
+            columnas =["Input","CTI_value","Accum_pct"]
+            for i in range(len(columnas)):
+                try:
+                    if str(control_file[columnas[i]].iloc[0]) == "nan":
+                        texto = ""
+                    else:
+                        texto = str(control_file[columnas[i]].iloc[0])
+                    dialogos[i].setText(texto)
+                except:
+                    pass
 
         #AGBUF
-        try:
-            control_file = pd.read_csv(self.direccion+"\\"+"AgBuf.csv",encoding = "ISO-8859-1",delimiter=",")
-        except:
-            pass
-        columnas =["BUFFER","VEGETATION","FOREST","GRASS","C_THRESHOLD","R_THRESHOLD","UNITS","ASC_PATH","CSV_PATH"]
-        dialogos = [self.cagbuf.lineEdit,self.cagbuf.lineEdit_2,self.cagbuf.lineEdit_3,self.cagbuf.lineEdit_4,self.cagbuf.lineEdit_5,self.cagbuf.lineEdit_6,self.cagbuf.lineEdit_7,self.cagbuf.lineEdit_8,self.cagbuf.lineEdit_9]
         #Primero se borra lo que haya previamente
+        dialogos = [self.cagbuf.lineEdit,self.cagbuf.lineEdit_2,self.cagbuf.lineEdit_3,self.cagbuf.lineEdit_4,self.cagbuf.lineEdit_5,self.cagbuf.lineEdit_6,self.cagbuf.lineEdit_7,self.cagbuf.lineEdit_8,self.cagbuf.lineEdit_9]
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        for i in range(len(columnas)):
+        if os.path.exists(self.direccion+"\AgBuf.csv"):
+            control_file = pd.read_csv(self.direccion+"\\"+"AgBuf.csv",encoding = "ISO-8859-1",delimiter=",")
+            columnas =["BUFFER","VEGETATION","FOREST","GRASS","C_THRESHOLD","R_THRESHOLD","UNITS","ASC_PATH","CSV_PATH"]
+            for i in range(len(columnas)):
+                try:
+                    if str(control_file[columnas[i]].iloc[0]) == "nan":
+                        texto = ""
+                    else:
+                        texto = str(control_file[columnas[i]].iloc[0])
+                    dialogos[i].setText(texto)
+                except:
+                    pass
+        
+        #AgFlow
+        #First we delete the previous
+        self.agflow.lineEdit_4.setText("")
+        self.agflow.lineEdit_5.setText("")
+        self.agflow.lineEdit_6.setText("")
+        self.agflow.lineEdit_7.setText("")
+        self.agflow.checkBox.setChecked(False)
+        self.agflow.checkBox_2.setChecked(False)
+        self.agflow.checkBox_3.setChecked(False)
+        self.agflow.checkBox_4.setChecked(False)
+        self.agflow.checkBox_5.setChecked(False)
+        if os.path.exists(self.direccion+"\AGFCNT.inp"):
             try:
-                if str(control_file[columnas[i]].iloc[0]) == "nan":
-                    texto = ""
+                #After we put the control files data
+                fichero = open(self.direccion+"\AGFCNT.inp","r+")
+                texto = fichero.read()
+                fichero.close()
+                def from_string_to_condition(string):
+                    if string == "F":
+                        return False
+                    elif string =="F\n":
+                        return False
+                    else:
+                        return True
+                        
+                valores = texto[237:].split("     ")
+                self.agflow.lineEdit_4.setText(valores[0])
+                self.agflow.lineEdit_5.setText(valores[1])
+                self.agflow.lineEdit_6.setText(valores[2])
+                if valores[3]=="100.0":
+                    self.agflow.lineEdit_7.setText("")
                 else:
-                    texto = str(control_file[columnas[i]].iloc[0])
-                dialogos[i].setText(texto)
+                    self.agflow.lineEdit_7.setText(valores[3])
+                self.agflow.checkBox.setChecked(from_string_to_condition(valores[4]))
+                self.agflow.checkBox_2.setChecked(from_string_to_condition(valores[5]))
+                self.agflow.checkBox_3.setChecked(from_string_to_condition(valores[6]))
+                self.agflow.checkBox_4.setChecked(from_string_to_condition(valores[7]))
+                self.agflow.checkBox_5.setChecked(from_string_to_condition(valores[8]))
+            except:
+                pass
+                
+        #First we delete the previous
+        self.agflow.checkBox_6.setChecked(False)
+        self.agflow.lineEdit_8.setText("")
+        if os.path.exists(self.direccion+"\AGFLOW.csv"):
+            try:
+                #After we put the control files data
+                control_file = pd.read_csv(self.direccion+"\\"+"AGFLOW.csv",encoding = "ISO-8859-1",delimiter=",")
+                if control_file["REASSIGN"].iloc[0]==0 or control_file["REASSIGN"].iloc[0]=="":
+                    self.agflow.checkBox_6.setChecked(False)
+                else:
+                    self.agflow.checkBox_6.setChecked(True)
+                if type(control_file["ASC_PATH"].iloc[0])!=str:
+                    self.agflow.lineEdit_8.setText("")
+                else:
+                    self.agflow.lineEdit_8.setText(control_file["ASC_PATH"].iloc[0])
             except:
                 pass
         
         #AGWET
-        try:
-            control_file = pd.read_csv(self.direccion+"\\"+"AgWet.csv",encoding = "ISO-8859-1",delimiter=",")
-        except:
-            pass
-        columnas =["FILENAME","BREACH_BARRIER","BARRIER_HEIGHT_OPTION","BARRIER_HEIGHT","BARRIER_HEIGHT_INCREMENT","BARRIER_HEIGHT_MAX","WETLAND_ID_OPTION","EROSION_INDEX_OPTION","EROSION_INDEX_THRESHOLD","DA_THRESHOLD","WI_THRESHOLD","MIN_WETLAND_RATIO","MAX_WETLAND_RATIO","BUFFER_WIDTH","BUFFER_EXTENT_OPTION","BUFFER_IDS_FILENAME","BUFFER_VEG_FILENAME","BUFFER_ZONE_FILENAME","ASC_PATH","CSV_PATH"]
-        dialogos = [self.cagwet.lineEdit,self.cagwet.lineEdit_18,self.cagwet.lineEdit_17,self.cagwet.lineEdit_11,self.cagwet.lineEdit_12,self.cagwet.lineEdit_14,self.cagwet.lineEdit_21,self.cagwet.lineEdit_20,self.cagwet.lineEdit_8,self.cagwet.lineEdit_9,self.cagwet.lineEdit_7,self.cagwet.lineEdit_13,self.cagwet.lineEdit_10,self.cagwet.lineEdit_15,self.cagwet.lineEdit_19,self.cagwet.lineEdit_2,self.cagwet.lineEdit_3,self.cagwet.lineEdit_4,self.cagwet.lineEdit_5,self.cagwet.lineEdit_6]
         #Primero se borra lo que haya previamente
+        dialogos = [self.cagwet.lineEdit,self.cagwet.lineEdit_18,self.cagwet.lineEdit_17,self.cagwet.lineEdit_11,self.cagwet.lineEdit_12,self.cagwet.lineEdit_14,self.cagwet.lineEdit_21,self.cagwet.lineEdit_20,self.cagwet.lineEdit_8,self.cagwet.lineEdit_9,self.cagwet.lineEdit_7,self.cagwet.lineEdit_13,self.cagwet.lineEdit_10,self.cagwet.lineEdit_15,self.cagwet.lineEdit_19,self.cagwet.lineEdit_2,self.cagwet.lineEdit_3,self.cagwet.lineEdit_4,self.cagwet.lineEdit_5,self.cagwet.lineEdit_6]
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        for i in range(len(columnas)):
-            try:
-                if str(control_file[columnas[i]].iloc[0]) == "nan":
-                    texto = ""
-                else:
-                    texto = str(control_file[columnas[i]].iloc[0])
-                dialogos[i].setText(texto)
-            except:
-                pass
+        if os.path.exists(self.direccion+"\AgWet.csv"):
+            control_file = pd.read_csv(self.direccion+"\\"+"AgWet.csv",encoding = "ISO-8859-1",delimiter=",")
+            columnas =["FILENAME","BREACH_BARRIER","BARRIER_HEIGHT_OPTION","BARRIER_HEIGHT","BARRIER_HEIGHT_INCREMENT","BARRIER_HEIGHT_MAX","WETLAND_ID_OPTION","EROSION_INDEX_OPTION","EROSION_INDEX_THRESHOLD","DA_THRESHOLD","WI_THRESHOLD","MIN_WETLAND_RATIO","MAX_WETLAND_RATIO","BUFFER_WIDTH","BUFFER_EXTENT_OPTION","BUFFER_IDS_FILENAME","BUFFER_VEG_FILENAME","BUFFER_ZONE_FILENAME","ASC_PATH","CSV_PATH"]
+            for i in range(len(columnas)):
+                try:
+                    if str(control_file[columnas[i]].iloc[0]) == "nan":
+                        texto = ""
+                    else:
+                        texto = str(control_file[columnas[i]].iloc[0])
+                    dialogos[i].setText(texto)
+                except:
+                    pass
         
         #CONCEPTS
-        try:
-            control_file = pd.read_csv(self.direccion+"\\"+"CONCEPTS.csv",encoding = "ISO-8859-1",delimiter=",")
-        except:
-            pass
-        columnas =["UPSTREAM_REACH_ID","DOWNSTREAM_REACH_ID"]
-        dialogos = [self.cconcepts.lineEdit,self.cconcepts.lineEdit_2]
         #Primero se borra lo que haya previamente
+        dialogos = [self.cconcepts.lineEdit,self.cconcepts.lineEdit_2]
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        for i in range(len(columnas)):
-            try:
-                if str(control_file[columnas[i]].iloc[0]) == "nan":
-                    texto = ""
-                else:
-                    texto = str(control_file[columnas[i]].iloc[0])
-                dialogos[i].setText(texto)
-            except:
-                pass
+        if os.path.exists(self.direccion+"\CONCEPTS.csv"):
+            control_file = pd.read_csv(self.direccion+"\\"+"CONCEPTS.csv",encoding = "ISO-8859-1",delimiter=",")
+            columnas =["UPSTREAM_REACH_ID","DOWNSTREAM_REACH_ID"]
+            
+            for i in range(len(columnas)):
+                try:
+                    if str(control_file[columnas[i]].iloc[0]) == "nan":
+                        texto = ""
+                    else:
+                        texto = str(control_file[columnas[i]].iloc[0])
+                    dialogos[i].setText(texto)
+                except:
+                    pass
         
         #POTHOLE
-        try:
-            control_file = pd.read_csv(self.direccion+"\\"+"POTHOLE.csv",encoding = "ISO-8859-1",delimiter=",")
-        except:
-            pass
-        columnas =["POTHOLE_OPTION","POTHOLE_SURFACE_AREA"]
-        dialogos = [self.cpothole.lineEdit,self.cpothole.lineEdit_2]
         #Primero se borra lo que haya previamente
+        dialogos = [self.cpothole.lineEdit,self.cpothole.lineEdit_2,self.cpothole.lineEdit_3,self.cpothole.lineEdit_4]
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        for i in range(len(columnas)):
-            try:
-                if str(control_file[columnas[i]].iloc[0]) == "nan":
-                    texto = ""
-                else:
-                    texto = str(control_file[columnas[i]].iloc[0])
-                dialogos[i].setText(texto)
-            except:
-                pass
+        if os.path.exists(self.direccion+"\POTHOLE.csv"):
+            control_file = pd.read_csv(self.direccion+"\\"+"POTHOLE.csv",encoding = "ISO-8859-1",delimiter=",")
+            columnas =["POTHOLE_OPTION","POTHOLE_SURFACE_AREA","ASC_Path","CSV_Path"]
+            for i in range(len(columnas)):
+                try:
+                    if str(control_file[columnas[i]].iloc[0]) == "nan":
+                        texto = ""
+                    else:
+                        texto = str(control_file[columnas[i]].iloc[0])
+                    dialogos[i].setText(texto)
+                except:
+                    pass
     
     def outputs(self):
         #Método para mostrar los resultados de la simulación

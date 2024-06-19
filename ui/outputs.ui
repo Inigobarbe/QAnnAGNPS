@@ -311,7 +311,7 @@
                     </font>
                    </property>
                    <property name="text">
-                    <string>File folder</string>
+                    <string>Select folder</string>
                    </property>
                   </widget>
                  </item>
@@ -342,11 +342,41 @@
                 </layout>
                </item>
                <item row="1" column="0">
-                <widget class="QLabel" name="label_2">
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
+                <layout class="QHBoxLayout" name="horizontalLayout_21">
+                 <item>
+                  <widget class="QLabel" name="label_45">
+                   <property name="font">
+                    <font>
+                     <weight>75</weight>
+                     <bold>true</bold>
+                    </font>
+                   </property>
+                   <property name="text">
+                    <string>Open folder</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="open_folder">
+                   <property name="text">
+                    <string/>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <spacer name="horizontalSpacer_2">
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>40</width>
+                     <height>20</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
                </item>
               </layout>
              </widget>
@@ -470,7 +500,11 @@
                     </widget>
                    </item>
                    <item>
-                    <widget class="QLineEdit" name="lineEdit_4"/>
+                    <widget class="QLineEdit" name="lineEdit_4">
+                     <property name="alignment">
+                      <set>Qt::AlignCenter</set>
+                     </property>
+                    </widget>
                    </item>
                   </layout>
                  </item>
@@ -493,7 +527,11 @@
                     </widget>
                    </item>
                    <item>
-                    <widget class="QLineEdit" name="lineEdit_5"/>
+                    <widget class="QLineEdit" name="lineEdit_5">
+                     <property name="alignment">
+                      <set>Qt::AlignCenter</set>
+                     </property>
+                    </widget>
                    </item>
                   </layout>
                  </item>
@@ -561,6 +599,9 @@
                    <pointsize>8</pointsize>
                   </font>
                  </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
                 </widget>
                </item>
                <item row="1" column="0" colspan="2">
@@ -580,6 +621,9 @@
                  <property name="text">
                   <string/>
                  </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
                 </widget>
                </item>
                <item row="5" column="0">
@@ -596,7 +640,11 @@
                 </widget>
                </item>
                <item row="6" column="1">
-                <widget class="QLineEdit" name="lineEdit_10"/>
+                <widget class="QLineEdit" name="lineEdit_10">
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
                </item>
                <item row="7" column="0">
                 <widget class="QLabel" name="label_30">
@@ -621,10 +669,17 @@
                  <property name="text">
                   <string/>
                  </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
                 </widget>
                </item>
                <item row="8" column="1">
-                <widget class="QLineEdit" name="lineEdit_11"/>
+                <widget class="QLineEdit" name="lineEdit_11">
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
                </item>
                <item row="2" column="0">
                 <widget class="QLabel" name="label_31">
@@ -671,6 +726,9 @@
                   <font>
                    <pointsize>8</pointsize>
                   </font>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
                  </property>
                 </widget>
                </item>
