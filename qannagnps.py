@@ -376,7 +376,7 @@ class qannagnps():
         fert_ref_col =  ["Reference_ID", "Nitrite", "Nitrate", "Inorganic_N", "Organic_N", "Ammonia", "Mineral_Ammonia", "Elemental_P", "Soluble_P", "Inorganic_P", "Organic_P", "Organic_Matter", "Consistency_Code"]
         geology_col = ["Geology_ID", "Delay_Time", "Water_Table", "Aquifer_Sat_Hyd_Conduct", "Vadose_Sat_Hyd_Conduct", "Porosity", "Field_Capacity", "Specific_Yield", "Thickness", "Soluble_N", "Soluble_P", "Input_Units_Code"]
         hydgeom_col = ["Hydraulic_Geom_ID", "Channel_Length_Coef", "Channel_Length_Exp", "Channel_Width_Coef", "Channel_Width_Exp", "Channel_Depth_Coef", "Channel_Depth_Exp", "Valley_Width_Coef", "Valley_Width_Exp"]
-        irr_app_col = ["Season_End_Month", "Season_End_Day", "Season_End_Year", "Method_Code", "Water_Source", "Cycle_Duration", "Amount_Lost", "Application_Rate", "Tailwater_Recovery", "Depletion_Lower_Limit", "Application_Amount", "Area_Fraction", "Interval_Number", "Interval_Days", "Chemical_Multiple", "Sediment_Rate", "Depletion_Upper_Limit", "Input_Units_Code"]
+        irr_app_col = ["Application_ID","Season_End_Month", "Season_End_Day", "Season_End_Year", "Method_Code", "Water_Source", "Cycle_Duration", "Amount_Lost", "Application_Rate", "Tailwater_Recovery", "Depletion_Lower_Limit", "Application_Amount", "Area_Fraction", "Interval_Number", "Interval_Days", "Chemical_Multiple", "Sediment_Rate", "Depletion_Upper_Limit", "Input_Units_Code"]
         manfield_col =["Field_ID", "Landuse_Type_ID", "Mgmt_Schd_ID", "Greg_Yr_for_1st_Yr_of_Rotation", "Percent_Rock_Cover", "Interrill_Erosion_Code", "Random_Roughness", "Terrace_Horizontal_Distance", "Terrace_Grade", "Tile_Drain_ID", "Input_Units_Code"]
         manoper_col = ["Mgmt_Operation_ID", "Effect_Code_01", "Effect_Code_02", "Effect_Code_03", "Effect_Code_04", "Effect_Code_05", "Residue_Cover_Remaining", "Residue_Weight_Remaining", "Area_Disturbed", "Initial_Random_Roughness", "Final_Random_Roughness", "Operation_Tillage_Depth", "Added_Surface_Residue", "Surface_Decomp", "Subsurface_Decomp", "Surface_Residue_30%", "Surface_Residue_60%", "Surface_Residue_90%", "Input_Units_Code"]
         mansched_col =["Mgmt_Schd_ID", "Event_Month", "Event_Day", "Event_Year", "Contour_ID", "New_Crop_ID", "Strip_Crop_ID", "New_Non-Crop_ID", "Curve_Number_ID", "Post_Event_Mannings_n", "Post_Event_Surface_Constant", "Operation_Residue_Change", "Fertilizer_Application_ID", "Irrigation_Application_ID", "Mgmt_Operation_ID", "Tile_Drain_Controlled_Status", "Tile_Drain_Controlled_Depth", "Input_Units_Code", "Pest_App_ID_1", "Pest_App_ID_2", "Pest_App_ID_3", "Pest_App_ID_4", "Pest_App_ID_5"]
@@ -628,7 +628,10 @@ class qannagnps():
     
     def open_annagnps_folder(self):
         #Metod to open AnnAGNPS output folder
-        os.startfile(self.output.lineEdit.text())
+        try:
+            os.startfile(self.output.lineEdit.text())
+        except:
+            pass
         
     def show_existing_control_files(self):
         #Metod to show existing control files
@@ -2738,6 +2741,7 @@ class qannagnps():
         
     def ejecuciones(self):
         #Método para las ejecuciones
+        self.end_execution = 0
         self.dlg.close()
         #Ejecutar
         self.ejecucion_completa()
@@ -2763,8 +2767,13 @@ class qannagnps():
             self.epsg = epsg
             
             #Se cambia de directorio al directorio del proyecto y se establece el directorio donde están los ejecutables
-            self.executable_directory  = self.plugin_dir+"\\Executables"
-            os.chdir(self.direccion)
+            self.executable_directory  = self.plugin_dir+"\\Executables"            
+            try:
+                os.chdir(self.direccion)
+            except:
+                self.end_execution = 1
+                iface.messageBar().pushMessage("Error Input data", "Please select a valid project folder" ,level=Qgis.Warning)
+                return
         
         #EJECUCIÓN DE TOPAGNPS
         if self.dlg.cbTop.isChecked():
@@ -2815,7 +2824,7 @@ class qannagnps():
                 topagnps_control_file["DEMPROC"].iloc[0] = "2" #se pone en texto porque sino se guarda en decimal y da error.
                 topagnps_control_file.to_csv(fichero("TOPAGNPS.csv"), index=False, float_format='%.5f')
             
-            #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs. El cambio se hace dentro de la carpeta del proyecto no la original!
+            #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs. ¡El cambio se hace dentro de la carpeta del proyecto no la original!
             if self.doing_sensitivity:
                 for j,k in enumerate(self.dic_data.keys()):
                     self.change_inputs_sensitivity(self.param_values[self.numero_ejecucion-1],j,k,spatial =True) #cambio de los inputs espaciales
@@ -2832,6 +2841,16 @@ class qannagnps():
             subprocess.call(self.executable_directory+"\\"+"EjecutarTopagnps.bat")
             #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarTopagnps.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             #stdout, stderr = proc.communicate()
+            
+            #If error file of TopAGNPS is opened, then return a error message
+            try:
+                open(self.direccion+"TOPAGNPS_err.csv", "r+") 
+            except PermissionError:
+                iface.messageBar().pushMessage("Error TopAGNPS","Close TOPAGNPS_err.csv before the start of execution",level=Qgis.Warning,duration = 10)
+                self.end_execution = 1
+                return
+            except:
+                pass
 
             #Cuando se eligen coordenadas automáticamente con el plugin primero se ejecuta Topagnps y da error (se ejecuta la primera para poner el reaches en QGIS) osea que no queremos que python salte si hay error en la primera ronda. Queremos que salte python cuando hay error y si se ha seleccionado que no se elige automaticamente. O sino cuando hay error y se ha elegido automáticamente pero la segunda ejecución de Topagnps da error. 
             if os.path.isfile(self.direccion+"\\TOPAGNPS_err.CSV") and os.path.getsize(self.direccion+"\\TOPAGNPS_err.CSV")>0 and (not self.dlg.checkBox_2.isChecked() or self.segunda_ronda):
@@ -3426,6 +3445,16 @@ class qannagnps():
             #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             #stdout, stderr = proc.communicate()
             
+            #If error file of AnnAGNPS is opened, then return a error message
+            try:
+                open(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv", "r+") 
+            except PermissionError:
+                iface.messageBar().pushMessage("Error AnnAGNPS","Close AnnAGNPS_LOG_Error.csv before the start of execution",level=Qgis.Warning,duration = 10)
+                self.end_execution = 1
+                return
+            except:
+                pass
+                        
             #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
             time.sleep(1)
             if path.exists(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv"):
@@ -5236,6 +5265,56 @@ class qannagnps():
             if nombre_parametro =="Pixel Size":
                 self.change_control_files_pixel(param_values,numero_parametro)
             
+            elif self.dic_name_column[nombre_parametro][1]=="AGFLOW.csv":#in the case of agflow the input change is different
+                #First we add the data of control files to the dialog. This is important because the rest of the values that are not changed need to be taken from the control file.
+                self.asignar_valores_control_dialogo()
+                #Then we change the inputs of agflow control file
+                fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
+                texto = fichero.read()
+                fichero.close()
+                
+                #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
+                try:
+                    if self.agflow.lineEdit_4.text() =="":slope="1"
+                    else:slope= str(int(self.agflow.lineEdit_4.text()))
+
+                    if self.agflow.lineEdit_5.text()=="":maxim_d="0.99"
+                    else:maxim_d=float(self.agflow.lineEdit_5.text())
+                    if nombre_parametro=="Drainage area \nto concentrated flow": maxim_d=round(param_values[numero_parametro],2)
+
+                    if self.agflow.lineEdit_6.text()=="":maxim_pl="300.0"
+                    else:maxim_pl=float(self.agflow.lineEdit_6.text())
+                    if nombre_parametro=="Maximum profile length \nuntil deposition": maxim_pl=round(param_values[numero_parametro],2)
+
+                    if self.agflow.lineEdit_7.text()=="":maxim_ps="100.0"
+                    else:maxim_ps=float(self.agflow.lineEdit_7.text())
+                    if nombre_parametro=="Maximum Profile Slope": maxim_ps=round(param_values[numero_parametro],2)
+                    
+                    def funcion_t(numero):
+                        if numero==1:
+                            return "T"
+                        elif numero ==0:
+                            return "F"
+                    
+                    use=funcion_t(int(self.agflow.checkBox.isChecked()))
+                    write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
+                    arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
+                    dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
+                    use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
+                
+                except:
+                    iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning,duration = 10)
+                    return
+                
+                texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
+                try:
+                    f = open(self.direccion+"\\"+"AGFCNT.inp","w+")
+                except:
+                    iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
+                    return 
+                f.write(texto_nuevo)
+                f.close()
+            
             else:
                 df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
                 if self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
@@ -5387,7 +5466,12 @@ class qannagnps():
         if lineEdit == self.inputs.l_3 and lineEdit.text()=="-- Provided by TopAGNPS --": #cell data
             return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Cell_Data_Section.csv"
         elif lineEdit == self.inputs.l_5 and lineEdit.text()=="-- Provided by TopAGNPS --": #ephemeral gully
-            return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Ephemeral_Gully_Data_Section.csv"
+            if os.path.exists(self.direccion+"\\"+"AGWET.csv"):
+                return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgWet.csv"
+            if os.path.exists(self.direccion+"\\"+"Agbuf.csv"):
+                return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgBuf.csv"
+            if os.path.exists(self.direccion+"\\"+"PEG.csv"):
+                return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Ephemeral_Gully_Data_Section.csv" 
         elif lineEdit == self.inputs.l_10 and lineEdit.text()=="-- Provided by TopAGNPS --": #reach
             return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Reach_Data_Section.csv"
         elif lineEdit == self.inputs.l_13 and lineEdit.text()=="-- Provided by TopAGNPS --": #wetland
@@ -5426,7 +5510,7 @@ class qannagnps():
             self.progress_dialog.close()
     
     def search_sensitiviy_input(self):
-        #Metod to search a sensitiviy input
+        #Metod to search a sensitiviy input in the dialog writing
         texto = str(self.sensitivity_dialog.search.text())
         #If text == "" then delete every button
         if texto =="":
@@ -5631,11 +5715,13 @@ class qannagnps():
             line_plot = list(range(-1,int(max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)+2))
             ax0.plot(line_plot, line_plot, color="red",linestyle="--")
 
-            ax0.set_xlim(-1,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
-            ax0.set_ylim(-1,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
+            ax0.set_xlim(0,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
+            ax0.set_ylim(0,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
             #Separador de miles
+            if max(list(self.Si["mu_star"])+list(self.Si["sigma"]))<5: number_decimals = 2
+            else: number_decimals = 0
             def formato_con_separador(valor, pos):
-                return "{:,.0f}".format(valor)
+                return "{:,.{}f}".format(valor,number_decimals)
             ax0.xaxis.set_major_formatter(FuncFormatter(formato_con_separador))
             ax0.yaxis.set_major_formatter(FuncFormatter(formato_con_separador))
             #Labels
