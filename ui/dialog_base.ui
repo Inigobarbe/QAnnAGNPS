@@ -279,7 +279,7 @@ QPushButton:hover {
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>0</y>
+            <y>-226</y>
             <width>479</width>
             <height>591</height>
            </rect>
@@ -784,6 +784,9 @@ QCheckBox::indicator:unchecked {
                         <property name="styleSheet">
                          <string notr="true">background-color: white;</string>
                         </property>
+                        <property name="alignment">
+                         <set>Qt::AlignCenter</set>
+                        </property>
                        </widget>
                       </item>
                      </layout>
@@ -822,6 +825,9 @@ QCheckBox::indicator:unchecked {
                         </property>
                         <property name="text">
                          <string/>
+                        </property>
+                        <property name="alignment">
+                         <set>Qt::AlignCenter</set>
                         </property>
                        </widget>
                       </item>

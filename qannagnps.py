@@ -190,6 +190,7 @@ class qannagnps():
         self.documentation = DocumentationDialog()
         self.sensitivity_dialog = SensitivityDialog()
         
+        
         #Boton principal
         icon_path = ':/plugins/qannagnps/images/logo.svg'
         icon_size = QSize(100, 100)
@@ -213,7 +214,7 @@ class qannagnps():
         self.dlg.cbSoil.currentIndexChanged.connect(self.cambios_suelo)
         self.dlg.cbMan.currentIndexChanged.connect(self.cambios_manejo)
         #Para que aparezcan las interfaces donde se pone el nombre de los inputs
-        self.dlg.pb_ann.clicked.connect(self.inputs.show)
+        self.dlg.pb_ann.clicked.connect(lambda: (self.inputs.show(), self.inputs.raise_()))
         #Al seleccionar el MDT que se establezca ya el directorio
         self.dlg.comboBox.currentIndexChanged.connect(self.setDirectory)
         
@@ -836,7 +837,7 @@ class qannagnps():
         #Asignar los valores de los control files a los diálogos
         self.asignar_valores_control_dialogo()
         #Poner el nombre de la carpeta en los outputs
-        self.output.lineEdit.setText(self.direccion+"/INPUTS")
+        self.output.lineEdit.setText(self.direccion+r"\INPUTS")
         self.output.lineEdit_2.setText(self.direccion)
         #Update existing control files
         self.show_existing_control_files()
@@ -884,7 +885,7 @@ class qannagnps():
         #Make project directory
         self.direccion = str(self.dlg.project.text())
         #Poner el nombre de la carpeta en los outputs
-        self.output.lineEdit.setText(self.direccion+"/INPUTS")
+        self.output.lineEdit.setText(self.direccion+r"\INPUTS")
         self.output.lineEdit_2.setText(self.direccion)
         #Pone la dirección del proyecto en las direcciones de las carpetas de los inputs de annagnps
         self.files_directory()
@@ -937,7 +938,6 @@ class qannagnps():
             else:
                 return self.dic_folder[self.dic_line_table[button]].text()+"/"+self.dic_line_table[button].text() 
         
-        
         #Condition adding data to table when there is not a csv written. 
         if self.dic_line_table[button].text() =="":
             #If file exist then warning
@@ -953,6 +953,7 @@ class qannagnps():
             columnas = self.dic_table_button[button]
             table_class.tableWidget.setColumnCount(len(columnas))
             table_class.tableWidget.setHorizontalHeaderLabels(columnas)
+            table_class.tableWidget.resizeColumnsToContents()
             #Add name to dialog
             table_class.setWindowTitle(" ".join([x.capitalize() for x in name_file.split("_")]))
             #Show dialog
@@ -968,6 +969,7 @@ class qannagnps():
             columnas = self.dic_table_button[button]
             table_class.tableWidget.setColumnCount(len(columnas))
             table_class.tableWidget.setHorizontalHeaderLabels(columnas)
+            table_class.tableWidget.resizeColumnsToContents()
             #Add name to dialog
             table_class.setWindowTitle(" ".join([x.capitalize() for x in name_file.split("_")]))
             #Show dialog
@@ -977,6 +979,8 @@ class qannagnps():
             
         else:
             file_path = file_input(button)
+            if self.dic_line_table[button].text() == "-- Provided by TopAGNPS --":
+                file_path = self.direccion+"\\"+ os.path.basename(self.file_input(self.dic_line_table[button]))
             if os.path.exists(file_path) and os.path.getsize(file_path)>0: 
                 #Add files and columns
                 #Add columns
@@ -996,6 +1000,7 @@ class qannagnps():
                 columnas, datos_filas = obtener_datos_filas(file_path)
                 table_class.tableWidget.setColumnCount(len(columnas))
                 table_class.tableWidget.setHorizontalHeaderLabels(columnas)
+                table_class.tableWidget.resizeColumnsToContents()
                 #Add rows
                 table_class.tableWidget.setRowCount(len(datos_filas))
                 for fila, datos in enumerate(datos_filas):
@@ -1026,8 +1031,10 @@ class qannagnps():
         #First we instantiate the variable of the dialog
         table_input = getattr(self, f"table_input_{numero_table_input}")
         #Then we determine the file path
-        if os.path.isabs(self.dic_line_table[button].text()):
-                file_path =  self.dic_line_table[button].text()
+        if self.dic_line_table[button].text()=="-- Provided by TopAGNPS --":
+            file_path = self.direccion+"\\"+os.path.basename(self.file_input(self.dic_line_table[button]))    
+        elif os.path.isabs(self.dic_line_table[button].text()):
+            file_path =  self.dic_line_table[button].text()
         else:
             file_path =  self.dic_folder[self.dic_line_table[button]].text()+"/"+self.dic_line_table[button].text() 
         #Now we create or upload the files
@@ -1073,7 +1080,7 @@ class qannagnps():
                 table_input.close()
                 self.table_inputs_front()
             except:
-                iface.messageBar().pushMessage(f"Please close {file_path} to update data",level=Qgis.Warning)
+                iface.messageBar().pushMessage(f"Please close {file_path} to update data",level=Qgis.Warning,duration = 10)
                 return
     
     def add_row(self,numero_table_input):
@@ -2113,6 +2120,9 @@ class qannagnps():
             legend.legendPatch.set_edgecolor("black")
             legend.legendPatch.set_facecolor("white")
             legend.legendPatch.set_linewidth(1)
+            #Quitar grids
+            ax2.grid(False)
+            ax2.grid(False)
             #Título del gráfico
             if self.cell != "All cells":
                 titulo = f"Cell {self.cell}"
@@ -2493,6 +2503,10 @@ class qannagnps():
         #Método para que se abra el archivo que contiene los datos de las secciones de AnnAGNPS
         if self.dic_botones[boton].text()!="":
             try:
+                if self.dic_botones[boton].text()=="-- Provided by TopAGNPS --":
+                    file_path = self.direccion+"\\"+os.path.basename(self.file_input(self.dic_botones[boton]))
+                    if os.path.exists(file_path):
+                        os.startfile(file_path)
                 if os.path.isabs(self.dic_botones[boton].text()):
                     os.startfile(self.dic_botones[boton].text())
                 else:
@@ -2603,10 +2617,11 @@ class qannagnps():
         #Función para que aparezca el nombre de las columnas al seleccionar la capa de suelos
         self.dlg.cbColumnSoil.clear()
         selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
+        layer_name = self.dlg.cbSoil.currentText()
         if selectedLayerIndex >=0:
             try:
                 layers = [tree_layer.layer() for tree_layer in QgsProject.instance().layerTreeRoot().findLayers()]
-                selectedLayer = layers[selectedLayerIndex]
+                selectedLayer = next((layer for layer in layers if layer.name() == layer_name), None)
                 fields = selectedLayer.fields()
                 field_names = [field.name() for field in fields]
                 self.dlg.cbColumnSoil.addItems(field_names)
@@ -2618,10 +2633,11 @@ class qannagnps():
         #Función para que aparezca el nombre de las columnas al seleccionar la capa de usos
         self.dlg.cbColumnMan.clear()
         selectedLayerIndex = self.dlg.cbMan.currentIndex()-1
+        layer_name = self.dlg.cbMan.currentText()
         if selectedLayerIndex >=0:
             try:
                 layers = [tree_layer.layer() for tree_layer in QgsProject.instance().layerTreeRoot().findLayers()]
-                selectedLayer = layers[selectedLayerIndex]
+                selectedLayer = next((layer for layer in layers if layer.name() == layer_name), None)
                 fields = selectedLayer.fields()
                 field_names = [field.name() for field in fields]
                 self.dlg.cbColumnMan.addItems(field_names)
@@ -2737,18 +2753,19 @@ class qannagnps():
 
         #Mostrar el diálogo principal
         self.dlg.show()
+        self.dlg.raise_()
+        self.dlg.activateWindow()
         self.ejecucion_condicion=0
         
     def ejecuciones(self):
         #Método para las ejecuciones
         self.end_execution = 0
-        self.dlg.close()
         #Ejecutar
         self.ejecucion_completa()
         if self.end_execution != 1:
             #MENSAJE DE ÉXITO
             self.iface.messageBar().pushMessage("Success", "Succes in execution ",level=Qgis.Success, duration=5)
-          
+            
     def ejecucion_completa(self):
         #Esta función es en donde se ejecuta el modelo
         
@@ -3029,8 +3046,8 @@ class qannagnps():
                     return
                 annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
                 annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
-                #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo AnnAGNPS_Ephemeral_Gully_Data_Section.csv
-                if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
+                #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo PEG.csv
+                if path.exists(fichero("PEG.csv")):
                     eg_path = fichero(self.ephemeral_gully_file()) #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
                     summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
                     def create_layer():
@@ -3329,31 +3346,31 @@ class qannagnps():
             for t in tipes_of_files:
                 for f in t:
                     try:
-                        if t == climate_files and origin_direction(f,"climate")!=fichero_input(f,"climate"):#esta última condición es porque si no hay que mover el archivo, da error
+                        if t == climate_files and os.path.normpath(origin_direction(f,"climate"))!=os.path.normpath(fichero_input(f,"climate")):#esta última condición es porque si no hay que mover el archivo, da error
                             shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
                     except:
                         iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning,duration = 10)
                         self.end_execution = 1
                         return
                     try:
-                        if t == general_files and origin_direction(f,"general")!= fichero_input(f,"general"):
+                        if t == general_files and os.path.normpath(origin_direction(f,"general"))!= os.path.normpath(fichero_input(f,"general")):
                            shutil.copyfile(origin_direction(f,"general"),fichero_input(f,"general"))
                     except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"general")),level=Qgis.Warning)
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"general")),level=Qgis.Warning,duration = 10)
                         self.end_execution = 1
                         return
                     try:
-                        if t == simulation_files and origin_direction(f,"simulation")!=fichero_input(f,"simulation"):
+                        if t == simulation_files and os.path.normpath(origin_direction(f,"simulation"))!=os.path.normpath(fichero_input(f,"simulation")):
                            shutil.copyfile(origin_direction(f,"simulation"),fichero_input(f,"simulation"))
                     except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"simulation")),level=Qgis.Warning)
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"simulation")),level=Qgis.Warning,duration = 10)
                         self.end_execution = 1
                         return
                     try:
-                        if t == watershed_files and origin_direction(f,"watershed")!=fichero_input(f,"watershed"):
+                        if t == watershed_files and os.path.normpath(origin_direction(f,"watershed"))!=os.path.normpath(fichero_input(f,"watershed")):
                             shutil.copyfile(origin_direction(f,"watershed"),fichero_input(f,"watershed"))
                     except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"watershed")),level=Qgis.Warning)
+                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"watershed")),level=Qgis.Warning,duration = 10)
                         self.end_execution = 1
                         return
                         
@@ -3466,9 +3483,10 @@ class qannagnps():
                         text = text.replace("\"", "/") 
                         texto = text.splitlines()
                         txt = texto[2].split(",")[-1]
+                        iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning,duration = 10)
                     except:
-                        return
-                    iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning,duration = 10)
+                        pass
+                    
                     self.end_execution = 1
                     #Se abre el archivo de errores
                     try:
@@ -4112,6 +4130,8 @@ class qannagnps():
     def outputs(self):
         #Método para mostrar los resultados de la simulación
         self.output.show()
+        self.output.raise_()
+        self.output.activateWindow()
     
     def output_topagnps(self,output_type):
         #Método para mostrar los outputs de TopAGNPS
@@ -4369,7 +4389,7 @@ class qannagnps():
         elif output_type == "PEG_points":
             try:
                 #Se importa el fichero donde se tienen las coordenadas de los puntos PEG
-                fichero_summary = self.direccion+"\\"+"PEG_Summary.txt"
+                fichero_summary = fichero("PEG_Summary.txt")
                 summary = pd.read_csv(fichero_summary,encoding = "ISO-8859-1",delimiter=",")
                 #Función para crear la capa con los puntos PEG
                 def create_layer():

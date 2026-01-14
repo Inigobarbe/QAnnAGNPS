@@ -352,7 +352,7 @@
                     </font>
                    </property>
                    <property name="text">
-                    <string>Open folder</string>
+                    <string>Open outputs folder</string>
                    </property>
                   </widget>
                  </item>
