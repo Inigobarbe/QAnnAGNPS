@@ -1,2 +1,2 @@
-CD C:/Users/inigo.barberena/OneDrive - UPNA/Clases/Sustagri/Agricultural Sysmtems Modelling/Clase QAnnAGNPS/Datos 
+CD C:/Users/inigo.barberena/Documents/Prueba\Preprocessing_inputs 
 CALL C:\Users/inigo.barberena/AppData/Roaming/QGIS/QGIS3\profiles\default/python/plugins\qannagnps\Executables\TopAGNPS_v6.00.a.025_release_64-bit.exe 

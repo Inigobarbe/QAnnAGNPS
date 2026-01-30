@@ -34,7 +34,7 @@ from PyQt5.QtGui import QFont,QColor
 from qgis.PyQt.QtWidgets import QApplication, QMainWindow, QProgressBar, QLabel, QWidget, QHBoxLayout, QVBoxLayout
 from qgis.core import QgsTask, QgsApplication
 from PyQt5.QtGui import QPixmap
-
+from pathlib import Path
 
 import subprocess
 import os
@@ -637,52 +637,51 @@ class qannagnps():
     def show_existing_control_files(self):
         #Metod to show existing control files
         try:
-            if os.path.exists(self.direccion+"\TOPAGNPS.csv"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\TOPAGNPS.csv"):
                 self.cgeneral.pushButton.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton.setStyleSheet("background-color: #becbd1;")
                 
-            if os.path.exists(self.direccion+"\PEG.csv"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\PEG.csv"):
                 self.cgeneral.pushButton_2.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_2.setStyleSheet("background-color: #becbd1;")
             
-            if os.path.exists(self.direccion+"\AGBUF.csv"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\AGBUF.csv"):
                 self.cgeneral.pushButton_3.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_3.setStyleSheet("background-color: #becbd1;")
             
-            if os.path.exists(self.direccion+"\AGWET.csv"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\AGWET.csv"):
                 self.cgeneral.pushButton_4.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_4.setStyleSheet("background-color: #becbd1;")
             
-            if os.path.exists(self.direccion+"\CONCEPTS.csv"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\CONCEPTS.csv"):
                 self.cgeneral.pushButton_5.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_5.setStyleSheet("background-color: #becbd1;")
             
-            if os.path.exists(self.direccion+"\POTHOLE.csv"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\POTHOLE.csv"):
                 self.cgeneral.pushButton_6.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_6.setStyleSheet("background-color: #becbd1;")
             
-            if os.path.exists(self.direccion+"\AGFLOW.csv") or os.path.exists(self.direccion+"\AGFCNT.inp"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\AGFLOW.csv") or os.path.exists(self.direccion+"\AGFCNT.inp"):
                 self.cgeneral.pushButton_9.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_9.setStyleSheet("background-color: #becbd1;")
             
-            if os.path.exists(self.direccion+"\dednm.inp"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\dednm.inp"):
                 self.cgeneral.pushButton_10.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_10.setStyleSheet("background-color: #becbd1;")
             
-            if os.path.exists(self.direccion+"\rasfor.inp"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\rasfor.inp"):
                 self.cgeneral.pushButton_8.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_8.setStyleSheet("background-color: #becbd1;")
-            
-            if os.path.exists(self.direccion+"\raspro.inp"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\raspro.inp"):
                 self.cgeneral.pushButton_7.setStyleSheet("background-color: #66FF66; color: black;")
             else:
                 self.cgeneral.pushButton_7.setStyleSheet("background-color: #becbd1;")
@@ -695,37 +694,37 @@ class qannagnps():
         try:
             if doc==self.ctopagnps.delete_2:
                 self.ctopagnps.close()
-                os.remove(self.direccion+"\TOPAGNPS.csv")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"\TOPAGNPS.csv")
             if doc==self.cpeg.delete_2:
                 self.cpeg.close()
-                os.remove(self.direccion+"\PEG.csv")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"\PEG.csv")
             if doc==self.cagbuf.delete_2:
                 self.cagbuf.close()
-                os.remove(self.direccion+"\AGBUF.csv")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"\AGBUF.csv")
             if doc==self.cagwet.delete_2:
                 self.cagwet.close()
-                os.remove(self.direccion+"\AGWET.csv")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"\AGWET.csv")
             if doc==self.cconcepts.delete_2:
                 self.cconcepts.close()
-                os.remove(self.direccion+"\CONCEPTS.csv")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"\CONCEPTS.csv")
             if doc==self.cpothole.delete_2:
                 self.cpothole.close()
-                os.remove(self.direccion+"\POTHOLE.csv")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"\POTHOLE.csv")
             if doc==self.agflow.delete_2:
                 self.agflow.close()
-                os.remove(self.direccion+"\AGFLOW.csv")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"\AGFLOW.csv")
             if doc==self.agflow.delete_inp:
                 self.agflow.close()
-                os.remove(self.direccion+"\AGFCNT.inp")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"\AGFCNT.inp")
             if doc==self.dednm.delete_2:
                 self.dednm.close()
-                os.remove(self.direccion+"\dednm.inp")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"\dednm.inp")
             if doc==self.crasfor.delete_2:
                 self.crasfor.close()
-                os.remove(self.direccion+"/rasfor.inp")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"/rasfor.inp")
             if doc==self.craspro.delete_2:
                 self.craspro.close()
-                os.remove(self.direccion+"/raspro.inp")
+                os.remove(self.direccion+"\\Preprocessing_inputs"+"/raspro.inp")
         except:
             pass
         
@@ -764,21 +763,21 @@ class qannagnps():
             self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
             buf_directory, self.nombre_buf = os.path.split(self.fichero_buf)
             #Create file if it doesn't exist
-            if not os.path.exists(self.direccion+"\\AGBUF.CSV"):
+            if not os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\AGBUF.CSV"):
                 control_file = pd.DataFrame(data = {"BUFFER":[self.nombre_buf],"VEGETATION":"",
                                     "FOREST":"","GRASS":"",
                                     "C_THRESHOLD":"","R_THRESHOLD":"",
                                     "UNITS":"","ASC_PATH":"",
                                     "CSV_PATH":""})
-                control_file.to_csv(self.direccion+"\\"+"AGBUF.csv", index=False, float_format='%.5f')
+                control_file.to_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"AGBUF.csv", index=False, float_format='%.5f')
             
         #Add name of Buffer to AGBUF.csv if this file exists
         try: #when opening the plugin self.direccion doesnt exist
-            if os.path.exists(self.direccion+"\\AGBUF.CSV"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\AGBUF.CSV"):
                 if selectedLayerIndex==-1:self.nombre_buf=""
-                topagnps_control_file = pd.read_csv(self.direccion+"\\AGBUF.CSV",encoding = "ISO-8859-1",delimiter=",")
+                topagnps_control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\AGBUF.CSV",encoding = "ISO-8859-1",delimiter=",")
                 topagnps_control_file["BUFFER"].iloc[0]=self.nombre_buf
-                topagnps_control_file.to_csv(self.direccion+"\\AGBUF.CSV", index=False, float_format='%.5f')
+                topagnps_control_file.to_csv(self.direccion+"\\Preprocessing_inputs"+"\\AGBUF.CSV", index=False, float_format='%.5f')
         except:
             pass
         
@@ -793,21 +792,21 @@ class qannagnps():
             self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
             veg_directory, self.nombre_veg = os.path.split(self.fichero_veg)
             #Create file if it doesn't exist
-            if not os.path.exists(self.direccion+"\\AGBUF.CSV"):
+            if not os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\AGBUF.CSV"):
                 control_file = pd.DataFrame(data = {"BUFFER":"","VEGETATION":[self.nombre_veg],
                                     "FOREST":"","GRASS":"",
                                     "C_THRESHOLD":"","R_THRESHOLD":"",
                                     "UNITS":"","ASC_PATH":"",
                                     "CSV_PATH":""})
-                control_file.to_csv(self.direccion+"\\"+"AGBUF.csv", index=False, float_format='%.5f')
+                control_file.to_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"AGBUF.csv", index=False, float_format='%.5f')
                 
         #Add name of Buffer to AGBUF.csv if this file exists
         try: #when opening the plugin self.direccion doesnt exist
-            if os.path.exists(self.direccion+"\\AGBUF.CSV"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\AGBUF.CSV"):
                 if selectedLayerIndex==-1:self.nombre_veg=""
-                topagnps_control_file = pd.read_csv(self.direccion+"\\AGBUF.CSV",encoding = "ISO-8859-1",delimiter=",")
+                topagnps_control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\AGBUF.CSV",encoding = "ISO-8859-1",delimiter=",")
                 topagnps_control_file["VEGETATION"].iloc[0]=self.nombre_veg
-                topagnps_control_file.to_csv(self.direccion+"\\AGBUF.CSV", index=False, float_format='%.5f')
+                topagnps_control_file.to_csv(self.direccion+"\\Preprocessing_inputs"+"\\AGBUF.CSV", index=False, float_format='%.5f')
         except:
             pass
             
@@ -980,7 +979,7 @@ class qannagnps():
         else:
             file_path = file_input(button)
             if self.dic_line_table[button].text() == "-- Provided by TopAGNPS --":
-                file_path = self.direccion+"\\"+ os.path.basename(self.file_input(self.dic_line_table[button]))
+                file_path = self.direccion+"\\Preprocessing_inputs"+"\\"+ os.path.basename(self.file_input(self.dic_line_table[button]))
             if os.path.exists(file_path) and os.path.getsize(file_path)>0: 
                 #Add files and columns
                 #Add columns
@@ -1032,7 +1031,7 @@ class qannagnps():
         table_input = getattr(self, f"table_input_{numero_table_input}")
         #Then we determine the file path
         if self.dic_line_table[button].text()=="-- Provided by TopAGNPS --":
-            file_path = self.direccion+"\\"+os.path.basename(self.file_input(self.dic_line_table[button]))    
+            file_path = self.direccion+"\\Preprocessing_inputs"+"\\"+os.path.basename(self.file_input(self.dic_line_table[button]))    
         elif os.path.isabs(self.dic_line_table[button].text()):
             file_path =  self.dic_line_table[button].text()
         else:
@@ -2504,7 +2503,7 @@ class qannagnps():
         if self.dic_botones[boton].text()!="":
             try:
                 if self.dic_botones[boton].text()=="-- Provided by TopAGNPS --":
-                    file_path = self.direccion+"\\"+os.path.basename(self.file_input(self.dic_botones[boton]))
+                    file_path = self.direccion+"\\Preprocessing_inputs"+"\\"+os.path.basename(self.file_input(self.dic_botones[boton]))
                     if os.path.exists(file_path):
                         os.startfile(file_path)
                 if os.path.isabs(self.dic_botones[boton].text()):
@@ -2558,11 +2557,13 @@ class qannagnps():
                 selectedLayer = layers[selectedLayerIndex].layer()
                 self.fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
                 dir_mdt, self.name_mdt = os.path.split(self.fichero_mdt)
+                #Si no existe la carpeta de preprocessing inputs entonces se crea
+                self.create_preprocessing_inputs_folder()
                 #Add name of DEM to Topagnps.csv if this file exists
-                if os.path.exists(self.direccion+"\\TOPAGNPS.CSV"):
-                    topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
+                if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV"):
+                    topagnps_control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
                     topagnps_control_file["FILENAME"].iloc[0]=self.name_mdt
-                    topagnps_control_file.to_csv(self.direccion+"\\TOPAGNPS.CSV", index=False, float_format='%.5f')
+                    topagnps_control_file.to_csv(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV", index=False, float_format='%.5f')
                 else:
                     control_file = pd.DataFrame(data = {"FILENAME":[self.name_mdt],"FORMAT":"",
                                     "DEMPROC":"","OUTFORMAT":"","OUTROW":"","OUTCOL":"","CSA":"","MSCL":"",
@@ -2570,7 +2571,7 @@ class qannagnps():
                                     "OUTSNAP":"","DNMCNT":"","DEMEDGE":"","VERBOSE":"",
                                     "KEEPFILES":"","OPTIMIZE":"","MODULE":"","OUTPUT":"",
                                     "READOUT":"","READPATH":""})
-                    control_file.to_csv(self.direccion+"\\"+"TOPAGNPS.csv", index=False, float_format='%.5f')
+                    control_file.to_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"TOPAGNPS.csv", index=False, float_format='%.5f')
             except:
                 pass
 
@@ -2649,17 +2650,17 @@ class qannagnps():
         #Asignar en el control file de AGBUF el nombre del archivo que se ha seleccionado en el plugin como el buffer
         try:
             if self.dlg.comboBox_2.currentIndex()>0:
-                if path.exists(self.direccion+"/AGBUF.csv"):
+                if path.exists(self.direccion+"\\Preprocessing_inputs"+"/AGBUF.csv"):
                     all_layers = QgsProject.instance().layerTreeRoot().children()
                     layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
                     selectedLayerIndex = self.dlg.comboBox_2.currentIndex()-1
                     selectedLayer = layers[selectedLayerIndex].layer()
                     self.fichero_buf =  selectedLayer.dataProvider().dataSourceUri()
                     buffer_directory, self.name_buffer  = os.path.split(self.fichero_buf)
-                    control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
+                    control = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
                     nombre_buffer_control = control.columns[[x.lower() for x in control.columns].index("buffer")]#esto es para poner cómo se llama el buffer en el control file
                     control[nombre_buffer_control].iloc[0]=self.name_buffer
-                    control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
+                    control.to_csv(self.direccion+"\\Preprocessing_inputs"+"/AGBUF.csv", index=False, float_format='%.5f')
                     
         except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
             pass
@@ -2670,17 +2671,17 @@ class qannagnps():
         #Asignar en el control file de AGBUF el nombre del archivo que se ha seleccionado en el plugin como el vegetation   
         try:
             if self.dlg.comboBox_3.currentIndex()>0:
-                if path.exists(self.direccion+"/AGBUF.csv"):
+                if path.exists(self.direccion+"\\Preprocessing_inputs"+"/AGBUF.csv"):
                     all_layers = QgsProject.instance().layerTreeRoot().children()
                     layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
                     selectedLayerIndex = self.dlg.comboBox_3.currentIndex()-1
                     selectedLayer = layers[selectedLayerIndex].layer()
                     self.fichero_veg =  selectedLayer.dataProvider().dataSourceUri()
                     vegetation_directory, self.name_vegetation  = os.path.split(self.fichero_veg)
-                    control = pd.read_csv(self.direccion+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
+                    control = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"/AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
                     nombre_veg_control = control.columns[[x.lower() for x in control.columns].index("vegetation")]#esto es para poner cómo se llama el vegetation en el control file
                     control[nombre_veg_control].iloc[0]=self.name_vegetation
-                    control.to_csv(self.direccion+"/AGBUF.csv", index=False, float_format='%.5f')
+                    control.to_csv(self.direccion+"\\Preprocessing_inputs"+"/AGBUF.csv", index=False, float_format='%.5f')
         except IndexError: #si el error es de que no hay capas en el canvas y se añade desde fichero y es index error entonces pasa, pero si es otro tipo de error entonces no. 
             pass
         except Exception as e:
@@ -2794,25 +2795,13 @@ class qannagnps():
         
         #EJECUCIÓN DE TOPAGNPS
         if self.dlg.cbTop.isChecked():
+            #Se crea la carpeta de Preprocessing_inputs si no estaba creada. Ahí se meten los inputs y se ejecuta TopAGNPS y luego los outputs se meten a Preprocessing_outputs
+            #Una vez creada se meten todos los archivos en esa carpeta
+            self.create_folder_preprocessing_and_move_files()
+            
             #Se pone el epsg del proyecto
             self.epsg = QgsProject.instance().crs().authid()
-            #Se mueve el DEM a la carpeta del proyecto
-            try: #si el origen y el destino son los mismos da error
-                shutil.copyfile(self.fichero_mdt,self.direccion+"\\"+self.name_mdt)
-            except:
-                pass
             
-            
-            #Mover el fichero de buffer la carpeta del proyecto
-            try: #si el origen y el destino son los mismos da error
-                shutil.copyfile(self.fichero_buf,self.direccion+"\\"+self.nombre_buf)
-            except:
-                pass
-            #Mover el fichero de vegetation la carpeta del proyecto
-            try: #si el origen y el destino son los mismos da error
-                shutil.copyfile(self.fichero_veg,self.direccion+"\\"+self.nombre_veg)
-            except:
-                pass
             #Si el input output_global Glbl_All_V3_sim no se pone en T no se obtiene el archivo que se necesita para calcular la erosión por cárcavas efímeras (AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv) y por lo tanto no se puede hacer el análisis de sensibilidad
             #Esto se hace primero porque la dirección puede estar dada con el nombre del archivo o en dirección completa
             if os.path.isabs(r"{}".format(str(self.inputs.l_63.text()))):
@@ -2821,15 +2810,15 @@ class qannagnps():
                 file_glbl = str(self.inputs.l_53.text()) + "/" + str(self.inputs.l_63.text())
             #Función para que se le diga el nombre del archivo y te devuelva la dirección completa
             def fichero(nombre):
-                return self.direccion+"\\"+nombre
+                return self.direccion+"\\Preprocessing_inputs"+"\\"+nombre
             
             #Dar error si no existe el archivo TOPAGNPS.CSV
-            if not os.path.exists(self.direccion+"\\TOPAGNPS.CSV"):
+            if not os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV"):
                 iface.messageBar().pushMessage("Error Input data", "Control file of TopAGNPS, TOPAGNPS.CSV, not found" ,level=Qgis.Warning)
                 self.end_execution = 1
                 return
             #Si el formato de la columna FILENAME no es str entonces dar error
-            topagnps_control_file = pd.read_csv(self.direccion+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
+            topagnps_control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
             if type(topagnps_control_file["FILENAME"].iloc[0])!=str:
                 iface.messageBar().pushMessage("Error Input data", "Please select a correct FILENAME in TOPAGNPS.CSV" ,level=Qgis.Warning)
                 self.end_execution = 1
@@ -2846,10 +2835,14 @@ class qannagnps():
                 for j,k in enumerate(self.dic_data.keys()):
                     self.change_inputs_sensitivity(self.param_values[self.numero_ejecucion-1],j,k,spatial =True) #cambio de los inputs espaciales
             
+            #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
+            self.time_start_preprocessing = datetime.now()
+            
+            
             #EJECUCIÓN DE TOPAGNPS            
             def main():
                 f = open(self.executable_directory+"\\"+"EjecutarTopagnps.bat","w+")
-                linea_uno = "CD {}".format(self.direccion)
+                linea_uno = "CD {}".format(self.direccion+"\\Preprocessing_inputs")
                 linea_dos = r"CALL {}\TopAGNPS_v6.00.a.025_release_64-bit.exe".format(self.executable_directory)
                 f.write("{} \n".format(linea_uno))
                 f.write("{} \n".format(linea_dos))
@@ -2861,22 +2854,26 @@ class qannagnps():
             
             #If error file of TopAGNPS is opened, then return a error message
             try:
-                open(self.direccion+"TOPAGNPS_err.csv", "r+") 
+                open(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.csv", "r+") 
             except PermissionError:
                 iface.messageBar().pushMessage("Error TopAGNPS","Close TOPAGNPS_err.csv before the start of execution",level=Qgis.Warning,duration = 10)
+                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                self.save_files_preprocessing_in_folder()
                 self.end_execution = 1
                 return
             except:
                 pass
 
             #Cuando se eligen coordenadas automáticamente con el plugin primero se ejecuta Topagnps y da error (se ejecuta la primera para poner el reaches en QGIS) osea que no queremos que python salte si hay error en la primera ronda. Queremos que salte python cuando hay error y si se ha seleccionado que no se elige automaticamente. O sino cuando hay error y se ha elegido automáticamente pero la segunda ejecución de Topagnps da error. 
-            if os.path.isfile(self.direccion+"\\TOPAGNPS_err.CSV") and os.path.getsize(self.direccion+"\\TOPAGNPS_err.CSV")>0 and (not self.dlg.checkBox_2.isChecked() or self.segunda_ronda):
+            if os.path.isfile(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV") and os.path.getsize(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV")>0 and (not self.dlg.checkBox_2.isChecked() or self.segunda_ronda):
                 self.end_execution = 1
                 error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
                 iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning,duration = 10)
+                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                self.save_files_preprocessing_in_folder()
                 #Se abre el archivo de errores
                 try:
-                    os.startfile(self.direccion+"\\TopAGNPS_err.csv")
+                    os.startfile(self.direccion+"\\Preprocessing_outputs"+"\\TopAGNPS_err.csv")
                 except:
                     pass
                 #Este return es para parar el codigo
@@ -2891,293 +2888,27 @@ class qannagnps():
             #Esto es para cambiar las coordenadas del outlet en TOPAGNPS.csv. Para ello se tiene que estar en primera ronda y se tiene que haber elegido la opción de escoger el outlet automáticamente. 
             if self.dlg.checkBox_2.isChecked() and not self.segunda_ronda:
                 if self.ejecucion_condicion == 0:
-                    #Primero, si no existe "NETFUL.asc" entonces ha dado error TOPAGNPS y hay que para la ejecución. Si no se para antes es porque le he dicho que no pare porque el hecho de no poner coordenadas daba error.
-                    if not os.path.exists(self.direccion+"\\NETFUL.asc"):
-                        self.end_execution = 1
-                        error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
-                        iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning)
-                        #Se abre el archivo de errores
-                        try:
-                            os.startfile(self.direccion+"\\TopAGNPS_err.csv")
-                        except:
-                            pass
-                        #Este return es para parar el codigo
+                    #Add coordinates to topagnps control file
+                    try:
+                        self.add_coordinates_to_topagnps_control_file()
+                    except Exception as e:
+                        self.iface.messageBar().pushMessage(str(e),level=Qgis.Info)
                         return
-                    
-                    change_coordinates("NETFUL.asc","NETFUL_epsg.asc")
-                    layer = QgsRasterLayer(fichero("NETFUL_epsg.asc"),"reaches")
-                    QgsProject.instance().addMapLayer(layer)
-                    #Esto es para que se desactiven el resto de las capas y se pueda ver la capa reaches
-                    root = QgsProject.instance().layerTreeRoot()
-                    for child in root.children():
-                        if child.name() != "reaches":
-                            child.setItemVisibilityChecked(False)
-                    iface.mapCanvas().refresh()
-
-                    #Se ejecuta el método para las coordenadas
-                    self.set_coordinates()
+                    #Return porque dentro del add_coordinates_to_topagnps_control_file ya se ejecuta de nuevo y no hay que seguir con el código
                     return
             self.segunda_ronda = False
             #VALORES DEL TAMAÑO DE PIXEL
             layer = QgsRasterLayer(topagnps_control_file["FILENAME"].iloc[0],"dednm")
-            pixelSizeX = round(layer.rasterUnitsPerPixelX(),2)
-            pixelSizeY = round(layer.rasterUnitsPerPixelY(),2)
+            self.pixelSizeX = round(layer.rasterUnitsPerPixelX(),2)
+            self.pixelSizeY = round(layer.rasterUnitsPerPixelY(),2)
             
             #ASIGNAR LOS VALORES DE SUELO Y MANEJO A AnnAGNPS_Cell_Data_Section.csv
-            #A esta función le das la capa de celdas y la que se superpone (tipo de suelo o uso) y devuelve el diccionario en el que se muestra a cada celda que valor (de suelo o de uso) le corresponde
-            def aplicar(fichero_celdas,fichero_superponer, columna_tipo,numero):
-                numero = str(numero) #esto es porque no deja sobreescribir y tengo que crear otra capa por cada ejecución de sensibilidad
-                fichero_cell = fichero_celdas
-                fichero_suelo = fichero_superponer
-                #Esta función devuelve un diccionario en donde a cada suelo/uso se le asigna un numero entero y luego en la capa (de suelos o uso) a cada suelo/uso se le añade el valor del diccionario
-                def create_fid(file_layer):
-                    layer = file_layer
-                    tipos_suelo = []
-                    for f in layer.getFeatures():
-                        tipos_suelo.append(f[columna_tipo])
-                    tipos_suelo = np.unique(tipos_suelo)
-                    tipos_suelo_dic = {tipos_suelo[x]:x+1 for x in range(len(tipos_suelo))}
-
-                    pv = layer.dataProvider()
-                    pv.addAttributes([QgsField("id_prueba",QVariant.Int)])
-                    context = QgsExpressionContext()
-                    with edit(layer):
-                        for f in layer.getFeatures():
-                            context.setFeature(f)
-                            f["id_prueba"] = tipos_suelo_dic[f[columna_tipo]]
-                            layer.updateFeature(f)
-                    layer.updateFields()
-                    return tipos_suelo_dic
-
-                #Pasar de shp a gpkg
-                e = processing.run("native:reprojectlayer", 
-                    {'INPUT':fichero_suelo,
-                    'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
-                    'OPERATION':'+proj=noop','OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
-                #Reproyectar celdas al epsg del proyecto
-                a = processing.run("gdal:warpreproject", 
-                    {'INPUT':fichero(fichero_cell),
-                    'SOURCE_CRS':None,'TARGET_CRS':QgsCoordinateReferenceSystem('{}'.format(self.epsg)),
-                    'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':None,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,
-                    'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
-                #Con esto se tiene el diccionario que te asigna para cada suelo/uso un valor numérico
-                dic_conv = create_fid(e["OUTPUT"])
-                #Rasterizar la capa de suelos
-                processing.run("gdal:rasterize", 
-                    {'INPUT':e["OUTPUT"],
-                    'FIELD':'id_prueba','BURN':0,'USE_Z':False,'UNITS':1,'WIDTH':pixelSizeX,
-                    'HEIGHT':pixelSizeY,'EXTENT':None,'NODATA':0,'OPTIONS':'','DATA_TYPE':4,'INIT':None,
-                    'INVERT':False,'EXTRA':'','OUTPUT':fichero("suelo_ras.tif")})
-                #Vectorizar la capa de celdas
-                c = processing.run("grass7:r.to.vect", {'input':a["OUTPUT"],
-                    'type':2,'column':'value','-s':False,
-                    '-v':False,'-z':False,'-b':False,'-t':False,
-                    'output':QgsProcessing.TEMPORARY_OUTPUT,'GRASS_REGION_PARAMETER':None,
-                    'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
-                    'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
-                    'GRASS_VECTOR_EXPORT_NOCAT':False})
-                #Corregir geometrías porque luego sino en unión da error 
-                d = processing.run("native:fixgeometries", 
-                    {'INPUT':c["output"],
-                    'OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})    
-                #Se unen las capas de celdas de celdas con las de suelo/uso
-                processing.run("native:union", 
-                {'INPUT':d["OUTPUT"],
-                'OVERLAY':e["OUTPUT"],
-                'OVERLAY_FIELDS_PREFIX':'','OUTPUT':fichero("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion))})
-                #Esta función es para crear una columna en una capa vectorial según la expresión que le pongas
-                def create_attribute(layer_name, expresion,nombre_columna):
-                    layer = QgsVectorLayer(fichero(layer_name),"union")
-                    pv = layer.dataProvider()
-                    pv.addAttributes([QgsField(nombre_columna,QVariant.Double)])
-                    expression1 = QgsExpression(expresion)
-                    context = QgsExpressionContext()
-                    context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
-                    with edit(layer):
-                        for f in layer.getFeatures():
-                            context.setFeature(f)
-                            f[nombre_columna] = expression1.evaluate(context)
-                            layer.updateFeature(f)
-                    layer.updateFields()
-                #De la capa de unión creada se calcula el área para cada zona
-                create_attribute("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion),"$area","area_zona")
-                
-                #Ahora se ve qué área de suelo/uso es la mayor para cada celda y esa será la que se escoja
-                layer = QgsVectorLayer(fichero("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion)),"union")
-                tres_valores = []
-                valores_unicos_celdas = []
-                valores_unicos_suelos=[]
-                for f in layer.getFeatures():
-                            tres_valores.append((f["value"],f["id_prueba"],f["area_zona"]))
-                            valores_unicos_celdas.append(f["value"])
-                            valores_unicos_suelos.append(f["id_prueba"])
-                valores_unicos_celdas = list(np.unique(valores_unicos_celdas))
-                valores_unicos_suelos=list(np.unique(valores_unicos_suelos))
-                valores_unicos_celdas=[x for x in valores_unicos_celdas if type(x)==float]
-                valores_unicos_suelos=[x for x in valores_unicos_suelos if type(x)==np.int32 or type(x)==int ]
-                lista_final = []
-                for i in valores_unicos_celdas:
-                    lista_maximos = []
-                    for x in valores_unicos_suelos:
-                        try:
-                            suma = sum([f[2] for f in tres_valores if f[0] == i and f[1] == x])
-                            lista_maximos.append((x,suma))
-                        except:
-                            pass
-                    lista_final.append((i,max(lista_maximos,key = lambda p:p[1])[0]))
-                diccionario_conversion = {x[0]:x[1] for x in lista_final}
-                dic_conv = {v: k for k, v in dic_conv.items()}
-                diccionario_final = {list(diccionario_conversion.keys())[x]:dic_conv[diccionario_conversion[list(diccionario_conversion.keys())[x]]] for x in range(len(diccionario_conversion))}
-                return diccionario_final,dic_conv
-            #Se importa el data frame en el que se muestran las celdas 
-            annagnps_cell_data = pd.read_csv("AnnAGNPS_Cell_Data_Section.csv",encoding = "ISO-8859-1",delimiter=",")
-            #Dar error si no se ha elegido ni capa de suelos ni se ha puesto un suelo único
-            if str(self.dlg.lineEdit.text())=="":
-                if self.dlg.cbSoil.currentIndex()==0:
-                    iface.messageBar().pushMessage("Error with soil layer","There isn't any soil information to use",level=Qgis.Warning)
-                    self.end_execution = 1
-                    return
-                #Se aplica el suelo al fichero de cells
-                try:
-                    suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
-                except:
-                    iface.messageBar().pushMessage("Error with soil layer","The DEM and the soil layer have to overlap.",level=Qgis.Warning)
-                    self.end_execution = 1
-                    return
-                annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
-                annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
-                #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo PEG.csv
-                if path.exists(fichero("PEG.csv")):
-                    eg_path = fichero(self.ephemeral_gully_file()) #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                    summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
-                    def create_layer():
-                        layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
-                        layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
-                        layer.updateFields()
-                        features = []
-                        for i in range(len(summary)):
-                            feature = QgsFeature()
-                            feature.setFields(layer.fields())
-                            x = summary.X.iloc[i]
-                            y = summary.Y.iloc[i]
-                            pt = QgsPointXY(x,y)
-                            geom = QgsGeometry.fromPointXY(pt)
-                            feature.setGeometry(geom)
-                            feature.setAttribute(0,summary.GULLY_ID.iloc[i])
-                            features.append(feature)
-                        layer.dataProvider().addFeatures(features)
-                        return layer
-                    summary_layer = create_layer()
-                    sampling = processing.run("native:rastersampling", 
-                        {'INPUT':summary_layer,
-                        'RASTERCOPY':fichero("suelo_ras.tif"),
-                        'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
-                    capa = sampling["OUTPUT"]
-                    dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
-                    
-                    annagnps_eg_data = pd.read_csv(eg_path,encoding = "ISO-8859-1",delimiter=",")
-                    suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
-                    try:
-                        annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
-                    except:
-                        iface.messageBar().pushMessage("Error soil map","The soil type layer may not cover the full extent of the watershed",level=Qgis.Warning)
-                        self.end_execution = 1
-                        return 
-                    #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
-                    def float_to_str(column):
-                        lista = []
-                        for i in annagnps_eg_data[column]:
-                            try:
-                                lista.append(str(int(i)))
-                            except:
-                                lista.append("")
-                        annagnps_eg_data[column] = lista
-                    #Primero para la columna de celdas
-                    float_to_str("Cell_ID")
-                    #Ahora para la columna de reaches
-                    float_to_str("Reach_ID")
-                    annagnps_eg_data.to_csv(eg_path, index=False, float_format='%.5f')
-                    
-                
-            #Dar error si no se ha elegido ni capa de usos ni se ha puesto un uso único
-            if str(self.dlg.lineEdit_2.text())=="":
-                if self.dlg.cbMan.currentIndex()==0:
-                        iface.messageBar().pushMessage("Error with soil management","There isn't any management information to use",level=Qgis.Warning)
-                        self.end_execution = 1
-                        return 
-                try:
-                    manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
-                except:
-                    iface.messageBar().pushMessage("Error with soil use layer","The DEM and the soil use layer have to overlap.",level=Qgis.Warning, duration=20)
-                    self.end_execution = 1
-                    return
-                annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
-                annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
-                #Se aplica el uso al fichero de cárcavas efímeras
-                if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
-                    eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                    summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
-                    def create_layer():
-                        layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
-                        layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
-                        layer.updateFields()
-                        features = []
-                        for i in range(len(summary)):
-                            feature = QgsFeature()
-                            feature.setFields(layer.fields())
-                            x = summary.X.iloc[i]
-                            y = summary.Y.iloc[i]
-                            pt = QgsPointXY(x,y)
-                            geom = QgsGeometry.fromPointXY(pt)
-                            feature.setGeometry(geom)
-                            feature.setAttribute(0,summary.GULLY_ID.iloc[i])
-                            features.append(feature)
-                        layer.dataProvider().addFeatures(features)
-                        return layer
-                    summary_layer = create_layer()
-                    sampling = processing.run("native:rastersampling", 
-                        {'INPUT':summary_layer,
-                        'RASTERCOPY':fichero("suelo_ras.tif"),
-                        'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
-                    capa = sampling["OUTPUT"]
-                    dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
-                    annagnps_eg_data = pd.read_csv(eg_path,encoding = "ISO-8859-1",delimiter=",")
-                    suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
-                    try:
-                        lista_tipos = []
-                        for eg_soil_i,eg_soil_k in enumerate([dic_conv[x] for x in suelos_eg]):
-                            if annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i]=="BUFFER" or annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i]=="WETLAND":
-                                lista_tipos.append(annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i])
-                            else:
-                                lista_tipos.append(eg_soil_k)
-                        annagnps_eg_data["Mgmt_Field_ID"]= lista_tipos
-                    except:
-                        iface.messageBar().pushMessage("Error soil use map","The soil use layer may not cover the full extent of the watershed",level=Qgis.Warning)
-                        self.end_execution = 1
-                        return
-                    #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
-                    def float_to_str(column):
-                        lista = []
-                        for i in annagnps_eg_data[column]:
-                            try:
-                                lista.append(str(int(i)))
-                            except:
-                                lista.append("")
-                        annagnps_eg_data[column] = lista
-                    #Primero para la columna de celdas
-                    float_to_str("Cell_ID")
-                    #Ahora para la columna de reaches
-                    float_to_str("Reach_ID")
-                    annagnps_eg_data.to_csv(eg_path, index=False, float_format='%.5f')
-                
-            #Si se ha puesto un suelo único entonces se añade a todas las celdas
-            if str(self.dlg.lineEdit.text())!="":
-                annagnps_cell_data["Soil_ID"] =str(self.dlg.lineEdit.text())
-                annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
-            #Si se ha puesto un uso único entonces se añade a todas las celdas
-            if str(self.dlg.lineEdit_2.text())!="":
-                annagnps_cell_data["Mgmt_Field_ID"]=str(self.dlg.lineEdit_2.text())
-                annagnps_cell_data.to_csv('AnnAGNPS_Cell_Data_Section.csv', index=False, float_format='%.5f')
+            try:
+                self.add_soil_and_management_cell()
+            except Exception as e:
+                self.iface.messageBar().pushMessage(str(e),level=Qgis.Info)
+                return
+            
             
             #Mensaje de éxito si se ha ejecutado TOPAGNPS con éxito si no se ha escogido ejecutar AnnAGNPS
             if not self.dlg.cbAnn.isChecked() and ((not self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 0)or (self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 1)):
@@ -3186,264 +2917,35 @@ class qannagnps():
             if not self.dlg.cbAnn.isChecked() and self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 0:
                 self.iface.messageBar().pushMessage("Coordinate selection", "Please move the mouse to the outlet and click on it",level=Qgis.Info)
             
+            #If add outlet automatically was checked, then uncheck
+            if self.dlg.checkBox_2.isChecked(): self.dlg.checkBox_2.setChecked(False)
+            
+            #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+            self.save_files_preprocessing_in_folder()
+            
+            
         #EJECUCIÓN DE ANNAGNPS
         if self.dlg.cbAnn.isChecked():
-            #CREACIÓN DE LA CARPETA QUE CONTENDRÁ LOS INPUTS DE ANNAGNPS
-            directory = "INPUTS"
             
-            parent_dir = self.direccion
-            path_file = os.path.join(parent_dir, directory)
-            mode = 0o666
-            try:
-                os.mkdir(path_file, mode)
-            except:
-                pass
-
-            #CREACIÓN DE LAS SUBCARPETAS EN DONDE SE ORGANIZARÁN LOS INPUTS
-            carpetas = ["simulation","general","watershed","climate"]
-            parent_dir = self.direccion +"\\" + directory
-            try:
-                for c in carpetas: 
-                    path_file = os.path.join(parent_dir, c)
-                    mode = 0o666
-                    os.mkdir(path_file, mode)
-            except:
-                pass
-
-            #CONCRETAR EL NOMBRE DE LOS INPUTS PARA ANNAGNPS. Obtenidos de Input_Specifications pero mejor sacarlo del input editor
-            #WATERSHED
-            aquaculture_pond_data= r"{}".format(str(self.inputs.l_2.text())) # el r"{}".format se pone porque si es una dirección completa luego no se puede reconocer si es una dirección completa o no
-            cell_data= r"{}".format(str(self.inputs.l_3.text()))
-            classic_gully= r"{}".format(str(self.inputs.l_4.text()))
-            ephemeral_gully= r"{}".format(str(self.inputs.l_5.text()))
-            feedlot_data= r"{}".format(str(self.inputs.l_6.text()))
-            field_pond_data= r"{}".format(str(self.inputs.l_7.text()))
-            impoundment_data= r"{}".format(str(self.inputs.l_8.text()))
-            point_source= r"{}".format(str(self.inputs.l_9.text()))
-            reach_data= r"{}".format(str(self.inputs.l_10.text()))
-            ricewq_data = r"{}".format(str(self.inputs.l_11.text()))
-            watershed_data = r"{}".format(str(self.inputs.l_12.text()))
-            wetland_data= r"{}".format(str(self.inputs.l_13.text()))
-            output_options_cell = r"{}".format(str(self.inputs.l_14.text()))
-            output_options_feedlot = r"{}".format(str(self.inputs.l_15.text()))
-            output_options_field = r"{}".format(str(self.inputs.l_16.text()))
-            output_options_classic_gully = r"{}".format(str(self.inputs.l_17.text()))
-            output_options_ephemeral_gully = r"{}".format(str(self.inputs.l_18.text()))
-            output_options_impoundment = r"{}".format(str(self.inputs.l_19.text()))
-            output_options_point_source = r"{}".format(str(self.inputs.l_20.text()))
-            output_options_reach = r"{}".format(str(self.inputs.l_21.text()))
-            output_options_wetland = r"{}".format(str(self.inputs.l_22.text()))
-
-            #GENERAL
-            aquaculture_schedule_data= r"{}".format(str(self.inputs.l_24.text()))
-            contour_data= r"{}".format(str(self.inputs.l_25.text()))
-            crop_data= r"{}".format(str(self.inputs.l_26.text()))
-            crop_growth = r"{}".format(str(self.inputs.l_27.text()))
-            feedlot_management= r"{}".format(str(self.inputs.l_28.text()))
-            fertilizer_application= r"{}".format(str(self.inputs.l_29.text()))
-            fertilizer_reference= r"{}".format(str(self.inputs.l_30.text()))
-            geology_data= r"{}".format(str(self.inputs.l_31.text()))
-            hydraulic_geometry= r"{}".format(str(self.inputs.l_32.text()))
-            irrigation_application= r"{}".format(str(self.inputs.l_33.text()))
-            management_field= r"{}".format(str(self.inputs.l_34.text()))
-            management_operation= r"{}".format(str(self.inputs.l_35.text()))
-            management_schedule_data= r"{}".format(str(self.inputs.l_36.text()))
-            non_crop= r"{}".format(str(self.inputs.l_37.text()))
-            pesticide_application= r"{}".format(str(self.inputs.l_38.text()))
-            pesticide_reference= r"{}".format(str(self.inputs.l_39.text()))
-            reach_nutrient= r"{}".format(str(self.inputs.l_40.text()))
-            riparian_buffer= r"{}".format(str(self.inputs.l_41.text()))
-            runoff_curve= r"{}".format(str(self.inputs.l_42.text()))
-            soil_data= r"{}".format(str(self.inputs.l_43.text()))
-            soil_layer_data = r"{}".format(str(self.inputs.l_44.text()))
-            strip_crop= r"{}".format(str(self.inputs.l_45.text()))
-            tile_drain= r"{}".format(str(self.inputs.l_46.text()))
-
-            #CLIMATE
-            climate_data_station = r"{}".format(str(self.inputs.l_48.text()))
-            climate_data_daily = r"{}".format(str(self.inputs.l_49.text()))
-            EI_pct_data = r"{}".format(str(self.inputs.l_50.text()))
-            storm_type_rfd = r"{}".format(str(self.inputs.l_51.text()))
-            storm_type_updrc = r"{}".format(str(self.inputs.l_52.text()))
-
-            #SIMULATION
-            annagnps_id = r"{}".format(str(self.inputs.l_54.text()))
-            global_error = r"{}".format(str(self.inputs.l_55.text()))
-            global_id = r"{}".format(str(self.inputs.l_56.text()))
-            pesticide_initial= r"{}".format(str(self.inputs.l_57.text()))
-            pl_calibration = r"{}".format(str(self.inputs.l_58.text()))
-            rcn_calibration = r"{}".format(str(self.inputs.l_59.text()))
-            simulation_period_data=r"{}".format(str(self.inputs.l_60.text()))
-            soil_initial_conditions = r"{}".format(str(self.inputs.l_61.text()))
-            rusle2_data= r"{}".format(str(self.inputs.l_62.text()))
-            output_global = r"{}".format(str(self.inputs.l_63.text()))
-            output_options_csv = r"{}".format(str(self.inputs.l_64.text()))
-            output_options_dpp = r"{}".format(str(self.inputs.l_65.text()))
-            output_options_npt = r"{}".format(str(self.inputs.l_66.text()))
-            output_options_sim = r"{}".format(str(self.inputs.l_67.text()))
-            output_options_aa= r"{}".format(str(self.inputs.l_68.text()))
-            output_options_ev = r"{}".format(str(self.inputs.l_69.text()))
-            output_options_tbl = r"{}".format(str(self.inputs.l_70.text()))
-            output_options_mn = r"{}".format(str(self.inputs.l_71.text()))
-
-            #METER ARCHIVOS EN CARPETAS DE INPUTS CORRESPONDIENTES. Completar cuales van a cada carpeta con el input editor.
-            #Primero se asigna la dirección, si es que se ha elegido la opción de que se obtengan de la ejecución de TopAGNPS
-            checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
-            sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data]
-            names_list = ["AnnAGNPS_Cell_Data_Section.csv",self.ephemeral_gully_file(),"AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
-            for i in range(len(checks_list)):
-                if checks_list[i].isChecked():
-                    sections_list[i]=self.direccion+"\\"+names_list[i]
-            cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data = sections_list
-            #Función para que se le diga el nombre del archivo y te devuelva la dirección completa, en este caso para los inputs que usará AnnAGNPS
-            def fichero_input(file_name,direct):
-                if os.path.isabs(file_name):
-                    return   self.direccion+"/"+ directory + "/" + direct + "/" +os.path.basename(file_name)
-                else:
-                    return self.direccion+"/"+ directory + "/" + direct + "/" +file_name
-            
-            #Listas de los nombres de archivos para cada tipo de input. Se elminan aquellos que no han sido escogidos ("")
-            #Clima
-            climate_files = [EI_pct_data,climate_data_daily,climate_data_station,storm_type_rfd,storm_type_updrc]
-            climate_files = [x for x in climate_files if x !=""]
-            #General
-            general_files = [crop_data,crop_growth,fertilizer_application,fertilizer_reference,hydraulic_geometry,management_field,
-                             management_operation,management_schedule_data,non_crop,riparian_buffer,runoff_curve,soil_data,soil_layer_data,
-                             strip_crop,tile_drain,aquaculture_schedule_data,contour_data,feedlot_management,geology_data,
-                             irrigation_application,pesticide_application,pesticide_reference,reach_nutrient,
-                             ]
-            general_files = [x for x in general_files if x !=""]
-            #Simulation
-            simulation_files = [annagnps_id,global_id,simulation_period_data,output_global,output_options_aa,output_options_tbl,
-                                global_error,pesticide_initial,pl_calibration,rcn_calibration,soil_initial_conditions,output_options_csv,
-                                output_options_dpp,output_options_npt, output_options_sim,output_options_mn,rusle2_data,output_options_ev]
-            simulation_files = [x for x in simulation_files if x !=""]
-            #Watershed
-            watershed_files = [cell_data,ephemeral_gully,reach_data,watershed_data,wetland_data,aquaculture_pond_data,
-                               classic_gully,feedlot_data,field_pond_data,impoundment_data,
-                               point_source,output_options_cell,output_options_feedlot,output_options_field,
-                               output_options_classic_gully,output_options_ephemeral_gully,output_options_impoundment,
-                               output_options_point_source,output_options_reach,output_options_wetland,ricewq_data]
-            watershed_files = [x for x in watershed_files if x !=""]
-            #Lista de listas
-            tipes_of_files = [climate_files,general_files,simulation_files,watershed_files]
-            
-            #Bucle para mover los inputs desde donde se encontraba el arcivo mdt a las carpetas necesarias
-            #Función para tener la dirección completa dependiendo de la carpeta en la que se encuentra o de si está la dirección completa puesta
-            def origin_direction(input_path, section):
-                if os.path.isabs(input_path):
-                    return input_path
-                else:
-                    if section == "watershed":
-                        return self.inputs.l_1.text()+"/"+input_path
-                    elif section == "general":
-                        return self.inputs.l_23.text()+"/"+input_path
-                    elif section == "climate":
-                        return self.inputs.l_47.text()+"/"+input_path
-                    elif section == "simulation":
-                        return self.inputs.l_53.text()+"/"+input_path
-            #Bucle para mover los archivos inputs de AnnAGNPS
-            for t in tipes_of_files:
-                for f in t:
-                    try:
-                        if t == climate_files and os.path.normpath(origin_direction(f,"climate"))!=os.path.normpath(fichero_input(f,"climate")):#esta última condición es porque si no hay que mover el archivo, da error
-                            shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
-                    except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning,duration = 10)
-                        self.end_execution = 1
-                        return
-                    try:
-                        if t == general_files and os.path.normpath(origin_direction(f,"general"))!= os.path.normpath(fichero_input(f,"general")):
-                           shutil.copyfile(origin_direction(f,"general"),fichero_input(f,"general"))
-                    except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"general")),level=Qgis.Warning,duration = 10)
-                        self.end_execution = 1
-                        return
-                    try:
-                        if t == simulation_files and os.path.normpath(origin_direction(f,"simulation"))!=os.path.normpath(fichero_input(f,"simulation")):
-                           shutil.copyfile(origin_direction(f,"simulation"),fichero_input(f,"simulation"))
-                    except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"simulation")),level=Qgis.Warning,duration = 10)
-                        self.end_execution = 1
-                        return
-                    try:
-                        if t == watershed_files and os.path.normpath(origin_direction(f,"watershed"))!=os.path.normpath(fichero_input(f,"watershed")):
-                            shutil.copyfile(origin_direction(f,"watershed"),fichero_input(f,"watershed"))
-                    except:
-                        iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"watershed")),level=Qgis.Warning,duration = 10)
-                        self.end_execution = 1
-                        return
-                        
-            #CREACIÓN DEL ARCHIVO annagnps_master.csv
-            def fichero_master(nombre):
-                try:
-                    if nombre in climate_files:
-                        directory = "climate"
-                    if nombre in general_files:
-                        directory = "general"
-                    if nombre in simulation_files:
-                        directory = "simulation"
-                    if nombre in watershed_files:
-                        directory = "watershed"
-                    if not os.path.isabs(nombre):
-                        return ".\\"+ directory + "\\" + nombre
-                    if os.path.isabs(nombre):
-                        return ".\\"+ directory + "\\" + os.path.basename(nombre)
-                except:
-                    return nombre 
-            master_dict = {"AnnAGNPS ID":annagnps_id,"Aquaculture Pond Data":aquaculture_pond_data,
-                           "Aquaculture Schedule Data":aquaculture_schedule_data,"Cell Data":cell_data,"Classic Gully Data":classic_gully,
-                           "Contour Data":contour_data,"Crop Data":crop_data,"Crop Growth Data":crop_growth,
-                           "Ephemeral Gully Data":ephemeral_gully,"Feedlot Data":feedlot_data,"Feedlot Management Data":feedlot_management,
-                           "Fertilizer Application Data":fertilizer_application,"Fertilizer Reference Data":fertilizer_reference,
-                           "Field Pond Data":field_pond_data,"Geology Data":geology_data,
-                           "Global Error and Warning Limits Data":global_error,"Global IDs Factors and Flags Data":global_id,
-                           "Hydraulic Geometry Data":hydraulic_geometry,"Impoundment Data":impoundment_data,
-                           "Irrigation Application Data":irrigation_application,"Management Field Data":management_field,
-                           "Management Operation Data":management_operation,"Management Schedule Data":management_schedule_data,
-                           "Non-Crop Data":non_crop,
-                           "Pesticide Application Data":pesticide_application,"Pesticide Initial Conditions Data":pesticide_initial,
-                           "Pesticide Reference Data":pesticide_reference,"PL Calibration Data":pl_calibration,
-                           "Point Source Data":point_source,"RCN Calibration Data":rcn_calibration,"Reach Data":reach_data,
-                           "Reach Nutrient Half-life Data":reach_nutrient,"Runoff Curve Number Data":runoff_curve,
-                           "Simulation Period Data":simulation_period_data,"Soil Data":soil_data,"Soil Layer Data":soil_layer_data,
-                           "Soil Initial Conditions Data":soil_initial_conditions,"Strip Crop Data":strip_crop,
-                           "Tile Drain Data":tile_drain,"Watershed Data":watershed_data,"EI Pct Data":EI_pct_data,
-                           "STORM TYPE DATA - RFD":storm_type_rfd,"STORM TYPE DATA - UPDRC":storm_type_updrc,
-                           "Output Options - Global":output_global,"Output Options - AA":output_options_aa, "Output Options - EV":output_options_ev,
-                           "Output Options - CSV":output_options_csv,"Output Options - DPP":output_options_dpp,
-                           "Output Options - NPT":output_options_npt,"Output Options - SIM":output_options_sim,
-                           "Output Options - TBL":output_options_tbl,"Output Options - MN/MX":output_options_mn,
-                           "Output Options - Cell":output_options_cell,"Output Options - Feedlot":output_options_feedlot,
-                           "Output Options - Field Pond":output_options_field,
-                           "Output Options - Classic Gully":output_options_classic_gully,
-                           "Output Options - Ephemeral Gully":output_options_ephemeral_gully,
-                           "Output Options - Impoundment":output_options_impoundment,
-                           "Output Options - Point Source":output_options_point_source,
-                           "Output Options - Reach":output_options_reach,
-                           "Output Options - Wetland":output_options_wetland,
-                           "CLIMATE DATA - STATION":climate_data_station,
-                           "CLIMATE DATA - DAILY":climate_data_daily,"Wetland Data":wetland_data,"Riparian Buffer Data":riparian_buffer,
-                           "RUSLE2 Data":rusle2_data,"RiceWQ Data":ricewq_data}
-            data_section = [list(master_dict)[x] for x in range(len(master_dict)) if master_dict[list(master_dict)[x]] !=""]
-            file_name = [fichero_master(master_dict[x]) for x in data_section]
-            master = pd.DataFrame(data = {"Data Section ID":data_section,"File Name":file_name})
-            master.to_csv(self.direccion + "\\" +directory + "\\" + "annagnps_master.csv", encoding='utf-8', index=False)
-            
-            #MOVER EL EJECUTABLE DE ANNAGNPS Y EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS 
-            shutil.copyfile(self.executable_directory + "\\" +"AnnAGNPS.fil" ,self.direccion + "\\"+directory+ "\\" +"AnnAGNPS.fil")
+            #Se crea la carpeta de Preprocessing_inputs si no estaba creada. Ahí se meten los inputs y se ejecuta TopAGNPS y luego los outputs se meten a Preprocessing_outputs
+            #Una vez creada se meten todos los archivos en esa carpeta
+            self.create_folder_processing_and_move_files()
             
             #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs. El cambio se hace dentro de la carpeta del proyecto no la original!
             if self.doing_sensitivity:
                 for j,k in enumerate(self.dic_data.keys()):
                     self.change_inputs_sensitivity(self.param_values[self.numero_ejecucion-1],j,k,spatial =False) #cambio de los inptus no espaciales
             
+            #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
+            self.time_start_processing = datetime.now()
+            
+            
             #EJECUCIÓN DE ANNAGNPS
             #os.chdir(self.direccion+"\\"+directory)
             def execute_bat():
                def main():
                    f = open(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
-                   linea_uno = "CD {}".format(self.direccion+"\\"+directory)
+                   linea_uno = "CD {}".format(self.direccion+"\\Processing_inputs")
                    linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
                    f.write("{} \n".format(linea_uno))
                    f.write("{} \n".format(linea_dos))
@@ -3455,16 +2957,12 @@ class qannagnps():
             command = self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat"
             result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='latin-1', env=env)'''
 
-
             subprocess.call(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
 
-
-            #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-            #stdout, stderr = proc.communicate()
             
             #If error file of AnnAGNPS is opened, then return a error message
             try:
-                open(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv", "r+") 
+                open(self.direccion+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv", "r+") 
             except PermissionError:
                 iface.messageBar().pushMessage("Error AnnAGNPS","Close AnnAGNPS_LOG_Error.csv before the start of execution",level=Qgis.Warning,duration = 10)
                 self.end_execution = 1
@@ -3474,11 +2972,11 @@ class qannagnps():
                         
             #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
             time.sleep(1)
-            if path.exists(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv"):
-                if os.stat(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv").st_size>0:
+            if path.exists(self.direccion+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv"):
+                if os.stat(self.direccion+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv").st_size>0:
                     self.end_execution =1
                     try:
-                        text = open(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv", "r")
+                        text = open(self.direccion+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv", "r")
                         text = ''.join([i for i in text]) 
                         text = text.replace("\"", "/") 
                         texto = text.splitlines()
@@ -3490,7 +2988,7 @@ class qannagnps():
                     self.end_execution = 1
                     #Se abre el archivo de errores
                     try:
-                        os.startfile(self.direccion+"\\INPUTS\\"+"AnnAGNPS_LOG_Error.csv")
+                        os.startfile(self.direccion+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv")
                     except:
                         pass
                     #Este return es para parar el codigo
@@ -3498,19 +2996,633 @@ class qannagnps():
             
             #EJECUCIÓN DEL OUTPUT_TABLES
             time.sleep(1)
-            shutil.copyfile(self.executable_directory + "\\" +"STEAD.fil" ,self.direccion + "\\"+directory + "\\" +"STEAD.fil")
-            os.chdir(self.direccion+"\\"+directory)
+            shutil.copyfile(self.executable_directory + "\\" +"STEAD.fil" ,self.direccion + "\\Processing_inputs\\" +"STEAD.fil")
+            os.chdir(self.direccion+"\\Processing_inputs")
             proc = subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             stdout, stderr = proc.communicate()
+            
+            #Los outputs de AnnAGNPS se guardan en Processing_outputs
+            self.save_files_processing_in_folder()
+    
+    
+    def add_coordinates_to_topagnps_control_file(self):
+        """Method to add coordinates to TOPAGNPS control file"""
+        def fichero(nombre):
+            return self.direccion+"\\Preprocessing_inputs"+"\\"+nombre
+        def change_coordinates(filename,outputname):
+            input_raster = gdal.Open(fichero(filename))
+            output_raster = fichero(outputname)
+            warp = gdal.Warp(output_raster,input_raster,dstSRS=self.epsg)
+            warp = None # Closes the files
+        #Primero, si no existe "NETFUL.asc" entonces ha dado error TOPAGNPS y hay que para la ejecución. Si no se para antes es porque le he dicho que no pare porque el hecho de no poner coordenadas daba error.
+        if not os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\NETFUL.asc"):
+            self.end_execution = 1
+            error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
+            #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+            self.save_files_preprocessing_in_folder()
+            #Se abre el archivo de errores
+            try:
+                os.startfile(self.direccion+"\\Preprocessing_outputs"+"\\TopAGNPS_err.csv")
+            except:
+                pass
+            #Este return es para parar el codigo
+            raise Exception("Error in preprocessing"+str(error.columns[3]))
+        
+        change_coordinates("NETFUL.asc","NETFUL_epsg.asc")
+        layer = QgsRasterLayer(fichero("NETFUL_epsg.asc"),"reaches")
+        QgsProject.instance().addMapLayer(layer)
+        #Esto es para que se desactiven el resto de las capas y se pueda ver la capa reaches
+        root = QgsProject.instance().layerTreeRoot()
+        for child in root.children():
+            if child.name() != "reaches":
+                child.setItemVisibilityChecked(False)
+        iface.mapCanvas().refresh()
+        
+        #Close dialog
+        self.dlg.close()
+        
+        #Se ejecuta el método para las coordenadas
+        self.set_coordinates()
+        
+        #Open again dialog
+        self.dlg.show()
+    
+    def add_soil_and_management_cell(self):
+        """Method to add soil type and management to cell"""
+        def fichero(nombre):
+            return self.direccion+"\\Preprocessing_inputs"+"\\"+nombre
+        #A esta función le das la capa de celdas y la que se superpone (tipo de suelo o uso) y devuelve el diccionario en el que se muestra a cada celda que valor (de suelo o de uso) le corresponde
+        def aplicar(fichero_celdas,fichero_superponer, columna_tipo,numero):
+            numero = str(numero) #esto es porque no deja sobreescribir y tengo que crear otra capa por cada ejecución de sensibilidad
+            fichero_cell = fichero_celdas
+            fichero_suelo = fichero_superponer
+            #Esta función devuelve un diccionario en donde a cada suelo/uso se le asigna un numero entero y luego en la capa (de suelos o uso) a cada suelo/uso se le añade el valor del diccionario
+            def create_fid(file_layer):
+                layer = file_layer
+                tipos_suelo = []
+                for f in layer.getFeatures():
+                    tipos_suelo.append(f[columna_tipo])
+                tipos_suelo = np.unique(tipos_suelo)
+                tipos_suelo_dic = {tipos_suelo[x]:x+1 for x in range(len(tipos_suelo))}
 
+                pv = layer.dataProvider()
+                pv.addAttributes([QgsField("id_prueba",QVariant.Int)])
+                context = QgsExpressionContext()
+                with edit(layer):
+                    for f in layer.getFeatures():
+                        context.setFeature(f)
+                        f["id_prueba"] = tipos_suelo_dic[f[columna_tipo]]
+                        layer.updateFeature(f)
+                layer.updateFields()
+                return tipos_suelo_dic
+
+            #Pasar de shp a gpkg
+            e = processing.run("native:reprojectlayer", 
+                {'INPUT':fichero_suelo,
+                'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
+                'OPERATION':'+proj=noop','OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
+            #Reproyectar celdas al epsg del proyecto
+            a = processing.run("gdal:warpreproject", 
+                {'INPUT':fichero(fichero_cell),
+                'SOURCE_CRS':None,'TARGET_CRS':QgsCoordinateReferenceSystem('{}'.format(self.epsg)),
+                'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':None,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,
+                'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
+            #Con esto se tiene el diccionario que te asigna para cada suelo/uso un valor numérico
+            dic_conv = create_fid(e["OUTPUT"])
+            #Rasterizar la capa de suelos
+            processing.run("gdal:rasterize", 
+                {'INPUT':e["OUTPUT"],
+                'FIELD':'id_prueba','BURN':0,'USE_Z':False,'UNITS':1,'WIDTH':self.pixelSizeX,
+                'HEIGHT':self.pixelSizeY,'EXTENT':None,'NODATA':0,'OPTIONS':'','DATA_TYPE':4,'INIT':None,
+                'INVERT':False,'EXTRA':'','OUTPUT':fichero("suelo_ras.tif")})
+            #Vectorizar la capa de celdas
+            c = processing.run("grass7:r.to.vect", {'input':a["OUTPUT"],
+                'type':2,'column':'value','-s':False,
+                '-v':False,'-z':False,'-b':False,'-t':False,
+                'output':QgsProcessing.TEMPORARY_OUTPUT,'GRASS_REGION_PARAMETER':None,
+                'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
+                'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
+                'GRASS_VECTOR_EXPORT_NOCAT':False})
+            #Corregir geometrías porque luego sino en unión da error 
+            d = processing.run("native:fixgeometries", 
+                {'INPUT':c["output"],
+                'OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})    
+            #Se unen las capas de celdas de celdas con las de suelo/uso
+            processing.run("native:union", 
+            {'INPUT':d["OUTPUT"],
+            'OVERLAY':e["OUTPUT"],
+            'OVERLAY_FIELDS_PREFIX':'','OUTPUT':fichero("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion))})
+            #Esta función es para crear una columna en una capa vectorial según la expresión que le pongas
+            def create_attribute(layer_name, expresion,nombre_columna):
+                layer = QgsVectorLayer(fichero(layer_name),"union")
+                pv = layer.dataProvider()
+                pv.addAttributes([QgsField(nombre_columna,QVariant.Double)])
+                expression1 = QgsExpression(expresion)
+                context = QgsExpressionContext()
+                context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
+                with edit(layer):
+                    for f in layer.getFeatures():
+                        context.setFeature(f)
+                        f[nombre_columna] = expression1.evaluate(context)
+                        layer.updateFeature(f)
+                layer.updateFields()
+            #De la capa de unión creada se calcula el área para cada zona
+            create_attribute("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion),"$area","area_zona")
+            
+            #Ahora se ve qué área de suelo/uso es la mayor para cada celda y esa será la que se escoja
+            layer = QgsVectorLayer(fichero("union_capas{}_{}.gpkg".format(numero,self.numero_ejecucion)),"union")
+            tres_valores = []
+            valores_unicos_celdas = []
+            valores_unicos_suelos=[]
+            for f in layer.getFeatures():
+                        tres_valores.append((f["value"],f["id_prueba"],f["area_zona"]))
+                        valores_unicos_celdas.append(f["value"])
+                        valores_unicos_suelos.append(f["id_prueba"])
+            valores_unicos_celdas = list(np.unique(valores_unicos_celdas))
+            valores_unicos_suelos=list(np.unique(valores_unicos_suelos))
+            valores_unicos_celdas=[x for x in valores_unicos_celdas if type(x)==float]
+            valores_unicos_suelos=[x for x in valores_unicos_suelos if type(x)==np.int32 or type(x)==int ]
+            lista_final = []
+            for i in valores_unicos_celdas:
+                lista_maximos = []
+                for x in valores_unicos_suelos:
+                    try:
+                        suma = sum([f[2] for f in tres_valores if f[0] == i and f[1] == x])
+                        lista_maximos.append((x,suma))
+                    except:
+                        pass
+                lista_final.append((i,max(lista_maximos,key = lambda p:p[1])[0]))
+            diccionario_conversion = {x[0]:x[1] for x in lista_final}
+            dic_conv = {v: k for k, v in dic_conv.items()}
+            diccionario_final = {list(diccionario_conversion.keys())[x]:dic_conv[diccionario_conversion[list(diccionario_conversion.keys())[x]]] for x in range(len(diccionario_conversion))}
+            return diccionario_final,dic_conv
+        #Se importa el data frame en el que se muestran las celdas 
+        annagnps_cell_data = pd.read_csv(fichero("AnnAGNPS_Cell_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
+        #Dar error si no se ha elegido ni capa de suelos ni se ha puesto un suelo único
+        if str(self.dlg.lineEdit.text())=="":
+            if self.dlg.cbSoil.currentIndex()==0:
+                self.end_execution = 1
+                raise Exception("Error with soil layer\nThere isn't any soil information to use")
+            #Se aplica el suelo al fichero de cells
+            try:
+                suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
+            except:
+                self.end_execution = 1
+                raise Exception("Error with soil layer\nThe DEM and the soil layer have to overlap")
+            annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
+            annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
+            #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo PEG.csv
+            if path.exists(fichero("PEG.csv")):
+                eg_path = fichero(self.ephemeral_gully_file()) #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
+                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                def create_layer():
+                    layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
+                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.updateFields()
+                    features = []
+                    for i in range(len(summary)):
+                        feature = QgsFeature()
+                        feature.setFields(layer.fields())
+                        x = summary.X.iloc[i]
+                        y = summary.Y.iloc[i]
+                        pt = QgsPointXY(x,y)
+                        geom = QgsGeometry.fromPointXY(pt)
+                        feature.setGeometry(geom)
+                        feature.setAttribute(0,summary.GULLY_ID.iloc[i])
+                        features.append(feature)
+                    layer.dataProvider().addFeatures(features)
+                    return layer
+                summary_layer = create_layer()
+                sampling = processing.run("native:rastersampling", 
+                    {'INPUT':summary_layer,
+                    'RASTERCOPY':fichero("suelo_ras.tif"),
+                    'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
+                capa = sampling["OUTPUT"]
+                dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
+                
+                annagnps_eg_data = pd.read_csv(eg_path,encoding = "ISO-8859-1",delimiter=",")
+                suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
+                try:
+                    annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
+                except:
+                    self.end_execution = 1
+                    raise Exception( "Error soil map\nThe soil type layer may not cover the full extent of the watershed")
+                #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
+                def float_to_str(column):
+                    lista = []
+                    for i in annagnps_eg_data[column]:
+                        try:
+                            lista.append(str(int(i)))
+                        except:
+                            lista.append("")
+                    annagnps_eg_data[column] = lista
+                #Primero para la columna de celdas
+                float_to_str("Cell_ID")
+                #Ahora para la columna de reaches
+                float_to_str("Reach_ID")
+                annagnps_eg_data.to_csv(eg_path, index=False, float_format='%.5f')
+                
+            
+        #Dar error si no se ha elegido ni capa de usos ni se ha puesto un uso único
+        if str(self.dlg.lineEdit_2.text())=="":
+            if self.dlg.cbMan.currentIndex()==0:
+                self.end_execution = 1
+                raise Exception( "Error with soil management\nThere isn't any management information to use")
+            try:
+                manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
+            except:
+                self.end_execution = 1
+                raise Exception("Error with soil use layer\nThe DEM and the soil use layer have to overlap.")
+            annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
+            annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
+            #Se aplica el uso al fichero de cárcavas efímeras
+            if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
+                eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
+                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                def create_layer():
+                    layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
+                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.updateFields()
+                    features = []
+                    for i in range(len(summary)):
+                        feature = QgsFeature()
+                        feature.setFields(layer.fields())
+                        x = summary.X.iloc[i]
+                        y = summary.Y.iloc[i]
+                        pt = QgsPointXY(x,y)
+                        geom = QgsGeometry.fromPointXY(pt)
+                        feature.setGeometry(geom)
+                        feature.setAttribute(0,summary.GULLY_ID.iloc[i])
+                        features.append(feature)
+                    layer.dataProvider().addFeatures(features)
+                    return layer
+                summary_layer = create_layer()
+                sampling = processing.run("native:rastersampling", 
+                    {'INPUT':summary_layer,
+                    'RASTERCOPY':fichero("suelo_ras.tif"),
+                    'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
+                capa = sampling["OUTPUT"]
+                dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
+                annagnps_eg_data = pd.read_csv(eg_path,encoding = "ISO-8859-1",delimiter=",")
+                suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
+                try:
+                    lista_tipos = []
+                    for eg_soil_i,eg_soil_k in enumerate([dic_conv[x] for x in suelos_eg]):
+                        if annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i]=="BUFFER" or annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i]=="WETLAND":
+                            lista_tipos.append(annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i])
+                        else:
+                            lista_tipos.append(eg_soil_k)
+                    annagnps_eg_data["Mgmt_Field_ID"]= lista_tipos
+                except:
+                    self.end_execution = 1
+                    raise Exception("Error soil use map\nThe soil use layer may not cover the full extent of the watershed")
+                #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
+                def float_to_str(column):
+                    lista = []
+                    for i in annagnps_eg_data[column]:
+                        try:
+                            lista.append(str(int(i)))
+                        except:
+                            lista.append("")
+                    annagnps_eg_data[column] = lista
+                #Primero para la columna de celdas
+                float_to_str("Cell_ID")
+                #Ahora para la columna de reaches
+                float_to_str("Reach_ID")
+                annagnps_eg_data.to_csv(eg_path, index=False, float_format='%.5f')
+            
+        #Si se ha puesto un suelo único entonces se añade a todas las celdas
+        if str(self.dlg.lineEdit.text())!="":
+            annagnps_cell_data["Soil_ID"] =str(self.dlg.lineEdit.text())
+            annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
+        #Si se ha puesto un uso único entonces se añade a todas las celdas
+        if str(self.dlg.lineEdit_2.text())!="":
+            annagnps_cell_data["Mgmt_Field_ID"]=str(self.dlg.lineEdit_2.text())
+            annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
+    
+    
+    def create_preprocessing_inputs_folder(self):
+        """Method to create preprocessing input folder if it doesn't exist"""
+        #Create folder
+        carpeta = self.direccion+"\\Preprocessing_inputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+    
+    def save_files_preprocessing_in_folder(self):
+        """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
+        #First create the folder Preprocessing_outputs if it doesn´t exist
+        carpeta = self.direccion+"\\Preprocessing_outputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+        
+        #Then move the files that were modified or created after the start of the preprocessing
+        carpeta_origen = Path(self.direccion+"\\Preprocessing_inputs")
+        carpeta_destino = Path(carpeta)
+
+        for f in carpeta_origen.iterdir():
+            try:
+                if f.is_file():
+                    t = datetime.fromtimestamp(max(f.stat().st_ctime, f.stat().st_mtime))
+                    if t > self.time_start_preprocessing:
+                        shutil.move(str(f), str(carpeta_destino / f.name))
+            except:
+                pass
+        
+        
+    def save_files_processing_in_folder(self):
+        """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
+        #First create the folder Preprocessing_outputs if it doesn´t exist
+        carpeta = self.direccion+"\\Processing_outputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+
+        #Then move the files that were modified or created after the start of the preprocessing
+        carpeta_origen = Path(self.direccion+"\\Processing_inputs")
+        carpeta_destino = Path(carpeta)
+        
+        archivo_excluido = Path(self.direccion) / "Processing_inputs" / "AnnAGNPS.fil"
+        
+        for f in carpeta_origen.iterdir():
+            try:
+                t = datetime.fromtimestamp(max(f.stat().st_ctime, f.stat().st_mtime))
+                if t > self.time_start_processing and f != archivo_excluido:
+                    shutil.move(str(f), str(carpeta_destino / f.name))
+            except:
+                pass
+         
+    
+    def create_folder_preprocessing_and_move_files(self):
+        """Method to create the preprocessing folders (if they dont exist) and move the input files here"""
+        #Create folder
+        carpeta = self.direccion+"\\Preprocessing_inputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+        #Move the files that are in the interface to this file
+        
+        #Primero los DEM
+        #Se mueve el DEM a la carpeta del proyecto
+        try: #si el origen y el destino son los mismos da error
+            shutil.copyfile(self.fichero_mdt,self.direccion+"\\Preprocessing_inputs"+"\\"+self.name_mdt)
+        except:
+            pass
+        #Mover el fichero de buffer la carpeta del proyecto
+        try: #si el origen y el destino son los mismos da error
+            shutil.copyfile(self.fichero_buf,self.direccion+"\\Preprocessing_inputs"+"\\"+self.nombre_buf)
+        except:
+            pass
+        #Mover el fichero de vegetation la carpeta del proyecto
+        try: #si el origen y el destino son los mismos da error
+            shutil.copyfile(self.fichero_veg,self.direccion+"\\Preprocessing_inputs"+"\\"+self.nombre_veg)
+        except:
+            pass
+    
+    
+    def create_folder_processing_and_move_files(self):
+        """Method to create the preprocessing folders (if they dont exist) and move the input files here"""
+        #Create folder
+        carpeta = self.direccion+"\\Processing_inputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+        #Move the files that are in the interface to this file
+        
+        #CREACIÓN DE LAS SUBCARPETAS EN DONDE SE ORGANIZARÁN LOS INPUTS
+        carpetas = ["simulation","general","watershed","climate"]
+        parent_dir = self.direccion +"\\Processing_inputs"
+        try:
+            for c in carpetas: 
+                path_file = os.path.join(parent_dir, c)
+                mode = 0o666
+                os.mkdir(path_file, mode)
+        except:
+            pass
+
+        #CONCRETAR EL NOMBRE DE LOS INPUTS PARA ANNAGNPS. Obtenidos de Input_Specifications pero mejor sacarlo del input editor
+        #WATERSHED
+        aquaculture_pond_data= r"{}".format(str(self.inputs.l_2.text())) # el r"{}".format se pone porque si es una dirección completa luego no se puede reconocer si es una dirección completa o no
+        cell_data= r"{}".format(str(self.inputs.l_3.text()))
+        classic_gully= r"{}".format(str(self.inputs.l_4.text()))
+        ephemeral_gully= r"{}".format(str(self.inputs.l_5.text()))
+        feedlot_data= r"{}".format(str(self.inputs.l_6.text()))
+        field_pond_data= r"{}".format(str(self.inputs.l_7.text()))
+        impoundment_data= r"{}".format(str(self.inputs.l_8.text()))
+        point_source= r"{}".format(str(self.inputs.l_9.text()))
+        reach_data= r"{}".format(str(self.inputs.l_10.text()))
+        ricewq_data = r"{}".format(str(self.inputs.l_11.text()))
+        watershed_data = r"{}".format(str(self.inputs.l_12.text()))
+        wetland_data= r"{}".format(str(self.inputs.l_13.text()))
+        output_options_cell = r"{}".format(str(self.inputs.l_14.text()))
+        output_options_feedlot = r"{}".format(str(self.inputs.l_15.text()))
+        output_options_field = r"{}".format(str(self.inputs.l_16.text()))
+        output_options_classic_gully = r"{}".format(str(self.inputs.l_17.text()))
+        output_options_ephemeral_gully = r"{}".format(str(self.inputs.l_18.text()))
+        output_options_impoundment = r"{}".format(str(self.inputs.l_19.text()))
+        output_options_point_source = r"{}".format(str(self.inputs.l_20.text()))
+        output_options_reach = r"{}".format(str(self.inputs.l_21.text()))
+        output_options_wetland = r"{}".format(str(self.inputs.l_22.text()))
+
+        #GENERAL
+        aquaculture_schedule_data= r"{}".format(str(self.inputs.l_24.text()))
+        contour_data= r"{}".format(str(self.inputs.l_25.text()))
+        crop_data= r"{}".format(str(self.inputs.l_26.text()))
+        crop_growth = r"{}".format(str(self.inputs.l_27.text()))
+        feedlot_management= r"{}".format(str(self.inputs.l_28.text()))
+        fertilizer_application= r"{}".format(str(self.inputs.l_29.text()))
+        fertilizer_reference= r"{}".format(str(self.inputs.l_30.text()))
+        geology_data= r"{}".format(str(self.inputs.l_31.text()))
+        hydraulic_geometry= r"{}".format(str(self.inputs.l_32.text()))
+        irrigation_application= r"{}".format(str(self.inputs.l_33.text()))
+        management_field= r"{}".format(str(self.inputs.l_34.text()))
+        management_operation= r"{}".format(str(self.inputs.l_35.text()))
+        management_schedule_data= r"{}".format(str(self.inputs.l_36.text()))
+        non_crop= r"{}".format(str(self.inputs.l_37.text()))
+        pesticide_application= r"{}".format(str(self.inputs.l_38.text()))
+        pesticide_reference= r"{}".format(str(self.inputs.l_39.text()))
+        reach_nutrient= r"{}".format(str(self.inputs.l_40.text()))
+        riparian_buffer= r"{}".format(str(self.inputs.l_41.text()))
+        runoff_curve= r"{}".format(str(self.inputs.l_42.text()))
+        soil_data= r"{}".format(str(self.inputs.l_43.text()))
+        soil_layer_data = r"{}".format(str(self.inputs.l_44.text()))
+        strip_crop= r"{}".format(str(self.inputs.l_45.text()))
+        tile_drain= r"{}".format(str(self.inputs.l_46.text()))
+
+        #CLIMATE
+        climate_data_station = r"{}".format(str(self.inputs.l_48.text()))
+        climate_data_daily = r"{}".format(str(self.inputs.l_49.text()))
+        EI_pct_data = r"{}".format(str(self.inputs.l_50.text()))
+        storm_type_rfd = r"{}".format(str(self.inputs.l_51.text()))
+        storm_type_updrc = r"{}".format(str(self.inputs.l_52.text()))
+
+        #SIMULATION
+        annagnps_id = r"{}".format(str(self.inputs.l_54.text()))
+        global_error = r"{}".format(str(self.inputs.l_55.text()))
+        global_id = r"{}".format(str(self.inputs.l_56.text()))
+        pesticide_initial= r"{}".format(str(self.inputs.l_57.text()))
+        pl_calibration = r"{}".format(str(self.inputs.l_58.text()))
+        rcn_calibration = r"{}".format(str(self.inputs.l_59.text()))
+        simulation_period_data=r"{}".format(str(self.inputs.l_60.text()))
+        soil_initial_conditions = r"{}".format(str(self.inputs.l_61.text()))
+        rusle2_data= r"{}".format(str(self.inputs.l_62.text()))
+        output_global = r"{}".format(str(self.inputs.l_63.text()))
+        output_options_csv = r"{}".format(str(self.inputs.l_64.text()))
+        output_options_dpp = r"{}".format(str(self.inputs.l_65.text()))
+        output_options_npt = r"{}".format(str(self.inputs.l_66.text()))
+        output_options_sim = r"{}".format(str(self.inputs.l_67.text()))
+        output_options_aa= r"{}".format(str(self.inputs.l_68.text()))
+        output_options_ev = r"{}".format(str(self.inputs.l_69.text()))
+        output_options_tbl = r"{}".format(str(self.inputs.l_70.text()))
+        output_options_mn = r"{}".format(str(self.inputs.l_71.text()))
+
+        #METER ARCHIVOS EN CARPETAS DE INPUTS CORRESPONDIENTES. Completar cuales van a cada carpeta con el input editor.
+        #Primero se asigna la dirección, si es que se ha elegido la opción de que se obtengan de la ejecución de TopAGNPS
+        checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
+        sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data]
+        names_list = ["AnnAGNPS_Cell_Data_Section.csv",self.ephemeral_gully_file(),"AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
+        for i in range(len(checks_list)):
+            if checks_list[i].isChecked():
+                sections_list[i]=self.direccion+"\\Prerocessing_outputs"+"\\"+names_list[i]
+        cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data = sections_list
+        #Función para que se le diga el nombre del archivo y te devuelva la dirección completa, en este caso para los inputs que usará AnnAGNPS
+        def fichero_input(file_name,direct):
+            if os.path.isabs(file_name):
+                return   self.direccion+"\\Processing_inputs\\" + direct + "/" +os.path.basename(file_name)
+            else:
+                return self.direccion+"\\Processing_inputs\\" + direct + "/" +file_name
+        
+        #Listas de los nombres de archivos para cada tipo de input. Se elminan aquellos que no han sido escogidos ("")
+        #Clima
+        climate_files = [EI_pct_data,climate_data_daily,climate_data_station,storm_type_rfd,storm_type_updrc]
+        climate_files = [x for x in climate_files if x !=""]
+        #General
+        general_files = [crop_data,crop_growth,fertilizer_application,fertilizer_reference,hydraulic_geometry,management_field,
+                         management_operation,management_schedule_data,non_crop,riparian_buffer,runoff_curve,soil_data,soil_layer_data,
+                         strip_crop,tile_drain,aquaculture_schedule_data,contour_data,feedlot_management,geology_data,
+                         irrigation_application,pesticide_application,pesticide_reference,reach_nutrient,
+                         ]
+        general_files = [x for x in general_files if x !=""]
+        #Simulation
+        simulation_files = [annagnps_id,global_id,simulation_period_data,output_global,output_options_aa,output_options_tbl,
+                            global_error,pesticide_initial,pl_calibration,rcn_calibration,soil_initial_conditions,output_options_csv,
+                            output_options_dpp,output_options_npt, output_options_sim,output_options_mn,rusle2_data,output_options_ev]
+        simulation_files = [x for x in simulation_files if x !=""]
+        #Watershed
+        watershed_files = [cell_data,ephemeral_gully,reach_data,watershed_data,wetland_data,aquaculture_pond_data,
+                           classic_gully,feedlot_data,field_pond_data,impoundment_data,
+                           point_source,output_options_cell,output_options_feedlot,output_options_field,
+                           output_options_classic_gully,output_options_ephemeral_gully,output_options_impoundment,
+                           output_options_point_source,output_options_reach,output_options_wetland,ricewq_data]
+        watershed_files = [x for x in watershed_files if x !=""]
+        #Lista de listas
+        tipes_of_files = [climate_files,general_files,simulation_files,watershed_files]
+        
+        #Bucle para mover los inputs desde donde se encontraba el arcivo mdt a las carpetas necesarias
+        #Función para tener la dirección completa dependiendo de la carpeta en la que se encuentra o de si está la dirección completa puesta
+        def origin_direction(input_path, section):
+            if os.path.isabs(input_path):
+                return input_path
+            else:
+                if section == "watershed":
+                    return self.inputs.l_1.text()+"/"+input_path
+                elif section == "general":
+                    return self.inputs.l_23.text()+"/"+input_path
+                elif section == "climate":
+                    return self.inputs.l_47.text()+"/"+input_path
+                elif section == "simulation":
+                    return self.inputs.l_53.text()+"/"+input_path
+        #Bucle para mover los archivos inputs de AnnAGNPS
+        for t in tipes_of_files:
+            for f in t:
+                try:
+                    if t == climate_files and os.path.normpath(origin_direction(f,"climate"))!=os.path.normpath(fichero_input(f,"climate")):#esta última condición es porque si no hay que mover el archivo, da error
+                        shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
+                except:
+                    iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"climate")),level=Qgis.Warning,duration = 10)
+                    self.end_execution = 1
+                    return
+                try:
+                    if t == general_files and os.path.normpath(origin_direction(f,"general"))!= os.path.normpath(fichero_input(f,"general")):
+                       shutil.copyfile(origin_direction(f,"general"),fichero_input(f,"general"))
+                except:
+                    iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"general")),level=Qgis.Warning,duration = 10)
+                    self.end_execution = 1
+                    return
+                try:
+                    if t == simulation_files and os.path.normpath(origin_direction(f,"simulation"))!=os.path.normpath(fichero_input(f,"simulation")):
+                       shutil.copyfile(origin_direction(f,"simulation"),fichero_input(f,"simulation"))
+                except:
+                    iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"simulation")),level=Qgis.Warning,duration = 10)
+                    self.end_execution = 1
+                    return
+                try:
+                    if t == watershed_files and os.path.normpath(origin_direction(f,"watershed"))!=os.path.normpath(fichero_input(f,"watershed")):
+                        shutil.copyfile(origin_direction(f,"watershed"),fichero_input(f,"watershed"))
+                except:
+                    iface.messageBar().pushMessage("Error AnnAGNPS","{} file not found".format(origin_direction(f,"watershed")),level=Qgis.Warning,duration = 10)
+                    self.end_execution = 1
+                    return
+                    
+        #CREACIÓN DEL ARCHIVO annagnps_master.csv
+        def fichero_master(nombre):
+            try:
+                if nombre in climate_files:
+                    directory = "climate"
+                if nombre in general_files:
+                    directory = "general"
+                if nombre in simulation_files:
+                    directory = "simulation"
+                if nombre in watershed_files:
+                    directory = "watershed"
+                if not os.path.isabs(nombre):
+                    return ".\\"+ directory + "\\" + nombre
+                if os.path.isabs(nombre):
+                    return ".\\"+ directory + "\\" + os.path.basename(nombre)
+            except:
+                return nombre 
+        master_dict = {"AnnAGNPS ID":annagnps_id,"Aquaculture Pond Data":aquaculture_pond_data,
+                       "Aquaculture Schedule Data":aquaculture_schedule_data,"Cell Data":cell_data,"Classic Gully Data":classic_gully,
+                       "Contour Data":contour_data,"Crop Data":crop_data,"Crop Growth Data":crop_growth,
+                       "Ephemeral Gully Data":ephemeral_gully,"Feedlot Data":feedlot_data,"Feedlot Management Data":feedlot_management,
+                       "Fertilizer Application Data":fertilizer_application,"Fertilizer Reference Data":fertilizer_reference,
+                       "Field Pond Data":field_pond_data,"Geology Data":geology_data,
+                       "Global Error and Warning Limits Data":global_error,"Global IDs Factors and Flags Data":global_id,
+                       "Hydraulic Geometry Data":hydraulic_geometry,"Impoundment Data":impoundment_data,
+                       "Irrigation Application Data":irrigation_application,"Management Field Data":management_field,
+                       "Management Operation Data":management_operation,"Management Schedule Data":management_schedule_data,
+                       "Non-Crop Data":non_crop,
+                       "Pesticide Application Data":pesticide_application,"Pesticide Initial Conditions Data":pesticide_initial,
+                       "Pesticide Reference Data":pesticide_reference,"PL Calibration Data":pl_calibration,
+                       "Point Source Data":point_source,"RCN Calibration Data":rcn_calibration,"Reach Data":reach_data,
+                       "Reach Nutrient Half-life Data":reach_nutrient,"Runoff Curve Number Data":runoff_curve,
+                       "Simulation Period Data":simulation_period_data,"Soil Data":soil_data,"Soil Layer Data":soil_layer_data,
+                       "Soil Initial Conditions Data":soil_initial_conditions,"Strip Crop Data":strip_crop,
+                       "Tile Drain Data":tile_drain,"Watershed Data":watershed_data,"EI Pct Data":EI_pct_data,
+                       "STORM TYPE DATA - RFD":storm_type_rfd,"STORM TYPE DATA - UPDRC":storm_type_updrc,
+                       "Output Options - Global":output_global,"Output Options - AA":output_options_aa, "Output Options - EV":output_options_ev,
+                       "Output Options - CSV":output_options_csv,"Output Options - DPP":output_options_dpp,
+                       "Output Options - NPT":output_options_npt,"Output Options - SIM":output_options_sim,
+                       "Output Options - TBL":output_options_tbl,"Output Options - MN/MX":output_options_mn,
+                       "Output Options - Cell":output_options_cell,"Output Options - Feedlot":output_options_feedlot,
+                       "Output Options - Field Pond":output_options_field,
+                       "Output Options - Classic Gully":output_options_classic_gully,
+                       "Output Options - Ephemeral Gully":output_options_ephemeral_gully,
+                       "Output Options - Impoundment":output_options_impoundment,
+                       "Output Options - Point Source":output_options_point_source,
+                       "Output Options - Reach":output_options_reach,
+                       "Output Options - Wetland":output_options_wetland,
+                       "CLIMATE DATA - STATION":climate_data_station,
+                       "CLIMATE DATA - DAILY":climate_data_daily,"Wetland Data":wetland_data,"Riparian Buffer Data":riparian_buffer,
+                       "RUSLE2 Data":rusle2_data,"RiceWQ Data":ricewq_data}
+        data_section = [list(master_dict)[x] for x in range(len(master_dict)) if master_dict[list(master_dict)[x]] !=""]
+        file_name = [fichero_master(master_dict[x]) for x in data_section]
+        master = pd.DataFrame(data = {"Data Section ID":data_section,"File Name":file_name})
+        master.to_csv(self.direccion +"\\Processing_inputs\\" + "annagnps_master.csv", encoding='utf-8', index=False)
+        
+        #MOVER EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS de procesamiento
+        shutil.copyfile(self.executable_directory + "\\" +"AnnAGNPS.fil" ,self.direccion +"\\Processing_inputs\\" +"AnnAGNPS.fil")
+        
+    
     def ephemeral_gully_file(self):
         #Metod to select the file name containing ephemeral gully information depending on the presence of other control files
         #Files that go from more to less information
-        if os.path.exists(self.direccion+"\\"+"AGWET.csv"):
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\"+"AGWET.csv"):
             return "AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgWet.csv"
-        if os.path.exists(self.direccion+"\\"+"Agbuf.csv"):
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\"+"Agbuf.csv"):
             return "AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgBuf.csv"
-        if os.path.exists(self.direccion+"\\"+"PEG.csv"):
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\"+"PEG.csv"):
             return "AnnAGNPS_Ephemeral_Gully_Data_Section.csv"
 
     def startCapturing(self):
@@ -3561,7 +3673,7 @@ class qannagnps():
         
     def update(self, point: QgsPointXY):
         def fichero(nombre):
-            return self.direccion +"\\"+nombre
+            return self.direccion+"\\Preprocessing_inputs"+"\\"+nombre
         userCrsPoint = self.transform.transform(point)
         self.dockwidget.userCrsEdit.setText('{0:.{2}f},{1:.{2}f}'.format(userCrsPoint.x(),
                                                                          userCrsPoint.y(),
@@ -3604,6 +3716,8 @@ class qannagnps():
         
     def create_control_file_topagnps(self):
         #Función para que cuando se le de al botón de aceptar en el control file de topagnps se cree el control file TOPAGNPS.csv con los datos que se han puesto
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()        
         control_file = pd.DataFrame(data = {"FILENAME":[self.ctopagnps.lineEdit_7.text()],"FORMAT":[self.ctopagnps.lineEdit_8.text()],
                                     "DEMPROC":[self.ctopagnps.lineEdit_5.text()],"OUTFORMAT":[self.ctopagnps.lineEdit_14.text()],
                                     "OUTROW":[self.ctopagnps.lineEdit_22.text()],"OUTCOL":[self.ctopagnps.lineEdit_15.text()],
@@ -3617,7 +3731,7 @@ class qannagnps():
                                     "MODULE":[self.ctopagnps.lineEdit_13.text()],"OUTPUT":[self.ctopagnps.lineEdit_16.text()],
                                     "READOUT":[self.ctopagnps.lineEdit_23.text()],"READPATH":[self.ctopagnps.lineEdit_24.text()]})
         try:
-            control_file.to_csv(self.direccion+"\\"+"TOPAGNPS.csv", index=False, float_format='%.5f')
+            control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"TOPAGNPS.csv", index=False, float_format='%.5f')
         except:
             iface.messageBar().pushMessage("Select project folder", "Please before creating the topagnps control file first select de project folder you are going to work with",level=Qgis.Warning)
             return 
@@ -3627,12 +3741,14 @@ class qannagnps():
         
     def create_control_file_peg(self):
         #Función para que cuando se le de al botón de aceptar en el control file de peg se cree el control file PEG.csv con los datos que se han puesto
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()
         control_file = pd.DataFrame(data = {"Input":[self.cpeg.lineEdit.text()],"CTI_value":[self.cpeg.lineEdit_2.text()],
                                     "Accum_pct":[self.cpeg.lineEdit_3.text()],"Display_Drainage_Option":[self.cpeg.lineEdit_4.text()],
                                     "Display_Location_Option":[self.cpeg.lineEdit_5.text()],"ASC_Path":[self.cpeg.lineEdit_6.text()],
                                     "CSV_Path":[self.cpeg.lineEdit_7.text()]})
         try:
-            control_file.to_csv(self.direccion+"\\"+"PEG.csv", index=False, float_format='%.5f')
+            control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"PEG.csv", index=False, float_format='%.5f')
         except:
             iface.messageBar().pushMessage("Select DEM", "Please before creating the PEG control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
@@ -3642,6 +3758,8 @@ class qannagnps():
         
     def create_control_file_agbuf(self):
         #Función para que cuando se le de al botón de aceptar en el control file de agbuf se cree el control file Agbuf.csv con los datos que se han puesto
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()
         control_file = pd.DataFrame(data = {"BUFFER":[self.cagbuf.lineEdit.text()],"VEGETATION":[self.cagbuf.lineEdit_2.text()],
                                     "FOREST":[self.cagbuf.lineEdit_3.text()],"GRASS":[self.cagbuf.lineEdit_4.text()],
                                     "C_THRESHOLD":[self.cagbuf.lineEdit_5.text()],"R_THRESHOLD":[self.cagbuf.lineEdit_6.text()],
@@ -3651,7 +3769,7 @@ class qannagnps():
         if str(self.cagbuf.lineEdit_3.text())=="":control_file.drop("FOREST",axis = 1,inplace = True)
         
         try:
-            control_file.to_csv(self.direccion+"\\"+"AgBuf.csv", index=False, float_format='%.5f')
+            control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"AgBuf.csv", index=False, float_format='%.5f')
         except:
             iface.messageBar().pushMessage("Select DEM", "Please before creating the AGBUF control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
@@ -3661,6 +3779,8 @@ class qannagnps():
         
     def create_control_file_agwet(self):
         #Función para que cuando se le de al botón de aceptar en el control file de agwet se cree el control file Agwet.csv con los datos que se han puesto
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()
         control_file = pd.DataFrame(data = {"FILENAME":[self.cagwet.lineEdit.text()],"BREACH_BARRIER":[self.cagwet.lineEdit_18.text()],
                                     "BARRIER_HEIGHT_OPTION":[self.cagwet.lineEdit_17.text()],"BARRIER_HEIGHT":[self.cagwet.lineEdit_11.text()],
                                     "BARRIER_HEIGHT_INCREMENT":[self.cagwet.lineEdit_12.text()],"BARRIER_HEIGHT_MAX":[self.cagwet.lineEdit_14.text()],
@@ -3672,7 +3792,7 @@ class qannagnps():
                                     "BUFFER_VEG_FILENAME":[self.cagwet.lineEdit_3.text()],"BUFFER_ZONE_FILENAME":[self.cagwet.lineEdit_4.text()],
                                     "ASC_PATH":[self.cagwet.lineEdit_5.text()],"CSV_PATH":[self.cagwet.lineEdit_6.text()]})
         try:
-            control_file.to_csv(self.direccion+"\\"+"AgWet.csv", index=False, float_format='%.5f')
+            control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"AgWet.csv", index=False, float_format='%.5f')
         except:
             iface.messageBar().pushMessage("Select DEM", "Please before creating the AGWET control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
@@ -3682,9 +3802,11 @@ class qannagnps():
         
     def create_control_file_concepts(self):
         #Función para que cuando se le de al botón de aceptar en el control file de concepts se cree el control file CONCEPTS.csv con los datos que se han puesto
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()
         control_file = pd.DataFrame(data = {"UPSTREAM_REACH_ID":[self.cconcepts.lineEdit.text()],"DOWNSTREAM_REACH_ID":[self.cconcepts.lineEdit_2.text()],"ASC_Path":[self.cconcepts.lineEdit_3.text()],"CSV_Path":[self.cconcepts.lineEdit_4.text()]})
         try:
-            control_file.to_csv(self.direccion+"\\"+"CONCEPTS.csv", index=False, float_format='%.5f')
+            control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"CONCEPTS.csv", index=False, float_format='%.5f')
         except:
             iface.messageBar().pushMessage("Select DEM", "Please before creating the CONCEPTS control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
@@ -3697,7 +3819,7 @@ class qannagnps():
         control_file = pd.DataFrame(data = {"POTHOLE_OPTION":[self.cpothole.lineEdit.text()],"POTHOLE_SURFACE_AREA":[self.cpothole.lineEdit_2.text()],
                                             "ASC_Path":[self.cpothole.lineEdit_3.text()],"CSV_Path":[self.cpothole.lineEdit_4.text()]})
         try:
-            control_file.to_csv(self.direccion+"\\"+"POTHOLE.csv", index=False, float_format='%.5f')
+            control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"POTHOLE.csv", index=False, float_format='%.5f')
         except:
             iface.messageBar().pushMessage("Select DEM", "Please before creating the POTHOLE control file first select de DEM you are going to use",level=Qgis.Warning)
             return 
@@ -3707,6 +3829,10 @@ class qannagnps():
         
     def create_control_file_rasfor(self):
         #Función para que cuando se le de al botón de aceptar en el control file de rasfor se cree el control file rasfor.inp con los datos que se han puesto
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()
         generate_program = int(self.crasfor.checkBox.isChecked())
         if self.crasfor.checkBox_2.isChecked():
             output_format=0
@@ -3763,7 +3889,7 @@ class qannagnps():
         for i in range(len(lista_parametros)):
             texto_nuevo = texto_nuevo[0:lista[i]]+str(lista_parametros[i])+texto_nuevo[lista[i]+1:]
         try:
-            f = open(self.direccion+"\\"+"rasfor.inp","w+")
+            f = open(self.direccion+"\\"+"Preprocessing_inputs\\"+"rasfor.inp","w+")
         except:
             iface.messageBar().pushMessage("Select Project Folder", "Please before creating the RASFOR data first select de project folder you are going to use",level=Qgis.Warning)
             return 
@@ -3775,6 +3901,8 @@ class qannagnps():
         
     def create_control_file_raspro(self):
         #Función para que cuando se le de al botón de aceptar en el control file de raspro se cree el control file raspro.inp con los datos que se han puesto
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()
         #Inputs
         program_r = int(self.craspro.checkBox.isChecked())
         process_n=int(self.craspro.checkBox_2.isChecked())
@@ -3793,7 +3921,7 @@ class qannagnps():
         for i in range(len(lista_parametros)):
             texto_nuevo = texto_nuevo[0:lista[i]]+str(lista_parametros[i])+texto_nuevo[lista[i]+1:]
         try:
-            f = open(self.direccion+"\\"+"raspro.inp","w+")
+            f = open(self.direccion+"\\"+"Preprocessing_inputs\\"+"raspro.inp","w+")
         except:
             iface.messageBar().pushMessage("Select Project Folder", "Please before creating the RASPRO data first select de project folder you are going to use",level=Qgis.Warning)
             return 
@@ -3805,6 +3933,8 @@ class qannagnps():
         
     def create_control_file_dednm(self):
         #Función para que cuando se le de al botón de aceptar en el control file de dednm se cree el control file dednm.inp con los datos que se han puesto
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()
         #Inputs
         try:
             utm_zone = int(self.dednm.lineEdit.text())
@@ -3877,7 +4007,7 @@ class qannagnps():
             texto_nuevo = texto_nuevo[0:lista[i]+contador]+str(lista_parametros[i])+texto_nuevo[lista[i]+contador+1:]
             contador += len(str(lista_parametros[i]))-1
         try:
-            f = open(self.direccion+"\\"+"dednm.inp","w+")
+            f = open(self.direccion+"\\"+"Preprocessing_inputs\\"+"dednm.inp","w+")
         except:
             iface.messageBar().pushMessage("Select DEM", "Please before creating the DEDNM data first select de DEM you are going to use",level=Qgis.Warning)
             return 
@@ -3889,6 +4019,8 @@ class qannagnps():
     
     def create_control_file_agflow(self,control_type):
         #Función para que cuando se le de al botón de aceptar en el control file de agflow se cree el control file dednm.inp con los datos que se han puesto
+        #Si no existe la carpeta de preprocessing inputs entonces se crea
+        self.create_preprocessing_inputs_folder()
         #Función para pasar de 1 a T y de 0 a F
         def funcion_t(numero):
             if numero==1:
@@ -3928,7 +4060,7 @@ class qannagnps():
             
             texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
             try:
-                f = open(self.direccion+"\\"+"AGFCNT.inp","w+")
+                f = open(self.direccion+"\\"+"Preprocessing_inputs\\"+"AGFCNT.inp","w+")
             except:
                 iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
                 return 
@@ -3939,7 +4071,7 @@ class qannagnps():
             reas=int(self.agflow.checkBox_6.isChecked())
             path = str(self.agflow.lineEdit_8.text())
             df = pd.DataFrame(data = {"REASSIGN":[reas],"ASC_PATH":[path]})
-            df.to_csv(self.direccion+"\\"+"AGFLOW.csv", index=False, float_format='%.5f')
+            df.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"AGFLOW.csv", index=False, float_format='%.5f')
             
         self.agflow.close()
         #Update use of control files
@@ -3959,8 +4091,8 @@ class qannagnps():
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        if os.path.exists(self.direccion+"\TOPAGNPS.csv"):
-            control_file = pd.read_csv(self.direccion+"\\"+"TOPAGNPS.csv",encoding = "ISO-8859-1",delimiter=",")
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\TOPAGNPS.csv"):
+            control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"TOPAGNPS.csv",encoding = "ISO-8859-1",delimiter=",")
             columnas = ["FILENAME","FORMAT","DEMPROC","OUTFORMAT","CSA","MSCL","UTME","UTMN","ROWS","COLS","CELLSIZE","NODATA","OUTSNAP","DNMCNT","DEMEDGE","VERBOSE","KEEPFILES","OPTIMIZE","OUTCOL","OUTROW","MODULE","OUTPUT","READOUT","READPATH"]
             for i in range(len(columnas)):
                 try:
@@ -3978,8 +4110,8 @@ class qannagnps():
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        if os.path.exists(self.direccion+"\PEG.csv"):
-            control_file = pd.read_csv(self.direccion+"\\"+"PEG.csv",encoding = "ISO-8859-1",delimiter=",")
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\PEG.csv"):
+            control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"PEG.csv",encoding = "ISO-8859-1",delimiter=",")
             columnas =["Input","CTI_value","Accum_pct"]
             for i in range(len(columnas)):
                 try:
@@ -3997,8 +4129,8 @@ class qannagnps():
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        if os.path.exists(self.direccion+"\AgBuf.csv"):
-            control_file = pd.read_csv(self.direccion+"\\"+"AgBuf.csv",encoding = "ISO-8859-1",delimiter=",")
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\AgBuf.csv"):
+            control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"AgBuf.csv",encoding = "ISO-8859-1",delimiter=",")
             columnas =["BUFFER","VEGETATION","FOREST","GRASS","C_THRESHOLD","R_THRESHOLD","UNITS","ASC_PATH","CSV_PATH"]
             for i in range(len(columnas)):
                 try:
@@ -4021,10 +4153,10 @@ class qannagnps():
         self.agflow.checkBox_3.setChecked(False)
         self.agflow.checkBox_4.setChecked(False)
         self.agflow.checkBox_5.setChecked(False)
-        if os.path.exists(self.direccion+"\AGFCNT.inp"):
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\AGFCNT.inp"):
             try:
                 #After we put the control files data
-                fichero = open(self.direccion+"\AGFCNT.inp","r+")
+                fichero = open(self.direccion+"\\Preprocessing_inputs"+"\AGFCNT.inp","r+")
                 texto = fichero.read()
                 fichero.close()
                 def from_string_to_condition(string):
@@ -4054,10 +4186,10 @@ class qannagnps():
         #First we delete the previous
         self.agflow.checkBox_6.setChecked(False)
         self.agflow.lineEdit_8.setText("")
-        if os.path.exists(self.direccion+"\AGFLOW.csv"):
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\AGFLOW.csv"):
             try:
                 #After we put the control files data
-                control_file = pd.read_csv(self.direccion+"\\"+"AGFLOW.csv",encoding = "ISO-8859-1",delimiter=",")
+                control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"AGFLOW.csv",encoding = "ISO-8859-1",delimiter=",")
                 if control_file["REASSIGN"].iloc[0]==0 or control_file["REASSIGN"].iloc[0]=="":
                     self.agflow.checkBox_6.setChecked(False)
                 else:
@@ -4075,8 +4207,8 @@ class qannagnps():
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        if os.path.exists(self.direccion+"\AgWet.csv"):
-            control_file = pd.read_csv(self.direccion+"\\"+"AgWet.csv",encoding = "ISO-8859-1",delimiter=",")
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\AgWet.csv"):
+            control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"AgWet.csv",encoding = "ISO-8859-1",delimiter=",")
             columnas =["FILENAME","BREACH_BARRIER","BARRIER_HEIGHT_OPTION","BARRIER_HEIGHT","BARRIER_HEIGHT_INCREMENT","BARRIER_HEIGHT_MAX","WETLAND_ID_OPTION","EROSION_INDEX_OPTION","EROSION_INDEX_THRESHOLD","DA_THRESHOLD","WI_THRESHOLD","MIN_WETLAND_RATIO","MAX_WETLAND_RATIO","BUFFER_WIDTH","BUFFER_EXTENT_OPTION","BUFFER_IDS_FILENAME","BUFFER_VEG_FILENAME","BUFFER_ZONE_FILENAME","ASC_PATH","CSV_PATH"]
             for i in range(len(columnas)):
                 try:
@@ -4094,8 +4226,8 @@ class qannagnps():
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        if os.path.exists(self.direccion+"\CONCEPTS.csv"):
-            control_file = pd.read_csv(self.direccion+"\\"+"CONCEPTS.csv",encoding = "ISO-8859-1",delimiter=",")
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\CONCEPTS.csv"):
+            control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"CONCEPTS.csv",encoding = "ISO-8859-1",delimiter=",")
             columnas =["UPSTREAM_REACH_ID","DOWNSTREAM_REACH_ID"]
             
             for i in range(len(columnas)):
@@ -4114,8 +4246,8 @@ class qannagnps():
         for i in dialogos:
             i.setText("")
         #Luego se pone lo que hay en el control file
-        if os.path.exists(self.direccion+"\POTHOLE.csv"):
-            control_file = pd.read_csv(self.direccion+"\\"+"POTHOLE.csv",encoding = "ISO-8859-1",delimiter=",")
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\POTHOLE.csv"):
+            control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\"+"POTHOLE.csv",encoding = "ISO-8859-1",delimiter=",")
             columnas =["POTHOLE_OPTION","POTHOLE_SURFACE_AREA","ASC_Path","CSV_Path"]
             for i in range(len(columnas)):
                 try:
@@ -4444,9 +4576,9 @@ class qannagnps():
     def add_master(self):
         #Método para añadir la información de un archivo master a los inputs de AnnAGNPS
         #Se abre la opción de escoger archivo y se obtiene la información
-        if hasattr(self, 'mdt_directory'):
-            fname = QFileDialog.getOpenFileName(self.inputs,"Select master file",self.direccion,"CSV files (*.csv)")
-        else:
+        try:
+            fname = QFileDialog.getOpenFileName(self.inputs,"Select master file",self.direccion+"\\Processing_inputs","CSV files (*.csv)")
+        except:
             fname = QFileDialog.getOpenFileName(self.inputs,"Select master file","C/","CSV files (*.csv)")
         if fname[0]!="":
             try:
@@ -4721,6 +4853,52 @@ class qannagnps():
                         file.write(f"{key},{value}\n")
             except:
                 iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
+                
+        #Create folder where the data of the proyect is going to be saved
+        carpeta_plugin = os.getcwd()
+        Path(carpeta_plugin+"\\Projects").mkdir(parents=True, exist_ok=True)
+        
+        #Create the folder of the project if it doesn't exist
+        name_of_project = Path(file_path).stem
+        Path(carpeta_plugin+f"\\Projects\\{name_of_project}").mkdir(parents=True, exist_ok=True)
+        
+        #Function to eliminate what is inside of a folder
+        def delete_files_and_folders(folder):
+            carpeta = Path(carpeta_plugin+"\\Projects\\"+folder)
+            # Borra todo el contenido de la carpeta
+            for item in carpeta.iterdir():
+                try:
+                    if item.is_file() or item.is_symlink():
+                        item.unlink()          
+                    elif item.is_dir():
+                        shutil.rmtree(item) 
+                except:
+                    pass
+        
+        
+        
+        #First we move the inputs of preprocessing
+        if os.Path.exists(self.direccion+"\\Preprocessing_inputs"):
+            #Create folder
+            Path(carpeta_plugin+f"\\Projects\\Preprocessin_inputs").mkdir(parents=True, exist_ok=True)
+            #We eliminate what is inside
+            delete_files_and_folders("Preprocessing_inputs")
+            #Add files
+            files_to_move = ["dem","soil_layer","use_layer","buffer_layer","vegetation_layer",control_files]
+            for name in files_to_move:
+                try:
+                    shutil.copy2(dic_save[name], carpeta_plugin+f"\\Projects\\Preprocessin_inputs\\"+Path(dic_save[name]).name) 
+                except:
+                    pass
+        
+        
+       
+        
+        
+        delete_files_and_folders("Preprocessing_outputs")
+        delete_files_and_folders("Processing_inputs")
+        delete_files_and_folders("Processing_outputs")
+        
     def load_project(self):
         #Método para cargar el proyecto
         #Se abre el archivo
@@ -4780,7 +4958,9 @@ class qannagnps():
             self.dlg.cbMan.addItems(combo_lista)
             self.dlg.comboBox_2.addItems(combo_lista)
             self.dlg.comboBox_3.addItems(combo_lista)
-        
+            
+            poner los control files
+            
             #Se añaden las capas a los combobox
             all_layers = QgsProject.instance().layerTreeRoot().children()
             layers_l = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
@@ -4880,6 +5060,8 @@ class qannagnps():
                 except:
                     iface.messageBar().pushMessage("Error Loading Project", "The file you have selected does not have the format or information necessary to upload a project. " ,level=Qgis.Warning)
                     return 
+            
+            
             
     def search_document(self,line):
         #Método para elegir en el buscador de archivos el archivo de cada input de AnnAGNPS
@@ -5328,7 +5510,7 @@ class qannagnps():
                 
                 texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
                 try:
-                    f = open(self.direccion+"\\"+"AGFCNT.inp","w+")
+                    f = open(self.direccion+"\\Preprocessing_inputs"+"\\"+"AGFCNT.inp","w+")
                 except:
                     iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
                     return 
@@ -5486,11 +5668,11 @@ class qannagnps():
         if lineEdit == self.inputs.l_3 and lineEdit.text()=="-- Provided by TopAGNPS --": #cell data
             return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Cell_Data_Section.csv"
         elif lineEdit == self.inputs.l_5 and lineEdit.text()=="-- Provided by TopAGNPS --": #ephemeral gully
-            if os.path.exists(self.direccion+"\\"+"AGWET.csv"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\"+"AGWET.csv"):
                 return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgWet.csv"
-            if os.path.exists(self.direccion+"\\"+"Agbuf.csv"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\"+"Agbuf.csv"):
                 return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Ephemeral_Gully_Data_Section_Revised_by_AgBuf.csv"
-            if os.path.exists(self.direccion+"\\"+"PEG.csv"):
+            if os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\"+"PEG.csv"):
                 return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Ephemeral_Gully_Data_Section.csv" 
         elif lineEdit == self.inputs.l_10 and lineEdit.text()=="-- Provided by TopAGNPS --": #reach
             return self.direccion+"\\INPUTS\\watershed\\"+"AnnAGNPS_Reach_Data_Section.csv"
