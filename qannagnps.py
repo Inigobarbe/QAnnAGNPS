@@ -21,7 +21,7 @@
 
     
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt
-from PyQt5.QtWidgets import QFrame,QTableWidgetItem,QProgressDialog,QLabel, QLineEdit
+from PyQt5.QtWidgets import QFrame,QTableWidgetItem,QProgressDialog,QLabel, QLineEdit, QMessageBox
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QFileDialog
 from qgis.core import QgsProject
@@ -57,6 +57,8 @@ import itertools
 from matplotlib.ticker import FuncFormatter
 import sys
 import chardet
+import glob
+
 
 #Local libraries
 from .libraries.SALib.sample import saltelli
@@ -86,6 +88,8 @@ from .ui.existing_dialog import ExistingDialog
 from .ui.documentation_dialog import DocumentationDialog
 from .ui.table_inputs import TableDialog
 from .ui.sensitivity import SensitivityDialog
+from .ui.warning_message import warning_message
+from .ui.overwrite_project import overwrite_project
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -189,6 +193,8 @@ class qannagnps():
         self.existing = ExistingDialog()
         self.documentation = DocumentationDialog()
         self.sensitivity_dialog = SensitivityDialog()
+        self.dlg_warning_message = warning_message()
+        self.dlg_overwrite_project = overwrite_project()
         
         
         #Boton principal
@@ -217,6 +223,9 @@ class qannagnps():
         self.dlg.pb_ann.clicked.connect(lambda: (self.inputs.show(), self.inputs.raise_()))
         #Al seleccionar el MDT que se establezca ya el directorio
         self.dlg.comboBox.currentIndexChanged.connect(self.setDirectory)
+        
+        #Quit the warning advice
+        self.dlg_warning_message.ok.clicked.connect(self.dlg_warning_message.close)
         
         #Actualizar los control files cuando se le de a uno de los botones
         push_buttons = [self.cgeneral.pushButton,self.cgeneral.pushButton_3,self.cgeneral.pushButton_9,self.cgeneral.pushButton_4,self.cgeneral.pushButton_5,self.cgeneral.pushButton_10,self.cgeneral.pushButton_2,self.cgeneral.pushButton_6,self.cgeneral.pushButton_8,self.cgeneral.pushButton_7]
@@ -464,6 +473,10 @@ class qannagnps():
         
         #Botón para guardar proyecto
         self.dlg.pb_save.clicked.connect(self.save_project)
+        
+        #Boton sobreescribir proyecto
+        self.dlg_overwrite_project.yes.clicked.connect(lambda _,b=True: self.save_project(b))
+        self.dlg_overwrite_project.yes.clicked.connect(self.dlg_overwrite_project.close)
         
         #Botón para cargar el proyecto
         self.dlg.pb_load.clicked.connect(self.load_project)
@@ -816,9 +829,14 @@ class qannagnps():
         all_layers = QgsProject.instance().layerTreeRoot().children()
         layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
         selectedLayerIndex = self.dlg.cbSoil.currentIndex()-1
+        
         if selectedLayerIndex>=0:
             selectedLayer = layers[selectedLayerIndex].layer()
             self.fichero_soil =  selectedLayer.dataProvider().dataSourceUri()
+            try:
+                self.epsg_soil = selectedLayer.crs().authid().split(":")[1]
+            except:
+                self.epsg_soil = "No defined"
         
     def instantiate_management(self):
         #Metod to select the layer of management that is going to be used
@@ -828,6 +846,10 @@ class qannagnps():
         if selectedLayerIndex>=0:
             selectedLayer = layers[selectedLayerIndex].layer()
             self.fichero_manag =  selectedLayer.dataProvider().dataSourceUri()
+            try:
+                self.epsg_manag = selectedLayer.crs().authid().split(":")[1]
+            except:
+                self.epsg_manag = "No defined"
     
     
     def add_project_folder_text_changed(self):
@@ -843,25 +865,48 @@ class qannagnps():
     
     def add_topagnps_input(self,type_input):
         #Metod to add topagnps inputs with pushbutton
-        fname = QFileDialog.getOpenFileName(self.inputs,f"Select {type_input} file","C/")
+        if hasattr(self,"direccion"):
+            fname = QFileDialog.getOpenFileName(self.inputs,f"Select {type_input} file",self.direccion)
+        else:
+            fname = QFileDialog.getOpenFileName(self.inputs,f"Select {type_input} file","C/")
         if fname[0]!="":
             dic = {"DEM":self.dlg.comboBox,"buffer":self.dlg.comboBox_2,"vegetation":self.dlg.comboBox_3,"soil":self.dlg.cbSoil,"management":self.dlg.cbMan}
             combo = dic[type_input]
             #Se añade el archivo al canvas
             if type_input=="DEM" or type_input=="buffer" or type_input=="vegetation":
                 layer = QgsRasterLayer(fname[0],type_input)
+                if not layer.isValid():
+                    iface.messageBar().pushMessage("Please select a raster file",level=Qgis.Warning)
+                    return
             else:
                 layer = QgsVectorLayer(fname[0],type_input)
+                if not layer.isValid():
+                    iface.messageBar().pushMessage("Please select a vector file",level=Qgis.Warning)
+                    return
+                    
             QgsProject.instance().addMapLayer(layer, False)
             root = QgsProject.instance().layerTreeRoot()
             root.insertLayer(0, layer)
             #QgsProject.instance().addMapLayer(layer)
+            
+            
             #Se obtienen las capas que hay en el canvas
             all_layers = QgsProject.instance().layerTreeRoot().children()
             layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
             project_layers=[layer.name() for layer in layers]
             project_layers.insert(0,"")
+            
+            
             #Se actualizan las capas
+            
+            #Si se actualiza la capa de suelo, no se quiere que se cambien las columnas de manejo, y viceversa. 
+            if type_input == "soil":
+                self.dlg.cbMan.currentIndexChanged.disconnect(self.cambios_manejo)
+            
+            elif type_input == "management":
+                self.dlg.cbSoil.currentIndexChanged.disconnect(self.cambios_suelo)
+            
+            
             for i in dic.keys():
                 if i!=type_input:
                     index = dic[i].currentIndex()
@@ -873,6 +918,13 @@ class qannagnps():
                 dic[i].addItems(project_layers)
                 #Se ponen bien los índices
                 dic[i].setCurrentIndex(index+1)              
+            
+            #Se vuelven a conectar
+            if type_input == "soil":
+                self.dlg.cbMan.currentIndexChanged.connect(self.cambios_manejo)
+            
+            elif type_input == "management":
+                self.dlg.cbSoil.currentIndexChanged.connect(self.cambios_suelo)
         
         
     def add_project_folder(self):
@@ -2556,6 +2608,11 @@ class qannagnps():
                 selectedLayerIndex = self.dlg.comboBox.currentIndex()-1
                 selectedLayer = layers[selectedLayerIndex].layer()
                 self.fichero_mdt =  selectedLayer.dataProvider().dataSourceUri()
+                try:
+                    self.epsg_dem = selectedLayer.crs().authid().split(":")[1]
+                except:
+                    self.epsg_dem = "No defined"
+                    
                 dir_mdt, self.name_mdt = os.path.split(self.fichero_mdt)
                 #Si no existe la carpeta de preprocessing inputs entonces se crea
                 self.create_preprocessing_inputs_folder()
@@ -2763,9 +2820,6 @@ class qannagnps():
         self.end_execution = 0
         #Ejecutar
         self.ejecucion_completa()
-        if self.end_execution != 1:
-            #MENSAJE DE ÉXITO
-            self.iface.messageBar().pushMessage("Success", "Succes in execution ",level=Qgis.Success, duration=5)
             
     def ejecucion_completa(self):
         #Esta función es en donde se ejecuta el modelo
@@ -2796,6 +2850,8 @@ class qannagnps():
         #EJECUCIÓN DE TOPAGNPS
         if self.dlg.cbTop.isChecked():
             #Se crea la carpeta de Preprocessing_inputs si no estaba creada. Ahí se meten los inputs y se ejecuta TopAGNPS y luego los outputs se meten a Preprocessing_outputs
+            
+            
             #Una vez creada se meten todos los archivos en esa carpeta
             self.create_folder_preprocessing_and_move_files()
             
@@ -2892,6 +2948,8 @@ class qannagnps():
                     try:
                         self.add_coordinates_to_topagnps_control_file()
                     except Exception as e:
+                        #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                        self.save_files_preprocessing_in_folder()
                         self.iface.messageBar().pushMessage(str(e),level=Qgis.Info)
                         return
                     #Return porque dentro del add_coordinates_to_topagnps_control_file ya se ejecuta de nuevo y no hay que seguir con el código
@@ -2906,7 +2964,9 @@ class qannagnps():
             try:
                 self.add_soil_and_management_cell()
             except Exception as e:
-                self.iface.messageBar().pushMessage(str(e),level=Qgis.Info)
+                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                self.save_files_preprocessing_in_folder()
+                self.warning_message(str(e))
                 return
             
             
@@ -3004,7 +3064,10 @@ class qannagnps():
             #Los outputs de AnnAGNPS se guardan en Processing_outputs
             self.save_files_processing_in_folder()
     
-    
+  
+            
+            
+        
     def add_coordinates_to_topagnps_control_file(self):
         """Method to add coordinates to TOPAGNPS control file"""
         def fichero(nombre):
@@ -3162,13 +3225,20 @@ class qannagnps():
         if str(self.dlg.lineEdit.text())=="":
             if self.dlg.cbSoil.currentIndex()==0:
                 self.end_execution = 1
-                raise Exception("Error with soil layer\nThere isn't any soil information to use")
+                self.warning_message("Error with soil layer\nNo soil layer has been selected")
+                return
             #Se aplica el suelo al fichero de cells
             try:
                 suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
             except:
                 self.end_execution = 1
-                raise Exception("Error with soil layer\nThe DEM and the soil layer have to overlap")
+                if self.epsg_dem != self.epsg_soil:
+                    raise Exception(f"Error with soil layer: The DEM and the soil layer have to overlap\nThe Coordinate Reference System of the soil layer is {self.epsg_soil} and that of the DEM is {self.epsg_dem}")
+                    
+                else:
+                    raise Exception(f"Error with soil layer: The DEM and the soil layer have to overlap")
+                    
+
             annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
             annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
             #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo PEG.csv
@@ -3227,12 +3297,20 @@ class qannagnps():
         if str(self.dlg.lineEdit_2.text())=="":
             if self.dlg.cbMan.currentIndex()==0:
                 self.end_execution = 1
-                raise Exception( "Error with soil management\nThere isn't any management information to use")
+                self.warning_message("Error with soil management\nNo management layer has been selected.")
+                return
             try:
                 manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_manag,self.management_field_names[self.dlg.cbColumnMan.currentIndex()],2)
             except:
                 self.end_execution = 1
-                raise Exception("Error with soil use layer\nThe DEM and the soil use layer have to overlap.")
+                if self.epsg_dem != self.epsg_manag:
+                    raise Exception(f"Error with management layer: The DEM and the management layer have to overlap\nThe Coordinate Reference System of the management layer is {self.epsg_manag} and that of the DEM is {self.epsg_dem}")
+                    
+                else:
+                    raise Exception(f"Error with management layer: The DEM and the management layer have to overlap")
+                
+                    
+            
             annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
             annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
             #Se aplica el uso al fichero de cárcavas efímeras
@@ -3313,6 +3391,8 @@ class qannagnps():
         carpeta = self.direccion+"\\Preprocessing_outputs"
         Path(carpeta).mkdir(parents=True, exist_ok=True)
         
+        
+        
         #Then move the files that were modified or created after the start of the preprocessing
         carpeta_origen = Path(self.direccion+"\\Preprocessing_inputs")
         carpeta_destino = Path(carpeta)
@@ -3329,9 +3409,10 @@ class qannagnps():
         
     def save_files_processing_in_folder(self):
         """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
-        #First create the folder Preprocessing_outputs if it doesn´t exist
+        #First create the folder Processing_outputs if it doesn´t exist
         carpeta = self.direccion+"\\Processing_outputs"
         Path(carpeta).mkdir(parents=True, exist_ok=True)
+        
 
         #Then move the files that were modified or created after the start of the preprocessing
         carpeta_origen = Path(self.direccion+"\\Processing_inputs")
@@ -3353,8 +3434,10 @@ class qannagnps():
         #Create folder
         carpeta = self.direccion+"\\Preprocessing_inputs"
         Path(carpeta).mkdir(parents=True, exist_ok=True)
-        #Move the files that are in the interface to this file
         
+        
+        
+        #Move the files that are in the interface to this file
         #Primero los DEM
         #Se mueve el DEM a la carpeta del proyecto
         try: #si el origen y el destino son los mismos da error
@@ -3371,15 +3454,62 @@ class qannagnps():
             shutil.copyfile(self.fichero_veg,self.direccion+"\\Preprocessing_inputs"+"\\"+self.nombre_veg)
         except:
             pass
+        
+        #Mover el archivo de suelo y manejo
+        #Estos archivos pueden ser shp por lo que hay que coger todos los archivos asociados a ese shp
+        if hasattr(self,"fichero_soil"):
+            origen_base = os.path.splitext(self.fichero_soil)[0]
+            archivos_asociados = glob.glob(origen_base + ".*")
+            destino_dir = os.path.join(self.direccion, "Preprocessing_inputs")
+            for f in archivos_asociados:
+                try: #si el origen y el destino son los mismos da error
+                    shutil.copy(f, destino_dir)
+                except:
+                    pass
+        
+        if hasattr(self,"fichero_manag"):
+            origen_base = os.path.splitext(self.fichero_manag)[0]
+            archivos_asociados = glob.glob(origen_base + ".*")
+            destino_dir = os.path.join(self.direccion, "Preprocessing_inputs")
+            for f in archivos_asociados:
+                try: #si el origen y el destino son los mismos da error
+                    shutil.copy(f, destino_dir)
+                except:
+                    pass
     
     
+    def warning_message(self,message):
+        """Method to put a warning message"""
+        #Put text
+        self.dlg_warning_message.warning.setText(message)              
+        
+        courier_font = QFont("Georgia")
+        courier_font.setStyleHint(QFont.Monospace)  # Asegura el estilo monoespaciado
+        courier_font.setFixedPitch(True)            # Garantiza el espaciado fijo
+        courier_font.setPointSize(12)               # Ajusta el tamaño de fuente, si es necesario
+
+        # Aplicar la fuente al QLabel
+        self.dlg_warning_message.warning.setFont(courier_font)
+            
+        #Put to the front
+        self.dlg_warning_message.setWindowFlags(
+            self.dlg_warning_message.windowFlags() | Qt.WindowStaysOnTopHint
+        )
+
+        self.dlg_warning_message.show()
+        self.dlg_warning_message.raise_()
+        self.dlg_warning_message.activateWindow()
+        #Adjust size
+        self.dlg_warning_message.adjustSize()
+        
     def create_folder_processing_and_move_files(self):
         """Method to create the preprocessing folders (if they dont exist) and move the input files here"""
         #Create folder
         carpeta = self.direccion+"\\Processing_inputs"
         Path(carpeta).mkdir(parents=True, exist_ok=True)
-        #Move the files that are in the interface to this file
         
+            
+        #Move the files that are in the interface to this file
         #CREACIÓN DE LAS SUBCARPETAS EN DONDE SE ORGANIZARÁN LOS INPUTS
         carpetas = ["simulation","general","watershed","climate"]
         parent_dir = self.direccion +"\\Processing_inputs"
@@ -3612,7 +3742,7 @@ class qannagnps():
         master.to_csv(self.direccion +"\\Processing_inputs\\" + "annagnps_master.csv", encoding='utf-8', index=False)
         
         #MOVER EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS de procesamiento
-        shutil.copyfile(self.executable_directory + "\\" +"AnnAGNPS.fil" ,self.direccion +"\\Processing_inputs\\" +"AnnAGNPS.fil")
+        shutil.copyfile(self.plugin_dir+"\\Executables"  + "\\" +"AnnAGNPS.fil" ,self.direccion +"\\Processing_inputs\\" +"AnnAGNPS.fil")
         
     
     def ephemeral_gully_file(self):
@@ -4746,26 +4876,73 @@ class qannagnps():
             if fname!="":
                 self.inputs.l_53.setText(fname)
                 
-    def save_project(self):
+    def save_project(self,overwrite = False):
         #Método para guardar el proyecto
         
-        # Se abre el cuadro de diálogo para guardar el archivo
-        file_dialog = QFileDialog()
+        #Si no existe una carepta de trabajo entonces error
+        if not hasattr(self, "direccion"):
+            iface.messageBar().pushMessage("Please, select a working directory before saving the project",level=Qgis.Warning)
+            return
+        
+        #Si no se ha puesto nombre al proyecto entonces error
+        name_of_project = self.dlg.name_of_project.text()
+        if name_of_project =="":
+            self.warning_message("Please select a name for the project before saving")
+            return
+        
+        r'''# Se abre el cuadro de diálogo para guardar el archivo
+        file_dialog = QFileDialog(
+            None,                   
+            "Save the direction of the files of the project",  
+            self.direccion, 
+            "CSV files (*.csv)" 
+        )
         file_dialog.setAcceptMode(QFileDialog.AcceptSave)
-        file_dialog.setNameFilter("CSV files (*.csv)")
         file_dialog.setDefaultSuffix("csv")
         
+        #Se guarda el archivo
+        if file_dialog.exec_() == QFileDialog.Accepted:
+        
+        
+        file_path = file_dialog.selectedFiles()[0]'''
+        
+        
+        #Create folder where the data of the proyect is going to be saved
+        carpeta_plugin = self.plugin_dir
+        Path(carpeta_plugin+"\\Projects").mkdir(parents=True, exist_ok=True)
+        
+        
+        #But if a project with the previous name has been saved previously then put a warning because there can be only one project with the same name
+        existing_names = [nombre for nombre in os.listdir(carpeta_plugin+"\\Projects") if os.path.isdir(os.path.join(carpeta_plugin+"\\Projects", nombre))]
+        
+        if name_of_project in existing_names and not overwrite:
+            #Open window to overwrite or not
+            self.dlg_overwrite_project.show()
+            self.dlg_overwrite_project.raise_()
+            self.dlg_overwrite_project.activateWindow()
+            return 
+        
+        #Create the folder of the project if it doesn't exist
+        Path(carpeta_plugin+f"\\Projects\\{name_of_project}").mkdir(parents=True, exist_ok=True)
+        
+
         #Se obtienen los datos de los inputs
+        #En el csv se van a guardar con la direccion haciendo referencia a la carpeta en donde se van a guardar
+        def cambiar_carpeta_base(ruta_original, nueva_carpeta):
+            p = Path(ruta_original)
+            nueva_ruta = Path(carpeta_plugin+f"\\Projects\\{name_of_project}\\{nueva_carpeta}") / p.name    
+            return str(nueva_ruta)
+    
         all_layers = QgsProject.instance().layerTreeRoot().children()
         layers = [node for node in all_layers if isinstance(node, QgsLayerTreeLayer)]
         if self.dlg.comboBox.currentIndex()>0:
-            dem_layer = layers[self.dlg.comboBox.currentIndex() - 1].layer().dataProvider().dataSourceUri()
+            dem_layer = cambiar_carpeta_base(layers[self.dlg.comboBox.currentIndex() - 1].layer().dataProvider().dataSourceUri(),"Preprocessing_inputs")
             dem_name = layers[self.dlg.comboBox.currentIndex() - 1].layer().name()
         else:
             dem_layer = ""
             dem_name =""
         if self.dlg.cbSoil.currentIndex()>0:
-            soil_layer = layers[self.dlg.cbSoil.currentIndex()-1].layer().dataProvider().dataSourceUri()
+            soil_layer = cambiar_carpeta_base(layers[self.dlg.cbSoil.currentIndex()-1].layer().dataProvider().dataSourceUri(),"Preprocessing_inputs")
             soil_name = layers[self.dlg.cbSoil.currentIndex()-1].layer().name()
             soil_column = [field.name() for field in layers[self.dlg.cbSoil.currentIndex()-1].layer().fields()][self.dlg.cbColumnSoil.currentIndex()]
         else:
@@ -4773,7 +4950,7 @@ class qannagnps():
             soil_name = ""
             soil_column = ""
         if self.dlg.cbMan.currentIndex()>0:
-            use_layer = layers[self.dlg.cbMan.currentIndex()-1].layer().dataProvider().dataSourceUri()
+            use_layer = cambiar_carpeta_base(layers[self.dlg.cbMan.currentIndex()-1].layer().dataProvider().dataSourceUri(),"Preprocessing_inputs")
             use_name = layers[self.dlg.cbMan.currentIndex()-1].layer().name()
             try:
                 use_column = [field.name() for field in layers[self.dlg.cbMan.currentIndex()-1].layer().fields()][self.dlg.cbColumnMan.currentIndex()]
@@ -4784,13 +4961,13 @@ class qannagnps():
             use_name = ""
             use_column = ""
         if self.dlg.comboBox_2.currentIndex()>0:
-            buffer_layer = layers[self.dlg.comboBox_2.currentIndex()-1].layer().dataProvider().dataSourceUri()
+            buffer_layer = cambiar_carpeta_base(layers[self.dlg.comboBox_2.currentIndex()-1].layer().dataProvider().dataSourceUri(),"Preprocessing_inputs")
             buffer_name = layers[self.dlg.comboBox_2.currentIndex()-1].layer().name()
         else:
             buffer_layer = ""
             buffer_name = ""
         if self.dlg.comboBox_3.currentIndex()>0:
-            vegetation_layer = layers[self.dlg.comboBox_3.currentIndex()-1].layer().dataProvider().dataSourceUri()
+            vegetation_layer = cambiar_carpeta_base(layers[self.dlg.comboBox_3.currentIndex()-1].layer().dataProvider().dataSourceUri(),"Preprocessing_inputs")
             vegetation_name = layers[self.dlg.comboBox_3.currentIndex()-1].layer().name()
         else:
             vegetation_layer = ""
@@ -4801,10 +4978,12 @@ class qannagnps():
         dic_save = {"Input":"value","project_folder":str(self.dlg.project.text()),"epsg":QgsProject.instance().crs().authid(),"dem": dem_layer,"dem_name":dem_name,"soil_layer":soil_layer,"soil_name":soil_name,"soil_column":soil_column,"use_layer":use_layer,"use_name":use_name,"use_column":use_column,
             "buffer_layer":buffer_layer,"buffer_name":buffer_name,"vegetation_layer":vegetation_layer,"vegetation_name":vegetation_name,"unique_soil":unique_soil,"unique_landuse":unique_landuse,
             "add_outlet":self.dlg.checkBox_2.isChecked(),"execute_topagnps":self.dlg.cbTop.isChecked(),"execute_annagnps":self.dlg.cbAnn.isChecked(),
-            "watershed_directory":self.inputs.l_1.text(),
-            "general_directory":self.inputs.l_23.text(),"climate_directory":self.inputs.l_47.text(),
-            "simulation_directory":self.inputs.l_53.text(),"cell_topagpns_provided":self.inputs.checkBox.isChecked(),"eg_topagpns_provided":self.inputs.checkBox_2.isChecked(),
+            "watershed_directory":cambiar_carpeta_base(self.inputs.l_1.text(),"Processing_inputs"),
+            "general_directory":cambiar_carpeta_base(self.inputs.l_23.text(),"Processing_inputs"),"climate_directory":cambiar_carpeta_base(self.inputs.l_47.text(),"Processing_inputs"),
+            "simulation_directory":cambiar_carpeta_base(self.inputs.l_53.text(),"Processing_inputs"),"cell_topagpns_provided":self.inputs.checkBox.isChecked(),"eg_topagpns_provided":self.inputs.checkBox_2.isChecked(),
             "reach_topagpns_provided":self.inputs.checkBox_3.isChecked(),"riparian_topagpns_provided":self.inputs.checkBox_4.isChecked(),"wetland_topagpns_provided":self.inputs.checkBox_5.isChecked()}
+        
+        
         #A este diccionario se le añaden los inputs de AnnAGNPS
         master_dict = {"AnnAGNPS ID":self.inputs.l_54,"Aquaculture Pond Data":self.inputs.l_2,
                                "Aquaculture Schedule Data":self.inputs.l_24,"Cell Data":self.inputs.l_3,"Classic Gully Data":self.inputs.l_4,
@@ -4843,28 +5022,22 @@ class qannagnps():
         #Bucle para añadir los inptus de AnnAGNPS al diccionario que va a guardar
         for i in master_dict.keys():
             dic_save[i] = master_dict[i].text()
-        #Se guarda el archivo
-        if file_dialog.exec_() == QFileDialog.Accepted:
-            file_path = file_dialog.selectedFiles()[0]
-            # Se guarda el archivo CSV utilizando la API de QGIS
-            try:
-                with open(file_path, 'w') as file:
-                    for key, value in dic_save.items():
-                        file.write(f"{key},{value}\n")
-            except:
-                iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
-                
-        #Create folder where the data of the proyect is going to be saved
-        carpeta_plugin = os.getcwd()
-        Path(carpeta_plugin+"\\Projects").mkdir(parents=True, exist_ok=True)
         
-        #Create the folder of the project if it doesn't exist
-        name_of_project = Path(file_path).stem
-        Path(carpeta_plugin+f"\\Projects\\{name_of_project}").mkdir(parents=True, exist_ok=True)
+        # Se guarda el archivo CSV utilizando la API de QGIS
+        file_path = carpeta_plugin+f"\\Projects\\{name_of_project}\\{name_of_project}.csv"
+        try:
+            with open(file_path, 'w') as file:
+                for key, value in dic_save.items():
+                    file.write(f"{key},{value}\n")
+        except:
+            iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
+            return
+            
+        
         
         #Function to eliminate what is inside of a folder
         def delete_files_and_folders(folder):
-            carpeta = Path(carpeta_plugin+"\\Projects\\"+folder)
+            carpeta = Path(carpeta_plugin+"\\Projects\\"+f"{name_of_project}\\"+folder)
             # Borra todo el contenido de la carpeta
             for item in carpeta.iterdir():
                 try:
@@ -4874,30 +5047,100 @@ class qannagnps():
                         shutil.rmtree(item) 
                 except:
                     pass
-        
-        
-        
+            
         #First we move the inputs of preprocessing
-        if os.Path.exists(self.direccion+"\\Preprocessing_inputs"):
+        if os.path.exists(self.direccion+"\\Preprocessing_inputs") or dic_save["dem"]!="" or dic_save["soil_layer"]!="" or dic_save["use_layer"]!="" or dic_save["buffer_layer"]!="" or dic_save["vegetation_layer"]!="":
             #Create folder
-            Path(carpeta_plugin+f"\\Projects\\Preprocessin_inputs").mkdir(parents=True, exist_ok=True)
+            Path(carpeta_plugin+f"\\Projects\\{name_of_project}\\Preprocessing_inputs").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
             delete_files_and_folders("Preprocessing_inputs")
-            #Add files
-            files_to_move = ["dem","soil_layer","use_layer","buffer_layer","vegetation_layer",control_files]
-            for name in files_to_move:
+            
+            #First move the files selected in the interface to self.direccion+"\\Preprocessing_inputs"
+            self.create_folder_preprocessing_and_move_files()
+            
+            #Move all files
+            for elemento in os.listdir(self.direccion+"\\Preprocessing_inputs"):
                 try:
-                    shutil.copy2(dic_save[name], carpeta_plugin+f"\\Projects\\Preprocessin_inputs\\"+Path(dic_save[name]).name) 
+                    ruta_origen = os.path.join(self.direccion+"\\Preprocessing_inputs", elemento)
+                    ruta_destino = os.path.join(carpeta_plugin+f"\\Projects\\{name_of_project}\\Preprocessing_inputs", elemento)
+
+                    if os.path.isfile(ruta_origen):
+                        # Copiar archivos
+                        shutil.copy2(ruta_origen, ruta_destino)
+                    elif os.path.isdir(ruta_origen):
+                        # Copiar carpetas completas
+                        shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
+                except:
+                    pass
+            
+        #Now the preprocessing outputs
+        if os.path.exists(self.direccion+"\\Preprocessing_outputs"):
+            #Create folder
+            Path(carpeta_plugin+f"\\Projects\\{name_of_project}\\Preprocessing_outputs").mkdir(parents=True, exist_ok=True)
+            #We eliminate what is inside
+            delete_files_and_folders("Preprocessing_outputs")
+            #Move all files
+            for elemento in os.listdir(self.direccion+"\\Preprocessing_outputs"):
+                try:
+                    ruta_origen = os.path.join(self.direccion+"\\Preprocessing_outputs", elemento)
+                    ruta_destino = os.path.join(carpeta_plugin+f"\\Projects\\{name_of_project}\\Preprocessing_outputs", elemento)
+
+                    if os.path.isfile(ruta_origen):
+                        # Copiar archivos
+                        shutil.copy2(ruta_origen, ruta_destino)
+                    elif os.path.isdir(ruta_origen):
+                        # Copiar carpetas completas
+                        shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
                 except:
                     pass
         
+        #Now Processing inputs
+        if os.path.exists(self.direccion+"\\Processing_inputs") or any(v != "" for v in master_dict.values()):
+            #Create folder
+            Path(carpeta_plugin+f"\\Projects\\{name_of_project}\\Processing_inputs").mkdir(parents=True, exist_ok=True)
+            #We eliminate what is inside
+            delete_files_and_folders("Processing_inputs")
+            
+            #First move the files selected in the interface to self.direccion+"\\Processing_inputs"
+            self.create_folder_processing_and_move_files()
+            
+            #Move all files
+            for elemento in os.listdir(self.direccion+"\\Processing_inputs"):
+                try:
+                    ruta_origen = os.path.join(self.direccion+"\\Processing_inputs", elemento)
+                    ruta_destino = os.path.join(carpeta_plugin+f"\\Projects\\{name_of_project}\\Processing_inputs", elemento)
+
+                    if os.path.isfile(ruta_origen):
+                        # Copiar archivos
+                        shutil.copy2(ruta_origen, ruta_destino)
+                    elif os.path.isdir(ruta_origen):
+                        # Copiar carpetas completas
+                        shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
+                except:
+                    pass
         
-       
-        
-        
-        delete_files_and_folders("Preprocessing_outputs")
-        delete_files_and_folders("Processing_inputs")
-        delete_files_and_folders("Processing_outputs")
+        #Finally Processing outputs
+        if os.path.exists(self.direccion+"\\Processing_outputs"):
+            #Create folder
+            Path(carpeta_plugin+f"\\Projects\\{name_of_project}\\Processing_outputs").mkdir(parents=True, exist_ok=True)
+            #We eliminate what is inside
+            delete_files_and_folders("Processing_outputs")
+            #Move all files
+            for elemento in os.listdir(self.direccion+"\\Processing_outputs"):
+                try:
+                    ruta_origen = os.path.join(self.direccion+"\\Processing_outputs", elemento)
+                    ruta_destino = os.path.join(carpeta_plugin+f"\\Projects\\{name_of_project}\\Processing_outputs", elemento)
+
+                    if os.path.isfile(ruta_origen):
+                        # Copiar archivos
+                        shutil.copy2(ruta_origen, ruta_destino)
+                    elif os.path.isdir(ruta_origen):
+                        # Copiar carpetas completas
+                        shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
+                        
+                except:
+                    pass
+            
         
     def load_project(self):
         #Método para cargar el proyecto
@@ -4959,7 +5202,7 @@ class qannagnps():
             self.dlg.comboBox_2.addItems(combo_lista)
             self.dlg.comboBox_3.addItems(combo_lista)
             
-            poner los control files
+            #poner los control files
             
             #Se añaden las capas a los combobox
             all_layers = QgsProject.instance().layerTreeRoot().children()
