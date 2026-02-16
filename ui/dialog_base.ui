@@ -280,7 +280,10 @@ QPushButton:hover {
         <widget class="QLabel" name="label_25">
          <property name="text">
           <string>que se ponga un esquema de como van a ser las carpetas en algún sitio
-que el proyecto que salga por defecto sea el último modificado</string>
+que el proyecto que salga por defecto sea el último modificado
+que en algun sitio salga para borrar proyectos dentro del ordenador de qannagnps
+ poner a la hora de gaurdar, ¿estas seguro que quieres guardar?
+falta poner el cambio de inputs en AGFLOW.csv en en analisis de sensibilidad</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
@@ -339,7 +342,7 @@ QPushButton:hover {
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-237</y>
+            <y>0</y>
             <width>641</width>
             <height>602</height>
            </rect>
