@@ -6221,6 +6221,57 @@ class qannagnps():
                     destino / carpeta.name,
                     dirs_exist_ok=True
                 )
+                
+    
+    def modify_input_sensitivity_match_output(self):
+        """Method to change the input files so that the output appears"""
+        master_file = self.direccion_sensitivity+r"\Processing_inputs\annagnps_master.csv"
+
+        def modify_input(name_master,column,new_columns,name_new_file):
+            
+            project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+
+            if name_master in project_df.iloc[:,0].values:
+                file = Path(self.direccion_sensitivity+"\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==name_master].iloc[0,1])
+                data = pd.read_csv(file,encoding = "ISO-8859-1",delimiter=",")
+                data[column].iloc[0] = "T"
+                data.to_csv(file, index=False, float_format='%.5f')
+                
+            else:
+                columns = new_columns
+                data = pd.DataFrame(columns=columns, data=[[""] * len(columns)])
+                data[column].iloc[0] = "T"
+                nombre = name_new_file
+                file = Path(self.direccion_sensitivity+"\\Processing_inputs"+"\\simulation\\"+f"{nombre}.csv")
+                data.to_csv(file, index=False, float_format='%.5f')
+                project_df[name_master] = f".\simulation\{nombre}.csv"
+        if self.sensitivity_dialog.runoff.isChecked(): 
+            columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
+            modify_input("Output Options - SIM","Insitu_Soil_Moist_Daily",columns,"out_sim")
+        
+        if self.sensitivity_dialog.total_erosion.isChecked() or self.sensitivity_dialog.gully.isChecked() or self.sensitivity_dialog.sheet.isChecked() or self.sensitivity_dialog.pond.isChecked(): 
+            columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+            modify_input("Output Options - EV","EV_Sed_Yld_Mass",columns,"out_ev")
+            
+            
+        if self.sensitivity_dialog.ephemeral.isChecked(): 
+            columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily ","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
+            modify_input("Output Options - SIM","Gully",columns,"out_sim")
+            
+        if self.sensitivity_dialog.nitrogen.isChecked(): 
+            columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+            modify_input("Output Options - EV","EV_N_Yld_Mass",columns,"out_ev")
+        
+        
+        if self.sensitivity_dialog.organic.isChecked(): 
+            columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+            modify_input("Output Options - EV","EV_OC_Yld_Mass",columns,"out_ev")
+        
+        if self.sensitivity_dialog.phosphorus.isChecked(): 
+            columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+            modify_input("Output Options - EV","EV_P_Yld_Mass",columns,"out_ev")
+        
+        
             
     def run_sensitivity_analysis(self): 
         #Metod to run sensitiviy analysis
@@ -6231,7 +6282,6 @@ class qannagnps():
             return
         
         
-        que si se ha escogido un output determinado que automaticamente se ponga el T en el CSV
         
         #Close dialogs
         self.sensitivity_dialog.close()
@@ -6252,6 +6302,9 @@ class qannagnps():
         
         #Obtener la direccoin de los raster ahora que están en la carpeta de "Sensitivity_analysis"
         self.declare_rasters_sensitivity_analysis()
+        
+        #Modifiy the inputs so that the required output are displayed
+        self.modify_input_sensitivity_match_output()
         
         #Si se ha escogido la opción de "Pixel Size" se obtienen todos los DEMs con todos los tamaños de píxeles
         if "Pixel Size" in list(self.dic_data.keys()):
