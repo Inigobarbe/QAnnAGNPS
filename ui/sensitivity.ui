@@ -239,6 +239,9 @@
            <property name="text">
             <string>Pond erosion (Mg)</string>
            </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item row="10" column="0">
@@ -252,6 +255,9 @@
            <property name="text">
             <string>Nitrogen (kg)</string>
            </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item row="9" column="0">
@@ -264,6 +270,9 @@
            </property>
            <property name="text">
             <string>Sheet and rill erosion (Mg)</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -291,6 +300,9 @@
            <property name="text">
             <string>Organic Carbon (kg)</string>
            </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item row="4" column="0">
@@ -303,6 +315,9 @@
            </property>
            <property name="text">
             <string>Gully erosion (Mg)</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -330,6 +345,9 @@
            <property name="text">
             <string>Phosphorus (kg)</string>
            </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item row="2" column="0">
@@ -342,6 +360,9 @@
            </property>
            <property name="text">
             <string>Total runoff (mm)</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -356,6 +377,9 @@
            <property name="text">
             <string>Total erosion (Mg)</string>
            </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
          <item row="8" column="0">
@@ -368,6 +392,9 @@
            </property>
            <property name="text">
             <string>Ephemeral Gully erosion (Mg)</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
            </property>
           </widget>
          </item>

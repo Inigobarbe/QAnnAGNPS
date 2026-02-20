@@ -1480,7 +1480,7 @@ class qannagnps():
             self.lowest_anual= min(year_average, key=lambda x: x [1])
         return resultado_final
 
-    def import_df(self,data_type,sensitivity=False):
+    def import_df(self,data_type,core,sensitivity=False):
         #Método para importar el df que se usará en los outputs
         #Dar error si no se han escogido las fechas bien. Solo cuando no se esté haciendo el analisis de sensibilidad
         if not sensitivity:
@@ -1496,14 +1496,14 @@ class qannagnps():
         #Primero si se ha elegido Runoff
         if data_type == "Runoff":
             #Se obtienen los datos ordenados
-            path = self.output.lineEdit.text()+"\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
+            path = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
             
             if not os.path.exists(path):
                 self.warning_message("AnnAGNPS_SIM_Insitu_Soil_Moisture output not found. \nInsitu_Soil_Moisture_Daily column in OUTPUT OPTIONS DATA -SIM file must be set to T ")
                 return
             
             if sensitivity: #cuando se hace el análisis de sensibilidad la ruta es otra
-                path = self.direccion+"\\INPUTS\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
+                path = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_SIM_Insitu_Soil_Moisture_Daily_Cell_Data.csv"
             try:
                 df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
             except:
@@ -1561,9 +1561,9 @@ class qannagnps():
                 return df
             #Se ponen aquí los inputs dependiendo de lo que se haya escogido
             if data_type == "Gully" or data_type == "Pond" or data_type == "Sheet & Rill" or data_type == "Subtotal":
-                path =  self.output.lineEdit.text()+"\\AnnAGNPS_EV_Sediment_yield_(mass).csv"
+                path =  self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_EV_Sediment_yield_(mass).csv"
                 if sensitivity: #cuando se hace el análisis de sensibilidad la ruta es otra
-                    path = self.direccion+"\\INPUTS\\AnnAGNPS_EV_Sediment_yield_(mass).csv"
+                    path = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_EV_Sediment_yield_(mass).csv"
                 column_name = "Subtotals"
                 try:
                     df = dataframe_creation(path,column_name,erosion = True, source = data_type)
@@ -1572,9 +1572,9 @@ class qannagnps():
                     self.error = True
                     return
             if data_type == "Nitrogen":
-                path =  self.output.lineEdit.text()+"\\AnnAGNPS_EV_Nitrogen_yield_(mass).csv"
+                path = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_EV_Nitrogen_yield_(mass).csv"
                 if sensitivity: #cuando se hace el análisis de sensibilidad la ruta es otra
-                    path = self.direccion+"\\INPUTS\\AnnAGNPS_EV_Nitrogen_yield_(mass).csv"
+                    path = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_EV_Nitrogen_yield_(mass).csv"
                 column_name = "Subtotal N"
                 try:
                     df = dataframe_creation(path,column_name)
@@ -1583,9 +1583,9 @@ class qannagnps():
                     self.error = True
                     return
             if data_type == "Carbon":
-                path =  self.output.lineEdit.text()+"\\AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv"
+                path =  self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv"
                 if sensitivity: #cuando se hace el análisis de sensibilidad la ruta es otra
-                    path = self.direccion+"\\INPUTS\\AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv"
+                    path = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_EV_Organic_Carbon_yield_(mass).csv"
                 column_name = "Subtotal C"
                 try:
                     df = dataframe_creation(path,column_name)
@@ -1594,9 +1594,9 @@ class qannagnps():
                     self.error = True
                     return
             if data_type == "Phosphorus":
-                path =  self.output.lineEdit.text()+"\\AnnAGNPS_EV_Phosphorus_yield_(mass).csv"
+                path =  self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_EV_Phosphorus_yield_(mass).csv"
                 if sensitivity: #cuando se hace el análisis de sensibilidad la ruta es otra
-                    path = self.direccion+"\\INPUTS\\AnnAGNPS_EV_Phosphorus_yield_(mass).csv"
+                    path = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs"+"\\AnnAGNPS_EV_Phosphorus_yield_(mass).csv"
                 column_name = "Subtotal P" 
                 try:
                     df = dataframe_creation(path,column_name)
@@ -3061,178 +3061,6 @@ class qannagnps():
             #Los outputs de AnnAGNPS se guardan en Processing_outputs
             self.save_files_processing_in_folder()
     
-    
-    def ejecucion_completa_sensitivity(self):
-        #Esta función es en donde se ejecuta el modelo
-        
-        #EJECUCIÓN DE TOPAGNPS
-        if self.execute_preprocessing_sensitivity:
-            #Se crea la carpeta de Preprocessing_inputs si no estaba creada. Ahí se meten los inputs y se ejecuta TopAGNPS y luego los outputs se meten a Preprocessing_outputs
-            
-            #Una vez creada se meten todos los archivos en esa carpeta
-            self.create_folder_preprocessing_and_move_files_sensitivity()
-            
-            #Función para que se le diga el nombre del archivo y te devuelva la dirección completa
-            def fichero(nombre):
-                return self.direccion_sensitivity+"\\Preprocessing_inputs"+"\\"+nombre
-            
-            #Dar error si no existe el archivo TOPAGNPS.CSV
-            if not os.path.exists(self.direccion_sensitivity+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV"):
-                self.warning_message("Error Input data\nControl file of TopAGNPS, TOPAGNPS.CSV, not found")
-                self.end_execution = 1
-                return
-            
-            #Si el formato de la columna FILENAME no es str entonces dar error
-            topagnps_control_file = pd.read_csv(self.direccion_sensitivity+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
-            if type(topagnps_control_file["FILENAME"].iloc[0])!=str:
-                self.warning_message("Error Input data\nPlease select a correct FILENAME in TOPAGNPS.CSV" )
-                self.end_execution = 1
-                return
-            
-            #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs.
-            for j,k in enumerate(self.dic_data.keys()):
-                self.change_inputs_sensitivity(self.param_values[self.numero_ejecucion-1],j,k,spatial =True) #cambio de los inputs espaciales
-            
-            #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
-            self.time_start_preprocessing = datetime.now()
-            
-            
-            #EJECUCIÓN DE TOPAGNPS            
-            def main():
-                f = open(self.executable_directory+"\\"+"EjecutarTopagnps.bat","w+")
-                linea_uno = "CD {}".format(self.direccion_sensitivity+"\\Preprocessing_inputs")
-                linea_dos = r"CALL {}\TopAGNPS_v6.00.a.025_release_64-bit.exe".format(self.executable_directory)
-                f.write("{} \n".format(linea_uno))
-                f.write("{} \n".format(linea_dos))
-                f.close()
-            main()
-            subprocess.call(self.executable_directory+"\\"+"EjecutarTopagnps.bat")
-            #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarTopagnps.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-            #stdout, stderr = proc.communicate()
-            
-            #If error file of TopAGNPS is opened, then return a error message
-            try:
-                open(self.direccion_sensitivity+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.csv", "r+") 
-            except PermissionError:
-                iface.messageBar().pushMessage("Error TopAGNPS","Close TOPAGNPS_err.csv before the start of execution",level=Qgis.Warning,duration = 10)
-                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
-                self.save_files_preprocessing_in_folder_sensitivity()
-                self.end_execution = 1
-                return
-            except:
-                pass
-
-            #Cuando se eligen coordenadas automáticamente con el plugin primero se ejecuta Topagnps y da error (se ejecuta la primera para poner el reaches en QGIS) osea que no queremos que python salte si hay error en la primera ronda. Queremos que salte python cuando hay error y si se ha seleccionado que no se elige automaticamente. O sino cuando hay error y se ha elegido automáticamente pero la segunda ejecución de Topagnps da error. 
-            if os.path.isfile(self.direccion_sensitivity+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV") and os.path.getsize(self.direccion_sensitivity+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV")>0:
-                self.end_execution = 1
-                error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
-                self.warning_message(f"Error TOPAGNPS\n{error.columns[3]}")
-                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
-                self.save_files_preprocessing_in_folder_sensitivity()
-                #Se abre el archivo de errores
-                try:
-                    os.startfile(self.direccion_sensitivity+"\\Preprocessing_outputs"+"\\TopAGNPS_err.csv")
-                except:
-                    pass
-                #Este return es para parar el codigo
-                return
-            
-            
-            #VALORES DEL TAMAÑO DE PIXEL
-            layer = QgsRasterLayer(self.direccion_sensitivity+"\\"+topagnps_control_file["FILENAME"].iloc[0],"dednm")
-            self.pixelSizeX = round(layer.rasterUnitsPerPixelX(),2)
-            self.pixelSizeY = round(layer.rasterUnitsPerPixelY(),2)
-            
-            #ASIGNAR LOS VALORES DE SUELO Y MANEJO A AnnAGNPS_Cell_Data_Section.csv
-            try:
-                self.add_soil_and_management_cell_sensitivity()
-            except Exception as e:
-                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
-                self.save_files_preprocessing_in_folder_sensitivity()
-                self.warning_message(str(e))
-                return
-            
-            
-            #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
-            self.save_files_preprocessing_in_folder_sensitivity()
-            
-            
-        #EJECUCIÓN DE ANNAGNPS
-
-        #MOVER EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS de procesamiento
-        shutil.copyfile(self.plugin_dir+"\\Executables"  + "\\" +"AnnAGNPS.fil" ,self.direccion_sensitivity +"\\Processing_inputs\\" +"AnnAGNPS.fil")
-                
-        #Se cambian los inputs
-        for j,k in enumerate(self.dic_data.keys()):
-            self.change_inputs_sensitivity(self.param_values[self.numero_ejecucion-1],j,k,spatial =False) #cambio de los inptus no espaciales
-        
-        #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
-        self.time_start_processing = datetime.now()
-        
-        
-        #EJECUCIÓN DE ANNAGNPS
-        #os.chdir(self.direccion+"\\"+directory)
-        def execute_bat():
-           def main():
-               f = open(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
-               linea_uno = "CD {}".format(self.direccion_sensitivity+"\\Processing_inputs")
-               linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
-               f.write("{} \n".format(linea_uno))
-               f.write("{} \n".format(linea_dos))
-               f.close()
-           main()
-        execute_bat()
-        r'''env = os.environ.copy()
-        env['PATH'] = f'{self.executable_directory};' + env['PATH']
-        command = self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat"
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='latin-1', env=env)'''
-
-        subprocess.call(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
-
-        
-        #If error file of AnnAGNPS is opened, then return a error message
-        try:
-            open(self.direccion_sensitivity+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv", "r+") 
-        except PermissionError:
-            self.warning_message("Error AnnAGNPS\nClose AnnAGNPS_LOG_Error.csv before the start of execution")
-            self.end_execution = 1
-            return
-        except:
-            pass
-                    
-        #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
-        time.sleep(1)
-        if path.exists(self.direccion_sensitivity+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv"):
-            if os.stat(self.direccion_sensitivity+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv").st_size>0:
-                self.end_execution =1
-                try:
-                    text = open(self.direccion_sensitivity+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv", "r")
-                    text = ''.join([i for i in text]) 
-                    text = text.replace("\"", "/") 
-                    texto = text.splitlines()
-                    txt = texto[2].split(",")[-1]
-                    iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning,duration = 10)
-                except:
-                    pass
-                
-                self.end_execution = 1
-                #Se abre el archivo de errores
-                try:
-                    os.startfile(self.direccion_sensitivity+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv")
-                except:
-                    pass
-                #Este return es para parar el codigo
-                return 
-        
-        #EJECUCIÓN DEL OUTPUT_TABLES
-        time.sleep(1)
-        shutil.copyfile(self.executable_directory + "\\" +"STEAD.fil" ,self.direccion_sensitivity + "\\Processing_inputs\\" +"STEAD.fil")
-        os.chdir(self.direccion_sensitivity+"\\Processing_inputs")
-        proc = subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-        stdout, stderr = proc.communicate()
-        
-        #Los outputs de AnnAGNPS se guardan en Processing_outputs
-        self.save_files_processing_in_folder_sensitivity()
             
             
         
@@ -3835,26 +3663,7 @@ class qannagnps():
             except:
                 pass
     
-    def save_files_preprocessing_in_folder_sensitivity(self):
-        """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
-        #First create the folder Preprocessing_outputs if it doesn´t exist
-        carpeta = self.direccion_sensitivity+"\\Preprocessing_outputs"
-        Path(carpeta).mkdir(parents=True, exist_ok=True)
-        
-        
-        
-        #Then move the files that were modified or created after the start of the preprocessing
-        carpeta_origen = Path(self.direccion_sensitivity+"\\Preprocessing_inputs")
-        carpeta_destino = Path(carpeta)
-
-        for f in carpeta_origen.iterdir():
-            try:
-                if f.is_file():
-                    t = datetime.fromtimestamp(max(f.stat().st_ctime, f.stat().st_mtime))
-                    if t > self.time_start_preprocessing:
-                        shutil.move(str(f), str(carpeta_destino / f.name))
-            except:
-                pass
+    
         
         
     def save_files_processing_in_folder(self):
@@ -3879,26 +3688,7 @@ class qannagnps():
                 pass
          
     
-    def save_files_processing_in_folder_sensitivity(self):
-        """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
-        #First create the folder Processing_outputs if it doesn´t exist
-        carpeta = self.direccion_sensitivity+"\\Processing_outputs"
-        Path(carpeta).mkdir(parents=True, exist_ok=True)
-        
-
-        #Then move the files that were modified or created after the start of the preprocessing
-        carpeta_origen = Path(self.direccion_sensitivity+"\\Processing_inputs")
-        carpeta_destino = Path(carpeta)
-        
-        archivo_excluido = Path(self.direccion_sensitivity) / "Processing_inputs" / "AnnAGNPS.fil"
-        
-        for f in carpeta_origen.iterdir():
-            try:
-                t = datetime.fromtimestamp(max(f.stat().st_ctime, f.stat().st_mtime))
-                if t > self.time_start_processing and f != archivo_excluido:
-                    shutil.move(str(f), str(carpeta_destino / f.name))
-            except:
-                pass
+    
     
     
     def create_folder_preprocessing_and_move_files(self):
@@ -3950,12 +3740,6 @@ class qannagnps():
                     pass
     
     
-    def create_folder_preprocessing_and_move_files_sensitivity(self):
-        """Method to create the preprocessing folders (if they dont exist) and move the input files here"""
-        #Create folder
-        carpeta = self.direccion_sensitivity+"\\Preprocessing_inputs"
-        Path(carpeta).mkdir(parents=True, exist_ok=True)
-        
     
     def warning_message(self,message):
         """Method to put a warning message"""
@@ -6209,30 +5993,49 @@ class qannagnps():
         selected_project = self.sensitivity_dialog.project_sensitivity.currentText()
         
         #Move all the folders to the new folder
-        origen = Path(self.carpeta_guardar_proyectos +"\\"+selected_project)
-        destino = Path(self.dlg.project.text()+"\\"+selected_project+"\\Sensitivity_analysis")
+        for core in range(1,self.number_cores+1):
+            origen = Path(self.carpeta_guardar_proyectos +"\\"+selected_project)
+            destino = Path(self.dlg.project.text()+"\\"+selected_project+f"\\Sensitivity_analysis\\Core_{core}")
 
-        destino.mkdir(parents=True, exist_ok=True)
+            destino.mkdir(parents=True, exist_ok=True)
+            
+            for carpeta in origen.iterdir():
+                if carpeta.is_dir():
+                    shutil.copytree(
+                        carpeta,
+                        destino / carpeta.name,
+                        dirs_exist_ok=True
+                    )
         
-        for carpeta in origen.iterdir():
-            if carpeta.is_dir():
-                shutil.copytree(
-                    carpeta,
-                    destino / carpeta.name,
-                    dirs_exist_ok=True
-                )
-                
+            #Create also the executables
+            #Executable of TopAGNPS
+            shutil.copyfile(str(Path(self.executable_directory+"/EjecutarTopagnps.bat")), str(Path(self.executable_directory+"/"+f"EjecutarTopagnps_{core}.bat")))
+            f = open(str(Path(self.executable_directory+"/"+f"EjecutarTopagnps_{core}.bat")),"w+")
+            linea_uno = "CD {}".format(self.direccion_sensitivity+f"\\Core_{core}\\Preprocessing_inputs")
+            linea_dos = r"CALL {}\TopAGNPS_v6.00.a.025_release_64-bit.exe".format(self.executable_directory)
+            f.write("{} \n".format(linea_uno))
+            f.write("{} \n".format(linea_dos))
+            f.close()
+            #Executable of AnnAGNPS
+            shutil.copyfile(str(Path(self.executable_directory+"/EjecutarAnnAGNPS.bat")), str(Path(self.executable_directory+"/"+f"EjecutarAnnAGNPS_{core}.bat")))
+            f = open(str(Path(self.executable_directory+"/"+f"EjecutarAnnAGNPS_{core}.bat")),"w+")
+            linea_uno = "CD {}".format(self.direccion_sensitivity+f"\\Core_{core}\\Processing_inputs")
+            linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
+            f.write("{} \n".format(linea_uno))
+            f.write("{} \n".format(linea_dos))
+            f.close()
+            
+            
     
     def modify_input_sensitivity_match_output(self):
         """Method to change the input files so that the output appears"""
-        master_file = self.direccion_sensitivity+r"\Processing_inputs\annagnps_master.csv"
-
+        #Method to crete the needed files to have the desired outputs
         def modify_input(name_master,column,new_columns,name_new_file):
-            
+            master_file = self.direccion_sensitivity+f"\\Core_{core}"+r"\Processing_inputs\annagnps_master.csv"
             project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
 
             if name_master in project_df.iloc[:,0].values:
-                file = Path(self.direccion_sensitivity+"\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==name_master].iloc[0,1])
+                file = Path(self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==name_master].iloc[0,1])
                 data = pd.read_csv(file,encoding = "ISO-8859-1",delimiter=",")
                 data[column].iloc[0] = "T"
                 data.to_csv(file, index=False, float_format='%.5f')
@@ -6242,34 +6045,63 @@ class qannagnps():
                 data = pd.DataFrame(columns=columns, data=[[""] * len(columns)])
                 data[column].iloc[0] = "T"
                 nombre = name_new_file
-                file = Path(self.direccion_sensitivity+"\\Processing_inputs"+"\\simulation\\"+f"{nombre}.csv")
+                file = Path(self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_inputs"+"\\simulation\\"+f"{nombre}.csv")
                 data.to_csv(file, index=False, float_format='%.5f')
-                project_df[name_master] = f".\simulation\{nombre}.csv"
-        if self.sensitivity_dialog.runoff.isChecked(): 
-            columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
-            modify_input("Output Options - SIM","Insitu_Soil_Moist_Daily",columns,"out_sim")
+                project_df.loc[len(project_df)] = [name_master, f".\simulation\{nombre}.csv"]
+                project_df.to_csv(master_file, index=False, float_format='%.5f')
         
-        if self.sensitivity_dialog.total_erosion.isChecked() or self.sensitivity_dialog.gully.isChecked() or self.sensitivity_dialog.sheet.isChecked() or self.sensitivity_dialog.pond.isChecked(): 
-            columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-            modify_input("Output Options - EV","EV_Sed_Yld_Mass",columns,"out_ev")
+        #Method to add th input code to the global factors
+        def select_input_code():
+            master_file = self.direccion_sensitivity+f"\\Core_{core}"+r"\Processing_inputs\annagnps_master.csv"
+            project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+
+            file = Path(self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]=="AnnAGNPS ID"].iloc[0,1])
+            data = pd.read_csv(file,encoding = "ISO-8859-1",delimiter=",")
+            input_code = data["Input_Units"].iloc[0]
+            
+            #Ahora se mete en el global factors
+            file = Path(self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]=="Global IDs Factors and Flags Data"].iloc[0,1])
+            data = pd.read_csv(file,encoding = "ISO-8859-1",delimiter=",")
+            try:
+                int(input_code)
+                data["Input_Units_Code"].iloc[0] = input_code
+            except:
+                data["Input_Units_Code"].iloc[0] = str(0)
+                
+
+            data.to_csv(file, index=False,float_format='%.5f')
+        
+        for core in range(1,self.number_cores+1):
+        
+            if self.sensitivity_dialog.runoff.isChecked(): 
+                columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
+                modify_input("Output Options - SIM","Insitu_Soil_Moist_Daily",columns,"out_sim")
+            
+            if self.sensitivity_dialog.total_erosion.isChecked() or self.sensitivity_dialog.gully.isChecked() or self.sensitivity_dialog.sheet.isChecked() or self.sensitivity_dialog.pond.isChecked(): 
+                columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                modify_input("Output Options - EV","EV_Sed_Yld_Mass",columns,"out_ev")
+                
+                
+            if self.sensitivity_dialog.ephemeral.isChecked():
+                #poner aqui que se ponga el input units code de AnnAGNPSID, y que si en AnnAGNPSID no hay entonces se pone el 0 qu es el por defecto
+                columns = ["Hdct_Detachment_Coef_a", "Hdct_Detachment_Exp_Coef_b", "Urban_Repair_Month", "Urban_Repair_Day", "Urban_Repair_Year", "Cropland_Repair_Month", "Cropland_Repair_Day", "Cropland_Repair_Year", "Forest_Repair_Month", "Forest_Repair_Day", "Forest_Repair_Year", "Pasture_Repair_Month", "Pasture_Repair_Day", "Pasture_Repair_Year", "Rangeland_Repair_Month", "Rangeland_Repair_Day", "Rangeland_Repair_Year", "Hdct_Erodibility_Coef_a", "Hdct_Erodibility_Exp_Coef_b", "Width_Nachtergaele", "Width_Hydraulic_Geometry", "Width_Non-submerging_Tailwater", "Width_Woodwards_Equilibrium", "Width_Woodwards_Ultimate", "Width_Wells_Eq.9", "Erosion_Vrfy", "Hydrograph_Vrfy", "Nickpoint_Vrfy", "Repair_Dates_Vrfy", "Sed_Yield_to_Gully_Mouth_Vrfy", "Sed_Yield_to_Rcvg_Reach_Vrfy", "Min_Interception_Evaporation", "Max_Interception_Evaporation", "Detention_Coef_a", "Detention_Coef_b", "RCN_Convergence_Tolerance", "RCN_Max_Iterations", "Avbl_Soil_Moist_Ratio_AMC_II", "Max_Avbl_Sed_Conc_for_Sht_Flw", "Max_Avbl_Sed_Conc_for_Conc_Flw", "AA_Unit_Area_Baseflow", "RCN_Calib_Only", "Calculate_Baseflow", "FAO_ET_Enhancement", "Basal_Crop_Coef_Climate_Adjust", "Wshd_Storm_Type_ID", "Dflt_Geology_ID", "Dflt_Hydraulic_Geom_ID", "Dflt_Init_Soil_Conditions_ID", "Dflt_Crop_RCN_ID", "Dflt_Non-Crop_RCN_ID", "Width_Wells_Eq.8", "Width_Reserved_i", "Width_Reserved_j", "Width_Reserved_k", "Critical_Shear_Stress", "RUSLE2_Flag", "Dflt_RUSLE2_ID", "Input_Units_Code"]
+                modify_input("Global IDs Factors and Flags Data","Erosion_Vrfy",columns,"global_factors")
+                select_input_code()
+                columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
+                modify_input("Output Options - SIM","Gully",columns,"out_sim")
+                
+            if self.sensitivity_dialog.nitrogen.isChecked(): 
+                columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                modify_input("Output Options - EV","EV_N_Yld_Mass",columns,"out_ev")
             
             
-        if self.sensitivity_dialog.ephemeral.isChecked(): 
-            columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily ","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
-            modify_input("Output Options - SIM","Gully",columns,"out_sim")
+            if self.sensitivity_dialog.organic.isChecked(): 
+                columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                modify_input("Output Options - EV","EV_OC_Yld_Mass",columns,"out_ev")
             
-        if self.sensitivity_dialog.nitrogen.isChecked(): 
-            columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-            modify_input("Output Options - EV","EV_N_Yld_Mass",columns,"out_ev")
-        
-        
-        if self.sensitivity_dialog.organic.isChecked(): 
-            columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-            modify_input("Output Options - EV","EV_OC_Yld_Mass",columns,"out_ev")
-        
-        if self.sensitivity_dialog.phosphorus.isChecked(): 
-            columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-            modify_input("Output Options - EV","EV_P_Yld_Mass",columns,"out_ev")
+            if self.sensitivity_dialog.phosphorus.isChecked(): 
+                columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                modify_input("Output Options - EV","EV_P_Yld_Mass",columns,"out_ev")
         
         
             
@@ -6280,8 +6112,6 @@ class qannagnps():
         if self.dlg.project.text()=="":
             self.warning_message("Please select a working directory where the files are going to be loaded")
             return
-        
-        
         
         #Close dialogs
         self.sensitivity_dialog.close()
@@ -6294,21 +6124,32 @@ class qannagnps():
         #Create the dictionary with the input data and the parameter values
         self.create_dictionary_sensitivity_analysis()        
         
-        #Move the files from the save project to working directory + name of the project + "Sensitivity_analysis"
-        self.progress_dialog.setLabelText("Moving files to the working directory...")
-        self.move_files_to_working_directory_sensitivity_analysis()
-        
-        #no hay que usar el self direccion porque se puede dar el caso en el que el se hace un analisis de sensibilidad sin haber escogido el nombre del proyecto en el dialogo base, es por eso que hay que crear otra variable que sea igual a working directory mas el nombre que se ha escogido en sensitivity
+        #Obtain the number of cores to work with
+        self.number_cores = os.cpu_count() - 1
         
         #Obtener la direccoin de los raster ahora que están en la carpeta de "Sensitivity_analysis"
         self.declare_rasters_sensitivity_analysis()
         
+        #Move the files from the save project to working directory + name of the project + "Sensitivity_analysis"
+        self.progress_dialog.setLabelText("Moving files to the working directory...")
+        self.move_files_to_working_directory_sensitivity_analysis()
+        
+        
         #Modifiy the inputs so that the required output are displayed
         self.modify_input_sensitivity_match_output()
+        
         
         #Si se ha escogido la opción de "Pixel Size" se obtienen todos los DEMs con todos los tamaños de píxeles
         if "Pixel Size" in list(self.dic_data.keys()):
             self.resample_rasters_sensitivity()
+        else: #si no se hace resample entonces no se crean variables como self.nombre_mdt_sensitivity que lo paso a la paralelización del análisis de sensibilidad, por eso los creo aquí
+            self.nombre_mdt_sensitivity ="nan"
+            self.extension_mdt_sensitivity ="nan"
+            self.nombre_buffer_sensitivity = "nan"
+            self.extension_buffer_sensitivity ="nan"
+            self.nombre_vegetation_sensitivity ="nan"
+            self.extension_vegetation_sensitivity ="nan"
+            
         
         #Esto borrar
         df_save_sens = pd.DataFrame(columns = ["Parameters","Result"])
@@ -6326,6 +6167,25 @@ class qannagnps():
             if self.dic_name_column[i][0]=="Spatial":
                 self.execute_preprocessing_sensitivity = True
         
+        
+        
+        #We do the sensitivity analysis
+        self.manager = QgsApplication.instance().taskManager()
+        self.carpetas_libres = list(range(1,self.number_cores+1))  # IDs de tus carpetas
+        self.tareas_pendientes = list(range(len(self.param_values)))
+        self.terminadas = 0
+        self.tareas_activas = []
+        self.lanzar_siguiente_sensitivity()
+        
+        
+        #Se ponen los resultados en un dataframe y se guarda
+        df_conc = pd.DataFrame(data = self.resultados)
+        df_save_sens.to_csv(self.direccion_sensitivity+"\\"+'Sensibilidad_cont.csv', index=False, float_format='%.5f')
+        
+        
+        
+        return
+        
         for i in self.param_values:
             self.numero_ejecucion+=1
             #Progress bar update
@@ -6339,13 +6199,14 @@ class qannagnps():
                     self.warning_message("Error in sensitivity analysis\nPlease check the error in the opened file")
                 self.progress_dialog.close()
                 return
-            
-            #ESTO BORRAR
-            df_conc = pd.DataFrame(data = {"Parameters":[i],"Result":[self.resultados[-1]]})
-            df_save_sens = pd.concat([df_save_sens,df_conc], ignore_index=True)
-            df_save_sens.to_csv(self.direccion+"\\"+'Sensibilidad_cont.csv', index=False, float_format='%.5f')
         
         
+        #ESTO BORRAR
+        df_conc = pd.DataFrame(data = self.resultados)
+        df_conc["Param_values"] = self.param_values
+        df_save_sens.to_csv(self.direccion_sensitivity+"\\"+'Sensibilidad_cont.csv', index=False, float_format='%.5f')
+        
+        return 
         #Se analizan los resultados
         if self.sensitivity_dialog.sobol.isChecked():
             self.Si = sobol.analyze(problem, np.array(self.resultados))
@@ -6359,6 +6220,228 @@ class qannagnps():
         self.warning_message("Success\nSucces in the sensitiviy analysis ")
     
     
+    def lanzar_siguiente_sensitivity(self):
+        """Method to run next execution in the parallelization of the sensitivity analysis"""
+        
+        if not self.tareas_pendientes:
+            return
+        
+        # Mientras haya tareas por hacer y carpetas vacías...
+        while self.tareas_pendientes and self.carpetas_libres:
+            
+            n_tarea = self.tareas_pendientes.pop(0)
+            id_carpeta = self.carpetas_libres.pop(0) # Reservamos la carpeta
+            
+            task = Sensitivity_Parallelization(n_tarea, id_carpeta,self.execute_preprocessing_sensitivity,self.direccion_sensitivity,
+                self.dic_data,self.param_values,self.executable_directory,self.plugin_dir,self.dic_name_column,self.nombre_mdt_sensitivity,
+                self.extension_mdt_sensitivity,self.fichero_buf_sensitivity,self.nombre_buffer_sensitivity,self.extension_buffer_sensitivity,
+                self.fichero_veg_sensitivity,self.nombre_vegetation_sensitivity,self.extension_vegetation_sensitivity,self.inputs)
+            
+            self.tareas_activas.append(task)
+            
+            # Al finalizar, liberamos la carpeta y lanzamos la siguiente
+            task.taskCompleted.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_sensitivity(t, f, n))
+            # Esto es por si hay error
+            task.taskTerminated.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_sensitivity(t, f, n))
+            self.manager.addTask(task)
+    
+    
+    def finalizar_tarea_sensitivity(self,task, id_carpeta,n):
+        """Method that will be executed after each execution in AnnAGNPS in the parallelization of the sensitivity analysis"""
+    
+        # IMPORTANT: Remove from active list immediately
+        if task in self.tareas_activas:
+            self.tareas_activas.remove(task)
+            
+        # Check if the task failed or was canceled
+        if task.status() != QgsTask.Complete:
+            # Check if we already cleared the queue (to avoid multiple popups)
+            if len(self.tareas_pendientes) > 0:
+                print(f"CRITICAL ERROR in task {n}. Stopping everything...")
+                self.stop_sensitivity_execution(task)
+            return # Stop this specific execution branch here
+        
+        # --- Normal Success Logic ---
+        # We save the result
+        self.resultados.append(self.save_result(id_carpeta, n))
+        
+        self.terminadas += 1
+        # Return folder to pool
+        self.carpetas_libres.append(id_carpeta)
+        
+        print(f"Task {n} finished in folder {id_carpeta}. Progress: {self.terminadas}/{len(self.param_values)}")
+        
+        if self.terminadas == len(self.param_values):
+            print("--- ANALYSIS FINISHED ---")
+        else:
+            # Only launch next if the queue hasn't been emptied by an error
+            if self.tareas_pendientes:
+                self.lanzar_siguiente_sensitivity()
+        
+    def stop_sensitivity_execution(self,task):
+        """Método para detener el análisis de sensibilidad de forma segura"""
+        self.tareas_pendientes = []  # Clear the queue
+        
+        # Use a copy [:] to iterate safely
+        for t in self.tareas_activas[:]:
+            try:
+                # We only cancel tasks that are still alive and are NOT the failed one
+                if t and t != task:
+                    t.cancel()
+            except (RuntimeError, ReferenceError):
+                pass
+                
+        self.tareas_activas = [] 
+        
+        # Try to build the error message safely
+        try:
+            msg = f"Analysis stopped in task {task.n}. Reason: {task.error_msg}"
+        except (RuntimeError, ReferenceError, AttributeError):
+            msg = "Sensitivity analysis stopped due to an unexpected error."
+
+        # Show the warning in English
+        self.warning_message(msg)
+    
+    def save_result(self,core,n):
+        #Metod to save the results of the sensitivity analysis
+        data_to_save = {}
+        #Runoff
+        if self.sensitivity_dialog.runoff.isChecked():
+            #Se importan los datos
+            try:
+                df = self.import_df("Runoff",core,sensitivity=True)
+            except:
+                self.end_execution =True
+                return
+            #Esto se hace porque la escorrentía de la cuenca es la media ponderada con el área de las escorrentías de las celdas
+            try:
+                df['Runoff_Ponderado'] = df['Runoff'] * df['Drainage']
+                result = df.groupby('Fecha').agg({'Runoff_Ponderado': 'sum', 'Drainage': 'sum'}).reset_index()
+            except:
+                self.end_execution =True
+                self.warning_message("AnnAGNPS_SIM_Insitu_Soil_Moisture output not found. \nInsitu_Soil_Moisture_Daily column in OUTPUT OPTIONS DATA -SIM file must be set to T ")
+                return
+            result['Runoff'] = result['Runoff_Ponderado'] / result['Drainage']
+            df_graph = result[['Fecha', 'Runoff']]
+            df_graph.set_index('Fecha', inplace=True)
+            data_to_save["Runoff"] = df_graph["Runoff"].sum()
+
+        #Total erosion
+        if self.sensitivity_dialog.total_erosion.isChecked():
+            df = self.import_df("Subtotal",core,sensitivity=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
+                self.end_execution =True
+                return
+                
+            data_to_save["Total_erosion"] = df_graph.sum()       
+            
+        #Gully erosion
+        if self.sensitivity_dialog.gully.isChecked():
+            df = self.import_df("Gully",core,sensitivity=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
+                self.end_execution =True
+                return
+            data_to_save["Gully_erosion"] = df_graph.sum()    
+            
+        #Ephemeral gully
+        r'''if self.sensitivity_dialog.ephemeral.isChecked():
+            fichero = self.direccion_sensitivity+"\\Preprocessing_outputs\\"+"AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv"
+            try:
+                file = open(fichero)
+            except:
+                self.warning_message("AnnAGNPS_SIM_Ephemeral_Gully_Erosion output not found. \nGully column in OUTPUT OPTIONS DATA -SIM file must be set to T ")
+                self.end_execution =True
+                return
+            csvreader = csv.reader(file)
+            rows = []
+            for row in csvreader:
+                    rows.append(row)
+            lista = []
+            a = 0
+            for i in rows:
+                try:
+                    if i[0]=="Day":
+                        a = 1
+                        lista.append(i)
+                    elif a ==1:
+                        lista.append(i[:-1])
+                except:
+                    continue
+            erosion = [float(lista[x][27]) for x in range(1,len(lista)) if len(lista[x])==30]
+            data_to_save["Ephemeral_gully_erosion"] = sum(erosion)'''
+        
+        #Pond erosion
+        if self.sensitivity_dialog.pond.isChecked():
+            df = self.import_df("Pond",core,sensitivity=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
+                self.end_execution =True
+                return
+            data_to_save["Pond_erosion"] = df_graph.sum() 
+            
+        #Sheet and rill erosion
+        if self.sensitivity_dialog.sheet.isChecked():
+            df = self.import_df("Sheet & Rill",core,sensitivity=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
+                self.end_execution =True
+                return
+            
+            data_to_save["Sheet_and_rill_erosion"] = df_graph.sum() 
+            
+        #Nitrogen
+        if self.sensitivity_dialog.nitrogen.isChecked():
+            df = self.import_df("Nitrogen",core,sensitivity=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                self.warning_message("AnnAGNPS_EV_Nitrogen_yield_(mass) output not found. \nEV_N_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
+                self.end_execution =True
+                return
+            
+            data_to_save["Nitrogen"] = df_graph.sum()
+            
+        #Organic carbon
+        if self.sensitivity_dialog.organic.isChecked():
+            df = self.import_df("Carbon",core,sensitivity=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                self.warning_message("AnnAGNPS_EV_Organic_Carbon_yield_(mass) output not found. \nEV_OC_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
+                self.end_execution =True
+                return
+            
+            data_to_save["Organic_carbon"] = df_graph.sum()
+            
+        #Phosphorus
+        if self.sensitivity_dialog.phosphorus.isChecked():
+            df = self.import_df("Phosphorus",core,sensitivity=True)
+            try:
+                df_graph = df.groupby(df.index).sum(numeric_only=True)
+            except:
+                self.warning_message("AnnAGNPS_EV_Phosphorus_yield_(mass) output not found. \nEV_P_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
+                self.end_execution =True
+                return
+            data_to_save["Phosphorus"] = df_graph.sum() 
+        
+        
+        #Se añade tambien los inputs
+        data_to_save["Parameters"] = self.param_values[n]
+        
+        return data_to_save
+    
+    
+    
     def declare_rasters_sensitivity_analysis(self):
         """Method to declare the values of the rasters in sensitivity analysis"""
         #Function to transform from the path where the file is saved to the new path where sensitivity analysis is going to be performed
@@ -6369,7 +6452,7 @@ class qannagnps():
                     return "nan"
                 ruta_nueva = Path(ruta).parts[-2:]
                 resultado = str(Path(*ruta_nueva))
-                return self.dlg.project.text()+"\\"+selected_project +"\\Sensitivity_analysis" +"\\"+resultado
+                return self.dlg.project.text()+"\\"+selected_project +"\\Sensitivity_analysis\\Core_1" +"\\"+resultado
             except:
                 return "nan"
         
@@ -6381,6 +6464,7 @@ class qannagnps():
         project_df = pd.read_csv(csv_file,encoding = "ISO-8859-1",delimiter=",")
         
         #Obtain the direction of sensitivity analysis
+        #no hay que usar el self direccion porque se puede dar el caso en el que el se hace un analisis de sensibilidad sin haber escogido el nombre del proyecto en el dialogo base, es por eso que hay que crear otra variable que sea igual a working directory mas el nombre que se ha escogido en sensitivity
         self.direccion_sensitivity = self.dlg.project.text()+"\\"+selected_project +"\\Sensitivity_analysis"
         
         #DEM
@@ -6410,225 +6494,8 @@ class qannagnps():
         #Epsg
         self.epsg_sensitivity = project_df[project_df.iloc[:,0]=="epsg"].iloc[0,1]
     
-    def change_inputs_sensitivity(self,param_values,numero_parametro,nombre_parametro,spatial):
-        #Metod to change the inputs of sensitivity analysis
-        try: #este try es para cuando cuando de error si elige la misma columna pero distintas filas
-            if self.dic_name_column[nombre_parametro][0]=="Spatial" and spatial:
-                direccion = self.direccion_sensitivity+"\\"+self.dic_name_column[nombre_parametro][1]
-                columna = self.dic_name_column[nombre_parametro][2]
-            elif self.dic_name_column[nombre_parametro][0]!="Spatial" and not spatial:
-                direccion = self.file_input(self.dic_name_column[nombre_parametro][0])
-                columna = self.dic_name_column[nombre_parametro][1]
-        except KeyError: #misma columna, distintas filas
-            if self.dic_name_column[nombre_parametro.split("__")[0]][0]=="Spatial" and spatial:
-                direccion = self.direccion_sensitivity+"\\"+self.dic_name_column[nombre_parametro.split("__")[0]][1]
-                columna = self.dic_name_column[nombre_parametro.split("__")[0]][2]
-            elif self.dic_name_column[nombre_parametro.split("__")[0]][0]!="Spatial" and not spatial:
-                direccion = self.file_input(self.dic_name_column[nombre_parametro.split("__")[0]][0])
-                columna = self.dic_name_column[nombre_parametro.split("__")[0]][1]
-        if 'direccion_sensitivity' in locals():
-            #Si el input es tamaño de pixel entonces la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
-            if nombre_parametro =="Pixel Size":
-                self.change_control_files_pixel(param_values,numero_parametro)
-            
-            elif self.dic_name_column[nombre_parametro][1]=="AGFLOW.csv":#in the case of agflow the input change is different
-                #First we add the data of control files to the dialog. This is important because the rest of the values that are not changed need to be taken from the control file.
-                self.asignar_valores_control_dialogo()
-                #Then we change the inputs of agflow control file
-                fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
-                texto = fichero.read()
-                fichero.close()
-                
-                #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
-                try:
-                    if self.agflow.lineEdit_4.text() =="":slope="1"
-                    else:slope= str(int(self.agflow.lineEdit_4.text()))
-
-                    if self.agflow.lineEdit_5.text()=="":maxim_d="0.99"
-                    else:maxim_d=float(self.agflow.lineEdit_5.text())
-                    if nombre_parametro=="Drainage area \nto concentrated flow": maxim_d=round(param_values[numero_parametro],2)
-
-                    if self.agflow.lineEdit_6.text()=="":maxim_pl="300.0"
-                    else:maxim_pl=float(self.agflow.lineEdit_6.text())
-                    if nombre_parametro=="Maximum profile length \nuntil deposition": maxim_pl=round(param_values[numero_parametro],2)
-
-                    if self.agflow.lineEdit_7.text()=="":maxim_ps="100.0"
-                    else:maxim_ps=float(self.agflow.lineEdit_7.text())
-                    if nombre_parametro=="Maximum Profile Slope": maxim_ps=round(param_values[numero_parametro],2)
-                    
-                    def funcion_t(numero):
-                        if numero==1:
-                            return "T"
-                        elif numero ==0:
-                            return "F"
-                    
-                    use=funcion_t(int(self.agflow.checkBox.isChecked()))
-                    write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
-                    arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
-                    dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
-                    use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
-                
-                except:
-                    iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning,duration = 10)
-                    return
-                
-                texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
-                try:
-                    f = open(self.direccion_sensitivity+"\\Preprocessing_inputs"+"\\"+"AGFCNT.inp","w+")
-                except:
-                    iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
-                    return 
-                f.write(texto_nuevo)
-                f.close()
-            
-            else:
-                df = pd.read_csv(direccion_sensitivity,encoding = "ISO-8859-1",delimiter=",")
-                if self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
-                    df[columna] = [param_values[numero_parametro] for x in range(len(df))]
-                else:#si solo se ha elegido una fila entonces se cambia una única fila
-                    df[columna].iloc[int(self.dic_data[nombre_parametro][2])] = param_values[numero_parametro]
-                #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
-                def float_to_str(df,column):
-                    #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
-                    lista = []
-                    for param_values in df[column]:
-                        try:
-                            lista.append(str(int(param_values)))
-                        except:
-                            lista.append("")
-                    df[column] = lista
-                if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
-                if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
-                df.to_csv(direccion, index=False, float_format='%.5f')
+    
         
-    def save_result(self):
-        #Metod to save the results of the sensitivity analysis
-        #Runoff
-        if self.sensitivity_dialog.runoff.isChecked():
-            #Se importan los datos
-            try:
-                df = self.import_df("Runoff",sensitivity=True)
-            except:
-                self.end_execution =True
-                return
-            #Esto se hace porque la escorrentía de la cuenca es la media ponderada con el área de las escorrentías de las celdas
-            try:
-                df['Runoff_Ponderado'] = df['Runoff'] * df['Drainage']
-                result = df.groupby('Fecha').agg({'Runoff_Ponderado': 'sum', 'Drainage': 'sum'}).reset_index()
-            except:
-                self.end_execution =True
-                self.warning_message("AnnAGNPS_SIM_Insitu_Soil_Moisture output not found. \nInsitu_Soil_Moisture_Daily column in OUTPUT OPTIONS DATA -SIM file must be set to T ")
-                return
-                
-            result['Runoff'] = result['Runoff_Ponderado'] / result['Drainage']
-            df_graph = result[['Fecha', 'Runoff']]
-            df_graph.set_index('Fecha', inplace=True)
-            return df_graph["Runoff"].sum()
-        #Total erosion
-        if self.sensitivity_dialog.total_erosion.isChecked():
-            df = self.import_df("Subtotal",sensitivity=True)
-            try:
-                df_graph = df.groupby(df.index).sum(numeric_only=True)
-            except:
-                self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
-                self.end_execution =True
-                return
-                
-            return df_graph.sum()       
-            
-        #Gully erosion
-        if self.sensitivity_dialog.gully.isChecked():
-            df = self.import_df("Gully",sensitivity=True)
-            try:
-                df_graph = df.groupby(df.index).sum(numeric_only=True)
-            except:
-                self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
-                self.end_execution =True
-                return
-            return df_graph.sum()  
-            
-        #Ephemeral gully
-        if self.sensitivity_dialog.ephemeral.isChecked():
-            fichero = self.direccion+"\\INPUTS\\"+"AnnAGNPS_SIM_Ephemeral_Gully_Erosion.csv"
-            try:
-                file = open(fichero)
-            except:
-                self.warning_message("AnnAGNPS_SIM_Ephemeral_Gully_Erosion output not found. \nGully column in OUTPUT OPTIONS DATA -SIM file must be set to T ")
-                self.end_execution =True
-                return
-            csvreader = csv.reader(file)
-            rows = []
-            for row in csvreader:
-                    rows.append(row)
-            lista = []
-            a = 0
-            for i in rows:
-                try:
-                    if i[0]=="Day":
-                        a = 1
-                        lista.append(i)
-                    elif a ==1:
-                        lista.append(i[:-1])
-                except:
-                    continue
-            erosion = [float(lista[x][27]) for x in range(1,len(lista)) if len(lista[x])==30]
-            return sum(erosion)
-        
-        #Pond erosion
-        if self.sensitivity_dialog.pond.isChecked():
-            df = self.import_df("Pond",sensitivity=True)
-            try:
-                df_graph = df.groupby(df.index).sum(numeric_only=True)
-            except:
-                self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
-                self.end_execution =True
-                return
-            return df_graph.sum() 
-            
-        #Sheet and rill erosion
-        if self.sensitivity_dialog.sheet.isChecked():
-            df = self.import_df("Sheet & Rill",sensitivity=True)
-            try:
-                df_graph = df.groupby(df.index).sum(numeric_only=True)
-            except:
-                self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
-                self.end_execution =True
-                return
-            return df_graph.sum() 
-            
-        #Nitrogen
-        if self.sensitivity_dialog.nitrogen.isChecked():
-            df = self.import_df("Nitrogen",sensitivity=True)
-            try:
-                df_graph = df.groupby(df.index).sum(numeric_only=True)
-            except:
-                self.warning_message("AnnAGNPS_EV_Nitrogen_yield_(mass) output not found. \nEV_N_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
-                self.end_execution =True
-                return
-                
-            return df_graph.sum()
-            
-        #Organic carbon
-        if self.sensitivity_dialog.organic.isChecked():
-            df = self.import_df("Carbon",sensitivity=True)
-            try:
-                df_graph = df.groupby(df.index).sum(numeric_only=True)
-            except:
-                self.warning_message("AnnAGNPS_EV_Organic_Carbon_yield_(mass) output not found. \nEV_OC_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
-                self.end_execution =True
-                return
-            return df_graph.sum()
-            
-        #Phosphorus
-        if self.sensitivity_dialog.phosphorus.isChecked():
-            df = self.import_df("Phosphorus",sensitivity=True)
-            try:
-                df_graph = df.groupby(df.index).sum(numeric_only=True)
-            except:
-                self.warning_message("AnnAGNPS_EV_Phosphorus_yield_(mass) output not found. \nEV_P_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
-                self.end_execution =True
-                return
-            return df_graph.sum()    
     
     def file_input(self,lineEdit):
         #Metod to go from line edit to the final direction
@@ -6979,22 +6846,410 @@ class qannagnps():
                     'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':round(float(pixel_size),2),'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,
                     'MULTITHREADING':False,'EXTRA':'','OUTPUT':str(destino)+"\\"+self.nombre_vegetation_sensitivity+f"_{round(pixel_size,2)}"+"."+self.extension_vegetation_sensitivity})
         
+    
+            
+
+
+
+class Sensitivity_Parallelization(QgsTask):
+    def __init__(self, n, core,execute_preprocessing_sensitivity,direccion_sensitivity,dic_data,param_values,executable_directory,plugin_dir,dic_name_column,nombre_mdt_sensitivity,extension_mdt_sensitivity,fichero_buf_sensitivity,nombre_buffer_sensitivity,extension_buffer_sensitivity,fichero_veg_sensitivity,nombre_vegetation_sensitivity,extension_vegetation_sensitivity,inputs):
+        super().__init__(f"Tarea_{n}_Carpeta_{core}")
+        self.n = n
+        self.core = core
+        self.execute_preprocessing_sensitivity = execute_preprocessing_sensitivity
+        self.direccion_sensitivity = direccion_sensitivity
+        self.dic_data = dic_data
+        self.param_values = param_values
+        self.executable_directory = executable_directory
+        self.plugin_dir = plugin_dir
+        self.dic_name_column = dic_name_column
+        self.nombre_mdt_sensitivity =nombre_mdt_sensitivity
+        self.extension_mdt_sensitivity=extension_mdt_sensitivity
+        self.fichero_buf_sensitivity=fichero_buf_sensitivity
+        self.nombre_buffer_sensitivity=nombre_buffer_sensitivity
+        self.extension_buffer_sensitivity=extension_buffer_sensitivity
+        self.fichero_veg_sensitivity=fichero_veg_sensitivity
+        self.nombre_vegetation_sensitivity=nombre_vegetation_sensitivity
+        self.extension_vegetation_sensitivity=extension_vegetation_sensitivity
+        self.inputs = inputs
+        
+        
+    def run(self):
+        # Ajusta la ruta para que use la carpeta correspondiente al folder_id
+        
+        self.end_execution = 0
+        try:
+            self.ejecucion_completa_sensitivity()
+        except Exception as e:
+            self.error_msg = str(e)
+            return False
+        if self.end_execution ==1:
+            return False
+        
+        return True
+    
+    
+    def ejecucion_completa_sensitivity(self):
+        #Esta función es en donde se ejecuta el modelo
+        print("a")
+        #EJECUCIÓN DE TOPAGNPS
+        if self.execute_preprocessing_sensitivity:
+            #Se crea la carpeta de Preprocessing_inputs si no estaba creada. Ahí se meten los inputs y se ejecuta TopAGNPS y luego los outputs se meten a Preprocessing_outputs
+            
+            
+            #Función para que se le diga el nombre del archivo y te devuelva la dirección completa
+            def fichero(nombre):
+                return self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\"+nombre
+            
+            #Dar error si no existe el archivo TOPAGNPS.CSV
+            if not os.path.exists(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV"):
+                self.error_msg = "Error Input data\nControl file of TopAGNPS, TOPAGNPS.CSV, not found"
+                self.end_execution = 1
+                return
+            print("b")
+            #Si el formato de la columna FILENAME no es str entonces dar error
+            topagnps_control_file = pd.read_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
+            if type(topagnps_control_file["FILENAME"].iloc[0])!=str:
+                self.error_msg ="Error Input data\nPlease select a correct FILENAME in TOPAGNPS.CSV" 
+                self.end_execution = 1
+                return
+            
+            #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs.
+            for j,k in enumerate(self.dic_data.keys()):
+                self.change_inputs_sensitivity(self.param_values[self.n-1],j,k,spatial =True) #cambio de los inputs espaciales
+            
+            #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
+            self.time_start_preprocessing = datetime.now()
+            
+            print("c")
+            #EJECUCIÓN DE TOPAGNPS            
+            def main():
+                f = open(self.executable_directory+"\\"+f"EjecutarTopagnps_{self.core}.bat","w+")
+                linea_uno = "CD {}".format(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs")
+                linea_dos = r"CALL {}\TopAGNPS_v6.00.a.025_release_64-bit.exe".format(self.executable_directory)
+                f.write("{} \n".format(linea_uno))
+                f.write("{} \n".format(linea_dos))
+                f.close()
+            main()
+            subprocess.call(self.executable_directory+"\\"+"EjecutarTopagnps_{self.core}.bat")
+            print("d")
+            #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarTopagnps.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+            #stdout, stderr = proc.communicate()
+            
+            #If error file of TopAGNPS is opened, then return a error message
+            try:
+                open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.csv", "r+") 
+            except PermissionError:
+                self.error_msg ="Error TopAGNPS","Close TOPAGNPS_err.csv before the start of execution"
+                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                self.save_files_preprocessing_in_folder_sensitivity()
+                self.end_execution = 1
+                return
+            except:
+                pass
+
+            #Cuando se eligen coordenadas automáticamente con el plugin primero se ejecuta Topagnps y da error (se ejecuta la primera para poner el reaches en QGIS) osea que no queremos que python salte si hay error en la primera ronda. Queremos que salte python cuando hay error y si se ha seleccionado que no se elige automaticamente. O sino cuando hay error y se ha elegido automáticamente pero la segunda ejecución de Topagnps da error. 
+            if os.path.isfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV") and os.path.getsize(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV")>0:
+                self.end_execution = 1
+                error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
+                self.error_msg =f"Error TOPAGNPS\n{error.columns[3]}"
+                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                self.save_files_preprocessing_in_folder_sensitivity()
+                #Se abre el archivo de errores
+                try:
+                    os.startfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs"+"\\TopAGNPS_err.csv")
+                except:
+                    pass
+                #Este return es para parar el codigo
+                return
+            
+            
+            #VALORES DEL TAMAÑO DE PIXEL
+            layer = QgsRasterLayer(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\"+topagnps_control_file["FILENAME"].iloc[0],"dednm")
+            self.pixelSizeX = round(layer.rasterUnitsPerPixelX(),2)
+            self.pixelSizeY = round(layer.rasterUnitsPerPixelY(),2)
+            
+            #ASIGNAR LOS VALORES DE SUELO Y MANEJO A AnnAGNPS_Cell_Data_Section.csv
+            try:
+                self.add_soil_and_management_cell_sensitivity()
+            except Exception as e:
+                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                self.save_files_preprocessing_in_folder_sensitivity()
+                self.error_msg =str(e)
+                return
+            
+            
+            #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+            self.save_files_preprocessing_in_folder_sensitivity()
+            
+            
+        #EJECUCIÓN DE ANNAGNPS
+
+        #MOVER EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS de procesamiento
+        shutil.copyfile(self.plugin_dir+"\\Executables"  + "\\" +"AnnAGNPS.fil" ,self.direccion_sensitivity +f"\\Core_{self.core}"+"\\Processing_inputs\\" +"AnnAGNPS.fil")
+                
+        #Se cambian los inputs
+        for j,k in enumerate(self.dic_data.keys()):
+            self.change_inputs_sensitivity(self.param_values[self.n-1],j,k,spatial =False) #cambio de los inptus no espaciales
+        
+        #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
+        self.time_start_processing = datetime.now()
+        
+        
+        #EJECUCIÓN DE ANNAGNPS
+        #os.chdir(self.direccion+"\\"+directory)
+        def execute_bat():
+           def main():
+               f = open(self.executable_directory+"\\"+f"EjecutarAnnAGNPS_{self.core}.bat","w+")
+               linea_uno = "CD {}".format(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs")
+               linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
+               f.write("{} \n".format(linea_uno))
+               f.write("{} \n".format(linea_dos))
+               f.close()
+           main()
+        execute_bat()
+        r'''env = os.environ.copy()
+        env['PATH'] = f'{self.executable_directory};' + env['PATH']
+        command = self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat"
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='latin-1', env=env)'''
+
+        subprocess.call(self.executable_directory+"\\"+f"EjecutarAnnAGNPS_{self.core}.bat")
+
+        
+                  
+        #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
+        time.sleep(1)
+        if path.exists(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv"):
+            if os.stat(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv").st_size>0:
+                self.end_execution =1
+                try:
+                    text = open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv", "r")
+                    text = ''.join([i for i in text]) 
+                    text = text.replace("\"", "/") 
+                    texto = text.splitlines()
+                    txt = texto[2].split(",")[-1]
+                    self.error_msg = f"Error AnnAGNPS\n{txt}"
+                except:
+                    pass
+                
+                self.end_execution = 1
+                #Se abre el archivo de errores
+                try:
+                    os.startfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv")
+                except:
+                    pass
+                #Este return es para parar el codigo
+                return 
+        
+        #EJECUCIÓN DEL OUTPUT_TABLES
+        time.sleep(1)
+        shutil.copyfile(self.executable_directory + "\\" +"STEAD.fil" ,self.direccion_sensitivity+f"\\Core_{self.core}" + "\\Processing_inputs\\" +"STEAD.fil")
+        os.chdir(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs")
+        proc = subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        
+        #Los outputs de AnnAGNPS se guardan en Processing_outputs
+        self.save_files_processing_in_folder_sensitivity()
+    
+    
+    def save_files_preprocessing_in_folder_sensitivity(self):
+        """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
+        #First create the folder Preprocessing_outputs if it doesn´t exist
+        carpeta = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+        
+        
+        
+        #Then move the files that were modified or created after the start of the preprocessing
+        carpeta_origen = Path(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs")
+        carpeta_destino = Path(carpeta)
+
+        for f in carpeta_origen.iterdir():
+            try:
+                if f.is_file():
+                    t = datetime.fromtimestamp(max(f.stat().st_ctime, f.stat().st_mtime))
+                    if t > self.time_start_preprocessing:
+                        shutil.move(str(f), str(carpeta_destino / f.name))
+            except:
+                pass
+    
+    
+    def save_files_processing_in_folder_sensitivity(self):
+        """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
+        #First create the folder Processing_outputs if it doesn´t exist
+        carpeta = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_outputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+        
+
+        #Then move the files that were modified or created after the start of the preprocessing
+        carpeta_origen = Path(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs")
+        carpeta_destino = Path(carpeta)
+        
+        archivo_excluido = Path(self.direccion_sensitivity+f"\\Core_{self.core}") / "Processing_inputs" / "AnnAGNPS.fil"
+        
+        for f in carpeta_origen.iterdir():
+            try:
+                t = datetime.fromtimestamp(max(f.stat().st_ctime, f.stat().st_mtime))
+                if t > self.time_start_processing and f != archivo_excluido:
+                    shutil.move(str(f), str(carpeta_destino / f.name))
+            except:
+                pass
+    
+    
+    def change_inputs_sensitivity(self,param_values,numero_parametro,nombre_parametro,spatial):
+        #Metod to change the inputs of sensitivity analysis
+        try: #este try es para cuando cuando de error si elige la misma columna pero distintas filas
+            if self.dic_name_column[nombre_parametro][0]=="Spatial" and spatial:
+                direccion = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\"+self.dic_name_column[nombre_parametro][1]
+                columna = self.dic_name_column[nombre_parametro][2]
+            elif self.dic_name_column[nombre_parametro][0]!="Spatial" and not spatial:
+                direccion = self.file_input(self.dic_name_column[nombre_parametro][0])
+                columna = self.dic_name_column[nombre_parametro][1]
+        except KeyError: #misma columna, distintas filas
+            if self.dic_name_column[nombre_parametro.split("__")[0]][0]=="Spatial" and spatial:
+                direccion = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\"+self.dic_name_column[nombre_parametro.split("__")[0]][1]
+                columna = self.dic_name_column[nombre_parametro.split("__")[0]][2]
+            elif self.dic_name_column[nombre_parametro.split("__")[0]][0]!="Spatial" and not spatial:
+                direccion = self.file_input(self.dic_name_column[nombre_parametro.split("__")[0]][0])
+                columna = self.dic_name_column[nombre_parametro.split("__")[0]][1]
+        if 'direccion_sensitivity' in locals():
+            #Si el input es tamaño de pixel entonces la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
+            if nombre_parametro =="Pixel Size":
+                self.change_control_files_pixel(param_values,numero_parametro)
+            
+            elif self.dic_name_column[nombre_parametro][1]=="AGFLOW.csv":#in the case of agflow the input change is different
+                #First we add the data of control files to the dialog. This is important because the rest of the values that are not changed need to be taken from the control file.
+                self.asignar_valores_control_dialogo()
+                #Then we change the inputs of agflow control file
+                fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
+                texto = fichero.read()
+                fichero.close()
+                
+                #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
+                try:
+                    if self.agflow.lineEdit_4.text() =="":slope="1"
+                    else:slope= str(int(self.agflow.lineEdit_4.text()))
+
+                    if self.agflow.lineEdit_5.text()=="":maxim_d="0.99"
+                    else:maxim_d=float(self.agflow.lineEdit_5.text())
+                    if nombre_parametro=="Drainage area \nto concentrated flow": maxim_d=round(param_values[numero_parametro],2)
+
+                    if self.agflow.lineEdit_6.text()=="":maxim_pl="300.0"
+                    else:maxim_pl=float(self.agflow.lineEdit_6.text())
+                    if nombre_parametro=="Maximum profile length \nuntil deposition": maxim_pl=round(param_values[numero_parametro],2)
+
+                    if self.agflow.lineEdit_7.text()=="":maxim_ps="100.0"
+                    else:maxim_ps=float(self.agflow.lineEdit_7.text())
+                    if nombre_parametro=="Maximum Profile Slope": maxim_ps=round(param_values[numero_parametro],2)
+                    
+                    def funcion_t(numero):
+                        if numero==1:
+                            return "T"
+                        elif numero ==0:
+                            return "F"
+                    
+                    use=funcion_t(int(self.agflow.checkBox.isChecked()))
+                    write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
+                    arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
+                    dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
+                    use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
+                
+                except:
+                    iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning,duration = 10)
+                    return
+                
+                texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
+                try:
+                    f = open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\"+"AGFCNT.inp","w+")
+                except:
+                    iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
+                    return 
+                f.write(texto_nuevo)
+                f.close()
+            
+            else:
+                df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
+                if self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
+                    df[columna] = [param_values[numero_parametro] for x in range(len(df))]
+                else:#si solo se ha elegido una fila entonces se cambia una única fila
+                    df[columna].iloc[int(self.dic_data[nombre_parametro][2])] = param_values[numero_parametro]
+                #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
+                def float_to_str(df,column):
+                    #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
+                    lista = []
+                    for param_values in df[column]:
+                        try:
+                            lista.append(str(int(param_values)))
+                        except:
+                            lista.append("")
+                    df[column] = lista
+                if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
+                if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
+                df.to_csv(direccion, index=False, float_format='%.5f')
+    
+    def file_input(self,lineEdit):
+        #Metod to go from line edit to the final direction
+        
+        #First convert from lineEdit to the direction of the folder
+        master_dict = {"AnnAGNPS ID":self.inputs.l_54,"Aquaculture Pond Data":self.inputs.l_2,
+                               "Aquaculture Schedule Data":self.inputs.l_24,"Cell Data":self.inputs.l_3,"Classic Gully Data":self.inputs.l_4,
+                               "Contour Data":self.inputs.l_25,"Crop Data":self.inputs.l_26,"Crop Growth Data":self.inputs.l_27,
+                               "Ephemeral Gully Data":self.inputs.l_5,"Feedlot Data":self.inputs.l_6,"Feedlot Management Data":self.inputs.l_28,
+                               "Fertilizer Application Data":self.inputs.l_29,"Fertilizer Reference Data":self.inputs.l_30,
+                               "Field Pond Data":self.inputs.l_7,"Geology Data":self.inputs.l_31,
+                               "Global Error and Warning Limits Data":self.inputs.l_55,"Global IDs Factors and Flags Data":self.inputs.l_56,
+                               "Hydraulic Geometry Data":self.inputs.l_32,"Impoundment Data":self.inputs.l_8,
+                               "Irrigation Application Data":self.inputs.l_33,"Management Field Data":self.inputs.l_34,
+                               "Management Operation Data":self.inputs.l_35,"Management Schedule Data":self.inputs.l_36,
+                               "Non-Crop Data":self.inputs.l_37,
+                               "Pesticide Application Data":self.inputs.l_38,"Pesticide Initial Conditions Data":self.inputs.l_57,
+                               "Pesticide Reference Data":self.inputs.l_39,"PL Calibration Data":self.inputs.l_58,
+                               "Point Source Data":self.inputs.l_9,"RCN Calibration Data":self.inputs.l_59,"Reach Data":self.inputs.l_10,
+                               "Reach Nutrient Half-life Data":self.inputs.l_40,"Runoff Curve Number Data":self.inputs.l_42,
+                               "Simulation Period Data":self.inputs.l_60,"Soil Data":self.inputs.l_43,"Soil Layer Data":self.inputs.l_44,
+                               "Soil Initial Conditions Data":self.inputs.l_61,"Strip Crop Data":self.inputs.l_45,
+                               "Tile Drain Data":self.inputs.l_46,"Watershed Data":self.inputs.l_12,"EI Pct Data":self.inputs.l_50,
+                               "STORM TYPE DATA - RFD":self.inputs.l_51,"STORM TYPE DATA - UPDRC":self.inputs.l_52,
+                               "Output Options - Global":self.inputs.l_63,"Output Options - AA":self.inputs.l_68,"Output Options - EV":self.inputs.l_69,
+                               "Output Options - CSV":self.inputs.l_64,"Output Options - DPP":self.inputs.l_65,
+                               "Output Options - NPT":self.inputs.l_66,"Output Options - SIM":self.inputs.l_67,
+                               "Output Options - TBL":self.inputs.l_70,"Output Options - MN/MX":self.inputs.l_71,
+                               "Output Options - Cell":self.inputs.l_14,"Output Options - Feedlot":self.inputs.l_15,
+                               "Output Options - Field Pond":self.inputs.l_16,
+                               "Output Options - Classic Gully":self.inputs.l_17,
+                               "Output Options - Ephemeral Gully":self.inputs.l_18,
+                               "Output Options - Impoundment":self.inputs.l_19,
+                               "Output Options - Point Source":self.inputs.l_20,
+                               "Output Options - Reach":self.inputs.l_21,
+                               "Output Options - Wetland":self.inputs.l_22,
+                               "CLIMATE DATA - STATION":self.inputs.l_48,
+                               "CLIMATE DATA - DAILY":self.inputs.l_49,"Wetland Data":self.inputs.l_13,"Riparian Buffer Data":self.inputs.l_41,
+                               "RUSLE2 Data":self.inputs.l_62,"RiceWQ Data":self.inputs.l_11}
+        
+        invertided_dic = {value: key for key, value in master_dict.items()}
+        csv_file = invertided_dic[lineEdit]
+        
+        master_file = self.direccion_sensitivity+f"\\Core_{self.core}"+r"\Processing_inputs\annagnps_master.csv"
+        project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+        
+        return Path(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==csv_file].iloc[0,1])
+
+    
     def change_control_files_pixel(self,i,j):
         #Metod to change control files if sensitivity analysis with pixel size is choosed
         #First with mdt
-        df = pd.read_csv(self.direccion_sensitivity+"\\TOPAGNPS.csv",encoding = "ISO-8859-1",delimiter=",")
+        df = pd.read_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\TOPAGNPS.csv",encoding = "ISO-8859-1",delimiter=",")
         df["FILENAME"].iloc[0] = str(self.nombre_mdt_sensitivity+f"_{round(i[j],2)}"+"."+self.extension_mdt_sensitivity)
-        df.to_csv(self.direccion_sensitivity+"\\TOPAGNPS.csv", index=False, float_format='%.5f')
+        df.to_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\TOPAGNPS.csv", index=False, float_format='%.5f')
         
         #If buffer exist then change name of buffer raster
         if self.fichero_buf_sensitivity!="nan":
-            df = pd.read_csv(self.direccion_sensitivity+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
+            df = pd.read_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
             df["BUFFER"].iloc[0] = str(self.nombre_buffer_sensitivity+f"_{round(i[j],2)}"+"."+self.extension_buffer_sensitivity)
-            df.to_csv(self.direccion_sensitivity+"\\AGBUF.csv", index=False, float_format='%.5f')
+            df.to_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\AGBUF.csv", index=False, float_format='%.5f')
         
         #If vegetation exist then change name of vegetation raster
         if self.fichero_veg_sensitivity!="nan":
-            df = pd.read_csv(self.direccion_sensitivity+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
+            df = pd.read_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
             df["VEGETATION"].iloc[0] = str(self.nombre_vegetation_sensitivity+f"_{round(i[j],2)}"+"."+self.extension_vegetation_sensitivity)
-            df.to_csv(self.direccion_sensitivity+"\\AGBUF.csv", index=False, float_format='%.5f')
-            
+            df.to_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\AGBUF.csv", index=False, float_format='%.5f')

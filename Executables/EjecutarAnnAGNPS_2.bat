@@ -1,0 +1,2 @@
+CD C:/Users/inigo.barberena/Documents/Prueba\prueba\Sensitivity_analysis\Core_2\Processing_inputs 
+CALL C:\Users/inigo.barberena/AppData/Roaming/QGIS/QGIS3\profiles\default/python/plugins\qannagnps\Executables\AnnAGNPS_v6.00.r.058_release_64-bit.exe 
