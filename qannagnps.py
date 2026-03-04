@@ -21,7 +21,7 @@
 
     
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt
-from PyQt5.QtWidgets import QFrame,QTableWidgetItem,QProgressDialog,QLabel, QLineEdit, QMessageBox
+from PyQt5.QtWidgets import QFrame,QTableWidgetItem,QProgressDialog,QLabel, QLineEdit, QMessageBox,QRadioButton
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QFileDialog
 from qgis.core import QgsProject
@@ -58,6 +58,7 @@ from matplotlib.ticker import FuncFormatter
 import sys
 import chardet
 import glob
+import textwrap
 
 import traceback
 
@@ -91,6 +92,8 @@ from .ui.table_inputs import TableDialog
 from .ui.sensitivity import SensitivityDialog
 from .ui.warning_message import warning_message
 from .ui.overwrite_project import overwrite_project
+from .ui.results_sensitivity import results_sensitivity
+from .ui.figure_settings import figure_settings
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -99,7 +102,7 @@ from .ui.dialog_base import Dialog_Base
 import os.path
 import webbrowser
 #from .Coordinate_capturer import PrintClickedPoint
-
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import threading
 
 qgis_processing_lock = threading.Lock()
@@ -199,6 +202,8 @@ class qannagnps():
         self.sensitivity_dialog = SensitivityDialog()
         self.dlg_warning_message = warning_message()
         self.dlg_overwrite_project = overwrite_project()
+        self.dlg_results_sensitivity = results_sensitivity()
+        self.dlg_figure_settings = figure_settings()
         
         
         #Boton principal
@@ -510,6 +515,29 @@ class qannagnps():
         #Poner las imágenes y condiciones de la página inicial
         self.images_dialog()
         
+        #Update sensitivity graph
+        radio_buttons = [self.dlg_results_sensitivity.runoff,self.dlg_results_sensitivity.total_erosion,self.dlg_results_sensitivity.gully_erosion,self.dlg_results_sensitivity.pond_erosion,
+            self.dlg_results_sensitivity.ephemeral_erosion,self.dlg_results_sensitivity.sheet_erosion,self.dlg_results_sensitivity.nitrogen_erosion,
+            self.dlg_results_sensitivity.carbon_erosion,self.dlg_results_sensitivity.phosphorus_erosion]
+            
+        for radio_button in radio_buttons:
+            # Conectar la función solo una vez
+            radio_button.toggled.connect(lambda checked, rb=radio_button: self.update_sensitivity_graph_global() if checked else None)
+            
+        self.dlg_results_sensitivity.radio_morris.toggled.connect(lambda checked: self.update_sensitivity_graph_global() if checked else None)
+        self.dlg_results_sensitivity.radio_sobol.toggled.connect(lambda checked: self.update_sensitivity_graph_global() if checked else None)
+        self.dlg_results_sensitivity.radio_sensitivity.toggled.connect(lambda checked: self.update_sensitivity_graph_global() if checked else None)
+        self.dlg_results_sensitivity.radio_uncertainty.toggled.connect(lambda checked: self.update_sensitivity_graph_global() if checked else None)
+        
+        #Browse results of sensitivity analysis
+        self.dlg_results_sensitivity.browse.clicked.connect(lambda _,b=["Morris",self.dlg_results_sensitivity.radio_morris]: self.browse_files_sensitivity_results(b))
+        self.dlg_results_sensitivity.browse_2.clicked.connect(lambda _,b=["Sobol",self.dlg_results_sensitivity.radio_sobol]: self.browse_files_sensitivity_results(b))
+        
+        
+        #When clicking save then close figures settings dialog
+        self.dlg_figure_settings.accept.clicked.connect(self.save_figures)
+        self.dlg_figure_settings.accept.clicked.connect(self.dlg_figure_settings.close)
+
         #Ejecutar si se da a OK
         self.dlg.pushButton_6.clicked.connect(self.ejecuciones)
         self.dlg.pushButton_4.clicked.connect(self.ejecuciones)
@@ -573,8 +601,9 @@ class qannagnps():
         for i in dic.keys():
             i.clicked.connect(lambda _,b = dic[i]:self.output_topagnps(b))
             
-        #Open sensitivity analysis dialog
+        #Open sensitivity analysis dialog and results
         self.dlg.sensitivity.clicked.connect(self.sensitivity_dialog.show)
+        self.dlg.results_sensitivity.clicked.connect(self.dlg_results_sensitivity.show)
         
         #Show inputs in sensitivity analysis dialog
         self.sensitivity_dialog.Spatial.clicked.connect(lambda _,b = "Spatial":self.annagnps_inputs(b))
@@ -650,6 +679,56 @@ class qannagnps():
         
         #Open AnnAGNPS output folder
         self.output.open_folder.clicked.connect(self.open_annagnps_folder)
+    
+    def save_figures(self): 
+        """Method to save figures to the computer"""
+        
+        dialog =  self.information_figure_save[0]
+        canvas =  self.information_figure_save[1]
+        file_path, _ = QFileDialog.getSaveFileName(dialog, "Save graph", 
+                                           os.path.join("C:\\", "graph.png"), 
+                                            "PNG Files (*.png);;JPEG Files (*.jpg *.jpeg);;PDF Files (*.pdf);;All Files (*)")
+        if file_path:
+            #Change background color to white
+            canvas.figure.set_facecolor('white')
+            fig = canvas.figure
+            axes = fig.get_axes()
+            for axe in axes: 
+                axe.set_facecolor('white')
+            
+            dpi_value = float(self.dlg_figure_settings.resolution.text())
+            transparent = self.dlg_figure_settings.transparent.isChecked()
+            tight = self.dlg_figure_settings.tight.isChecked()
+            padding = float(self.dlg_figure_settings.padding.text())
+            canvas.figure.savefig(file_path, dpi = dpi_value,bbox_inches='tight' if tight else None, 
+                                         transparent=transparent, 
+                                         pad_inches=padding)
+        
+            #Change background color again to original
+            canvas.figure.set_facecolor('#f0f0f0')
+            for axe in axes: 
+                axe.set_facecolor('#f0f0f0')
+            canvas.draw()
+    
+    
+    
+    def browse_files_sensitivity_results(self,information):
+        """Method to select the file for sensitivity analysis graph between the local files for Morris and Sobol"""
+        print("a")
+        sensitivity_method, checkbox = information
+        fname = QFileDialog.getOpenFileName(self.dlg_results_sensitivity, f"Select {sensitivity_method} Sensitivity Analysis Results File","C:\\" , "CSV files (*.csv)")
+        if fname[0]!="":
+            if sensitivity_method == "Morris":
+                self.dlg_results_sensitivity.csv_results_morris.setText(fname[0])
+            elif sensitivity_method == "Sobol":
+                self.dlg_results_sensitivity.csv_results_2.setText(fname[0])
+
+            #Set checked morris results
+            checkbox.setChecked(True)
+            #Update graph
+            self.update_sensitivity_graph_global()
+    
+    
     
     def open_annagnps_folder(self):
         #Metod to open AnnAGNPS output folder
@@ -2906,7 +2985,7 @@ class qannagnps():
             #EJECUCIÓN DE TOPAGNPS            
             def main():
                 f = open(self.executable_directory+"\\"+"EjecutarTopagnps.bat","w+")
-                linea_uno = "CD {}".format(self.direccion+"\\Preprocessing_inputs")
+                linea_uno = "CD /d {}".format(self.direccion+"\\Preprocessing_inputs")
                 linea_dos = r"CALL {}\TopAGNPS_v6.00.a.025_release_64-bit.exe".format(self.executable_directory)
                 f.write("{} \n".format(linea_uno))
                 f.write("{} \n".format(linea_dos))
@@ -3008,7 +3087,7 @@ class qannagnps():
             def execute_bat():
                def main():
                    f = open(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
-                   linea_uno = "CD {}".format(self.direccion+"\\Processing_inputs")
+                   linea_uno = "CD /d {}".format(self.direccion+"\\Processing_inputs")
                    linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
                    f.write("{} \n".format(linea_uno))
                    f.write("{} \n".format(linea_dos))
@@ -6011,13 +6090,18 @@ class qannagnps():
 
             destino.mkdir(parents=True, exist_ok=True)
             
-            for carpeta in origen.iterdir():
-                if carpeta.is_dir():
-                    shutil.copytree(
-                        carpeta,
-                        destino / carpeta.name,
-                        dirs_exist_ok=True
-                    )
+            for carpeta in origen.iterdir() :
+                if carpeta.is_dir() and carpeta.name != "Sensitivity_analysis":
+                    try:
+                        shutil.copytree(
+                            carpeta,
+                            destino / carpeta.name,
+                            dirs_exist_ok=True
+                        )
+                    except Exception as e:
+                        self.end_execution = 1
+                        self.warning_message(str(e))
+                        return
         
             #Create also the executables
             #Executable of TopAGNPS
@@ -6119,7 +6203,7 @@ class qannagnps():
             
     def run_sensitivity_analysis(self): 
         #Metod to run sensitiviy analysis
-        
+        self.end_execution = 0
         #If there is not working directory selected then error
         if self.dlg.project.text()=="":
             self.warning_message("Please select a working directory where the files are going to be loaded")
@@ -6145,6 +6229,8 @@ class qannagnps():
         #Move the files from the save project to working directory + name of the project + "Sensitivity_analysis"
         self.progress_dialog.setLabelText("Moving files to the working directory...")
         self.move_files_to_working_directory_sensitivity_analysis()
+        if self.end_execution:
+            return
         
         
         #Modifiy the inputs so that the required output are displayed
@@ -6302,7 +6388,7 @@ class qannagnps():
             result['Runoff'] = result['Runoff_Ponderado'] / result['Drainage']
             df_graph = result[['Fecha', 'Runoff']]
             df_graph.set_index('Fecha', inplace=True)
-            data_to_save["Runoff"] = df_graph["Runoff"].sum()
+            data_to_save["Total runoff (mm)"] = df_graph["Runoff"].sum()
 
         #Total erosion
         if self.sensitivity_dialog.total_erosion.isChecked():
@@ -6314,7 +6400,7 @@ class qannagnps():
                 self.end_execution =True
                 return
                 
-            data_to_save["Total_erosion"] = df_graph.sum()       
+            data_to_save["Total erosion (Mg)"] = df_graph.sum()       
             
         #Gully erosion
         if self.sensitivity_dialog.gully.isChecked():
@@ -6325,7 +6411,7 @@ class qannagnps():
                 self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
                 self.end_execution =True
                 return
-            data_to_save["Gully_erosion"] = df_graph.sum()    
+            data_to_save["Gully erosion (Mg)"] = df_graph.sum()    
             
         #Ephemeral gully
         r'''if self.sensitivity_dialog.ephemeral.isChecked():
@@ -6352,7 +6438,7 @@ class qannagnps():
                 except:
                     continue
             erosion = [float(lista[x][27]) for x in range(1,len(lista)) if len(lista[x])==30]
-            data_to_save["Ephemeral_gully_erosion"] = sum(erosion)'''
+            data_to_save["Ephemeral Gully erosion (Mg)"] = sum(erosion)'''
         
         #Pond erosion
         if self.sensitivity_dialog.pond.isChecked():
@@ -6363,7 +6449,7 @@ class qannagnps():
                 self.warning_message("AnnAGNPS_EV_Sediment_yield_(mass) output not found. \nEV_Sed_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
                 self.end_execution =True
                 return
-            data_to_save["Pond_erosion"] = df_graph.sum() 
+            data_to_save["Pond erosion (Mg)"] = df_graph.sum() 
             
         #Sheet and rill erosion
         if self.sensitivity_dialog.sheet.isChecked():
@@ -6375,7 +6461,7 @@ class qannagnps():
                 self.end_execution =True
                 return
             
-            data_to_save["Sheet_and_rill_erosion"] = df_graph.sum() 
+            data_to_save["Sheet and rill erosion (Mg)"] = df_graph.sum() 
             
         #Nitrogen
         if self.sensitivity_dialog.nitrogen.isChecked():
@@ -6387,7 +6473,7 @@ class qannagnps():
                 self.end_execution =True
                 return
             
-            data_to_save["Nitrogen"] = df_graph.sum()
+            data_to_save["Nitrogen (kg)"] = df_graph.sum()
             
         #Organic carbon
         if self.sensitivity_dialog.organic.isChecked():
@@ -6399,7 +6485,7 @@ class qannagnps():
                 self.end_execution =True
                 return
             
-            data_to_save["Organic_carbon"] = df_graph.sum()
+            data_to_save["Organic Carbon (kg)"] = df_graph.sum()
             
         #Phosphorus
         if self.sensitivity_dialog.phosphorus.isChecked():
@@ -6410,7 +6496,7 @@ class qannagnps():
                 self.warning_message("AnnAGNPS_EV_Phosphorus_yield_(mass) output not found. \nEV_P_Yld_Mass column in OUTPUT OPTIONS DATA -EV file must be set to T ")
                 self.end_execution =True
                 return
-            data_to_save["Phosphorus"] = df_graph.sum() 
+            data_to_save["Phosphorus (kg)"] = df_graph.sum() 
         
         
         return data_to_save
@@ -6418,9 +6504,6 @@ class qannagnps():
     def create_df_sensitivity(self,results):
         """Method to create the dataframe of sensitivity after parallelization"""
         #First create dataframe
-        print(results)
-        print(self.dic_data.keys())
-        print(self.param_values)
         df = pd.DataFrame(results)
         #Put in the same order as the input values
         new_df = pd.DataFrame(columns=list(df.columns))
@@ -6450,6 +6533,7 @@ class qannagnps():
                     f.write(f"{i}" + '\n')
                     si = sobol.analyze(self.problem, np.array(self.results_sensitivity[i], dtype=float))
                     for input_parameter_k,input_parameter in enumerate(self.dic_data.keys()): 
+                        input_parameter = input_parameter.replace('\n', ' ')
                         f.write(f"{input_parameter}:{si['S1'][input_parameter_k]}_{si['S1_conf'][input_parameter_k]}_{si['ST'][input_parameter_k]}_{si['ST_conf'][input_parameter_k]}" + '\n')
                 f.write("----------------------------------------------------------------------" + '\n')
                 
@@ -6463,6 +6547,7 @@ class qannagnps():
                     f.write(f"{i}" + '\n')
                     si = analyze_morris(self.problem,np.array(self.param_values),np.array(self.results_sensitivity[i], dtype=float))
                     for input_parameter_k,input_parameter in enumerate(self.dic_data.keys()):    
+                        input_parameter = input_parameter.replace('\n', ' ')
                         f.write(f"{input_parameter}:{si['mu_star'][input_parameter_k]}_{si['sigma'][input_parameter_k]}_{si['mu'][input_parameter_k]}_{si['mu_star_conf'][input_parameter_k]}" + '\n')
                 f.write("----------------------------------------------------------------------" + '\n')
         
@@ -6471,13 +6556,21 @@ class qannagnps():
         
         #Se cierra la barra de progreso
         self.progress_dialog.close()
+        
+        
+        #Add csv result to the lineEdit and update graph
+        if self.sensitivity_dialog.sobol.isChecked():
+            self.dlg_results_sensitivity.radio_sobol.setChecked(True)
+            self.dlg_results_sensitivity.csv_results_2.setText(path)
+            self.update_sensitivity_graph_global()
+        elif self.sensitivity_dialog.morris.isChecked():
+            self.dlg_results_sensitivity.radio_morris.setChecked(True)
+            self.dlg_results_sensitivity.csv_results_morris.setText(path)
+            self.update_sensitivity_graph_global()
+        
         #MENSAJE DE ÉXITO
         self.warning_message("Succes in the sensitiviy analysis ")
         
-        
-        r'''#Se guarda gráfico
-        self.create_sensitivity_graph()
-       '''
        
     def declare_rasters_sensitivity_analysis(self):
         """Method to declare the values of the rasters in sensitivity analysis"""
@@ -6755,76 +6848,337 @@ class qannagnps():
             except:
                 pass
     
-    def create_sensitivity_graph(self):
-        #Metod to create sensitivity graph
-        if self.sensitivity_dialog.sobol.isChecked(): 
+    def update_sensitivity_graph_global(self):
+        """Method to update the graph of the sensitivity for Sobol"""
+        #Create and clear axis before drawing
+        if not hasattr(self, 'canvas_sensitivity_graph'):
+            # Si no existe, crear el canvas y añadirlo al layout
+            self.canvas_sensitivity_graph = FigureCanvas(plt.Figure(figsize=(15, 6)))
+            
+            # Asignar un layout al QFrame si no tiene uno
+            layout = QVBoxLayout(self.dlg_results_sensitivity.frame_64)
+            self.dlg_results_sensitivity.frame_64.setLayout(layout)
+            
+            # Añadir el canvas al layout
+            layout.addWidget(self.canvas_sensitivity_graph)
+        else:
+            # Si ya existe, simplemente limpiar el canvas
+            self.canvas_sensitivity_graph.figure.clear()
+        
+        #Function to convert nans to 0
+        def nan_function(value):    
+            if value.replace("\n","") == "nan":
+                return 0
             try:
-                self.Si.plot()
-                plt.savefig(self.direccion+"\\Sobol.png",transparent=False,bbox_inches = "tight",dpi=300)
-                os.startfile(self.direccion+"\\Sobol.png")
+                return float(value)
             except:
-                pass
-            #Se guardan datos
-            df_dic = {}
-            for i,k in enumerate(self.dic_data.keys()):
-                df_dic[k.replace('\n','')] = [x[i] for x in self.param_values]
-            df_dic["Results"] = self.resultados
-            df = pd.DataFrame(data = df_dic) 
-            df.to_csv(self.direccion+"\\"+'Results_sobol.csv', index=False, float_format='%.5f')
-            self.progress_metod(close = True)
-            print(self.Si)
+                return 0
+        
+        #Sensitivity graphs
+        if self.dlg_results_sensitivity.radio_sensitivity.isChecked():
+            #MORRIS
+            if self.dlg_results_sensitivity.radio_morris.isChecked():
+                ruta = self.dlg_results_sensitivity.csv_results_morris.text()
+                if os.path.exists(ruta) and os.path.isfile(ruta):
+                    with open(ruta, "r") as archivo:
+                        lineas = archivo.readlines()
+                    #If the csv is not of a Morris sensitivity analysis then give error
+                    if lineas[0]!="Morris sensitivity indexes (mu star_sigma_mu_mu star confidence)" + '\n':
+                        self.warning_message("Please select a csv file that contains Morris sensitivity analysis results")
+                        return
+                    
+                    #Obtain output
+                    for i in range(self.dlg_results_sensitivity.frame_18.layout().count()):
+                        item = self.dlg_results_sensitivity.frame_18.layout().itemAt(i)
+                        widget = item.widget()
+                        
+                        #Checks if the widget is a QCheckBox and if it is selected.
+                        if isinstance(widget, QRadioButton) and widget.isChecked():
+                            output_column = widget.text()
+                    
+                    names_inputs = []
+                    mu_star = []
+                    sigma = []
+                    mu = []
+                    mu_star_conf = []
+                    for i in range(len(lineas)):
+                        if lineas[i] == output_column+ '\n':
+                            for k in lineas[i+1:]:
+                                if k == "----------------------------------------------------------------------" + '\n':
+                                        break
+                                names_inputs.append(k.split(":")[0])
+                                mu_star.append(nan_function(k.split(":")[1].split("_")[0]))
+                                sigma.append(nan_function(k.split(":")[1].split("_")[1]))
+                                mu.append(nan_function(k.split(":")[1].split("_")[2]))
+                                mu_star_conf.append(nan_function(k.split(":")[1].split("_")[3]))
+                    
+                    #If output doesnt exist, then stop with the code
+                    if len(mu_star) == 0:
+                        self.canvas_sensitivity_graph.figure.clear()
+                        #If I clear but not .draw() then is changed but only when dialog is maximized or minimized
+                        self.canvas_sensitivity_graph.draw()
+                        return
+                        
+                    self.ax = self.canvas_sensitivity_graph.figure.subplots()
+                    # Graficar los puntos con color granate y agregar etiquetas
+                    add_label_monotonic = True # add label only once
+                    add_label_non_monotonic = True # add label only once
+                    for i, (x, y,conf) in enumerate(zip(mu_star, sigma,mu_star_conf)):
+                        if np.isnan(x):x = 0
+                        if np.isnan(y):y = 0
+                        #If the difference between mu and mu star is higher than 5%, then is non-monotonic
+                        if abs(mu_star[i]) == 0 and abs(mu_star[i]) == 0:
+                            difference = 0
+                        elif abs(mu_star[i]) != 0 and abs(mu_star[i]) == 0:
+                            difference = 1
+                        else:
+                            difference = (abs(mu_star[i])-abs(mu[i]))/abs(mu_star[i])
+                        if difference>0.05:
+                            if add_label_non_monotonic: # add label only once
+                                self.ax.errorbar(x, y, xerr = conf,color="blue",ecolor='black', marker="*", label="Non-Monotonic", capsize=5)
+                                add_label_non_monotonic = False
+                            else:
+                                self.ax.errorbar(x, y, xerr = conf, color="blue",ecolor='black', marker="*", capsize=5)
+                            self.ax.annotate("\n".join(textwrap.wrap(names_inputs[i], width=20, break_long_words=False)), (x, y), textcoords="offset points", xytext=(10,10), ha='center', 
+                                fontweight='bold',fontsize = 10)
+                        else:
+                            if add_label_monotonic: # add label only once
+                                self.ax.errorbar(x, y,xerr = conf, marker="o", color="maroon",ecolor='black',label="Monotonic", capsize=5)
+                                add_label_monotonic = False
+                            else:
+                                self.ax.errorbar(x, y, xerr = conf,marker="o", color="maroon",ecolor='black', capsize=5)
+                                
+                            self.ax.annotate("\n".join(textwrap.wrap(names_inputs[i], width=20, break_long_words=False)), (x, y), textcoords="offset points", xytext=(10,10), ha='center', 
+                                fontweight='bold',fontsize = 10)
+                            
+                    #Linea 1:1
+                    line_plot = list(range(-1,int(max([mu_star[x]+mu_star_conf[x] for x in range(len(mu_star))]+list(sigma))*1.1)+2))
+                    self.ax.plot(line_plot, line_plot, color="red",linestyle="--")
+                    
+                    if max(list(mu_star)+list(sigma))>0:
+                        self.ax.set_xlim(0,max([mu_star[x]+mu_star_conf[x] for x in range(len(mu_star))]+list(sigma))*1.1)
+                        self.ax.set_ylim(0,max([mu_star[x]+mu_star_conf[x] for x in range(len(mu_star))]+list(sigma))*1.1)
+                    else:
+                        self.ax.set_xlim(0,1)
+                        self.ax.set_ylim(0,1)
+                    
+                    #Add legend
+                    legend = self.ax.legend(
+                        loc="lower center",  # Centrar horizontalmente
+                        bbox_to_anchor=(0.9, 1.01),  # Posición justo arriba del gráfico
+                        ncol=1,  # Número de columnas en la leyenda
+                        frameon=False
+                    )
+                    legend.get_frame().set_alpha(0)
             
-            #Esto borrar
-            with open(self.direccion+"\\"+'Results_sobol.txt', "w") as archivo:
-                # Escribir cada clave y valor del diccionario en una línea
-                for clave, valor in self.Si.items():
-                    archivo.write(f"{clave}: {valor}\n")
+                    #Labels
+                    self.ax.set_xlabel(r"Mean of Elementary Effects ($\mu_{i}^{*}$)")
+                    self.ax.set_ylabel("Standard Deviation of Elementary Effects ($\sigma_{i}$)")
+                    self.ax.set_title("Morris sensitivity analysis indexes")
+                    #Change background color
+                    self.canvas_sensitivity_graph.figure.set_facecolor('#f0f0f0')
+                    self.ax.set_facecolor('#f0f0f0')
+                    # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
+                    self.canvas_sensitivity_graph.figure.subplots_adjust(left=0.2, bottom=0.2)
+                    #Draw canvas
+                    self.canvas_sensitivity_graph.draw()
+                
+                else: #if path doesnt exist then clear figure
+                    self.canvas_sensitivity_graph.figure.clear()
+                    #If I clear but not .draw() then is changed but only when dialog is maximized or minimized
+                    self.canvas_sensitivity_graph.draw()
+                    
             
-        elif self.sensitivity_dialog.morris.isChecked():
-            plt.rcParams["figure.figsize"] = [10, 8]
-            fig = plt.figure()
-            ax0 = plt.subplot()
-            # Graficar los puntos con color granate y agregar etiquetas
-            for i, (x, y) in enumerate(zip(self.Si["mu_star"], self.Si["sigma"])):
-                if np.isnan(x):x = 0
-                if np.isnan(y):y = 0
-                ax0.scatter(x, y, marker="o", color="maroon")
-                ax0.annotate(f'{self.Si["names"][i]}', (x, y), textcoords="offset points", xytext=(10,10), ha='center', fontweight='bold')
-            #Linea 1:1
-            line_plot = list(range(-1,int(max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)+2))
-            ax0.plot(line_plot, line_plot, color="red",linestyle="--")
+            
+            #Sobol
+            elif self.dlg_results_sensitivity.radio_sobol.isChecked():
+                ruta = self.dlg_results_sensitivity.csv_results_2.text()
+                if os.path.exists(ruta) and os.path.isfile(ruta):
+                    with open(ruta, "r") as archivo:
+                        lineas = archivo.readlines()
+                    #If the csv is not of a Sobol sensitivity analysis then give error
+                    if lineas[0]!="Sobol sensitivity indexes (S1_S1 conf_ST_ST conf)" + '\n':
+                        self.warning_message("Please select a csv file that contains Sobol sensitivity analysis results")
+                        return
+                    
+                    #Create and clear axis before drawing
+                    self.canvas_sensitivity_graph.figure.clear()
+                    self.ax_sobol = self.canvas_sensitivity_graph.figure.subplots(1, 2)
+                    
+                    #Obtain output
+                    for i in range(self.dlg_results_sensitivity.frame_18.layout().count()):
+                        item = self.dlg_results_sensitivity.frame_18.layout().itemAt(i)
+                        widget = item.widget()
+                        
+                        #Checks if the widget is a QCheckBox and if it is selected.
+                        if isinstance(widget, QRadioButton) and widget.isChecked():
+                            output_column = widget.text()
+                    
+                    names_inputs = []
+                    s1 = []
+                    s1_conf = []
+                    st = []
+                    st_conf = []
+                    for i in range(len(lineas)):
+                        if lineas[i] == output_column+ '\n':
+                            for k in lineas[i+1:]:
+                                if k == "----------------------------------------------------------------------" + '\n':
+                                        break
+                                names_inputs.append(k.split(":")[0]) 
+                                s1.append(nan_function(k.split(":")[1].split("_")[0]))
+                                s1_conf.append(nan_function(k.split(":")[1].split("_")[1]))
+                                st.append(nan_function(k.split(":")[1].split("_")[2]))
+                                st_conf.append(nan_function(k.split(":")[1].split("_")[3]))
+                    
+                    #If output doesnt exist, then stop with the code
+                    if len(s1) == 0:
+                        self.canvas_sensitivity_graph.figure.clear()
+                        #If I clear but not .draw() then is changed but only when dialog is maximized or minimized
+                        self.canvas_sensitivity_graph.draw()
+                        return
+                    
+                    #Total order 
+                    self.ax_sobol[0].bar(names_inputs, st, yerr=st_conf, capsize=5, color='b')
+                    self.ax_sobol[0].set_title('Sobol Total order index (ST)', fontsize=10)
+                    self.ax_sobol[0].set_ylabel('Sobol index')
+                    self.ax_sobol[0].tick_params(axis='x', rotation=90,labelsize = 10)
+                    for label in self.ax_sobol[0].get_xticklabels():
+                        label.set_ha('right')
+                    
+                    #First order 
+                    self.ax_sobol[1].bar(names_inputs, s1, yerr=s1_conf, capsize=5, color='b')
+                    self.ax_sobol[1].set_title('Sobol First order index (S1)', fontsize=10)
+                    self.ax_sobol[1].tick_params(axis='x', rotation=90,labelsize = 10)
+                    for label in self.ax_sobol[1].get_xticklabels():
+                        label.set_ha('right')
+                    
+                    #Change background color
+                    self.canvas_sensitivity_graph.figure.set_facecolor('#f0f0f0')
+                    self.ax_sobol[0].set_facecolor('#f0f0f0')
+                    self.ax_sobol[1].set_facecolor('#f0f0f0')
+                    
+                    # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
+                    self.canvas_sensitivity_graph.figure.subplots_adjust(wspace=0.4) #spacing beteween two graphs
+                    self.canvas_sensitivity_graph.figure.subplots_adjust(left=0.2, bottom=0.2)
+                    #Draw canvas
+                    self.canvas_sensitivity_graph.draw()
+                
+                else: #if path doesnt exist then clear figure
+                    self.canvas_sensitivity_graph.figure.clear()
+                    #If I clear but not .draw() then is changed but only when dialog is maximized or minimized
+                    self.canvas_sensitivity_graph.draw()
+            
+                
+        #Uncertainity graphs
+        elif self.dlg_results_sensitivity.radio_uncertainty.isChecked():
+            try:
+                #Warning messages
+                if self.dlg_results_sensitivity.radio_morris.isChecked():
+                    ruta = self.dlg_results_sensitivity.csv_results_morris.text()
+                elif self.dlg_results_sensitivity.radio_sobol.isChecked():
+                    ruta = self.dlg_results_sensitivity.csv_results_2.text()
+                if os.path.exists(ruta):
+                    with open(ruta, "r") as archivo:
+                        lineas = archivo.readlines()
+                    #If the csv is not of a Uncertainity sensitivity analysis then give error
+                    if lineas[0]!="Uncertainty analysis results" + '\n' and lineas[0]!="Morris sensitivity indexes (mu star_sigma_mu_mu star confidence)" + '\n' and lineas[0]!="FAST sensitivity indexes S1_S1 conf_ST_ST conf" + '\n' and lineas[0]!="Sobol sensitivity indexes (S1_S1 conf_ST_ST conf)" + '\n':
+                        self.warning_message("Please select a csv file that contains Uncertainity analysis results")
+                        return
+                        
+                    self.ax_uncertainity = self.canvas_sensitivity_graph.figure.subplots(1,2)
+                    
+                    #Obtain data 
+                    with open(ruta, "r") as archivo:
+                         lines = archivo.readlines()
+                    #Function to give nan if the value is not a number
+                    def nan_function(value):    
+                        if value.replace("\n","") == "nan":
+                            return np.nan
+                        try:
+                            return float(value)
+                        except:
+                            return np.nan
+                    
+                    #When we see column error then we have the data
+                    for index in range(len(lines)):
+                        if len(lines[index].split(","))>2:
+                            columns = [x.replace('\n', '') for x in lines[index].split(",")]
+                            rows = []
+                            for i in range(index+1,len(lines)):
+                                rows.append([nan_function(x) for x in lines[i].split(",")])
+                            break
 
-            ax0.set_xlim(0,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
-            ax0.set_ylim(0,max(list(self.Si["mu_star"])+list(self.Si["sigma"]))*1.05)
-            #Separador de miles
-            if max(list(self.Si["mu_star"])+list(self.Si["sigma"]))<5: number_decimals = 2
-            else: number_decimals = 0
-            def formato_con_separador(valor, pos):
-                return "{:,.{}f}".format(valor,number_decimals)
-            ax0.xaxis.set_major_formatter(FuncFormatter(formato_con_separador))
-            ax0.yaxis.set_major_formatter(FuncFormatter(formato_con_separador))
-            #Labels
-            ax0.set_xlabel("Mean of Elementary Effects ($\mu_{i}^{*}$)",size = 15,family="arial",weight = "bold",color = "black")
-            ax0.set_ylabel("Standard Deviation of Elementary Effects ($\sigma_{i}$)",size = 15,family="arial",weight = "bold",color = "black")
-            plt.savefig(self.direccion+"\\"+"Morris.png",transparent=False,bbox_inches = "tight",dpi=300)
-            os.startfile(self.direccion+"\\"+"Morris.png")
-            
-            #Se guardan datos
-            df_dic = {}
-            for i,k in enumerate(self.dic_data.keys()):
-                df_dic[k.replace("\n", "")] = [x[i] for x in self.param_values]
-            df_dic["Results"] = self.resultados
-            df = pd.DataFrame(data = df_dic) 
-            df.to_csv(self.direccion+"\\"+'Results_morris.csv', index=False, float_format='%.5f')
-            self.progress_metod(close = True)
-            print(self.Si)
-            
-            #Esto borrar
-            with open(self.direccion+"\\"+'Results_morris.txt', "w") as archivo:
-                # Escribir cada clave y valor del diccionario en una línea
-                for clave, valor in self.Si.items():
-                    archivo.write(f"{clave}: {valor}\n")
+
+                    df = pd.DataFrame(rows, columns=columns)
+                    
+                    #Get output
+                    for i in range(self.dlg_results_sensitivity.frame_18.layout().count()):
+                        item = self.dlg_results_sensitivity.frame_18.layout().itemAt(i)
+                        widget = item.widget()
+                        
+                        #Checks if the widget is a QCheckBox and if it is selected.
+                        if isinstance(widget, QRadioButton) and widget.isChecked():
+                            output_column = widget.text()
+                    
+                    
+                    y = [float(x) for x in df[output_column] if x!=np.nan]
+                    
+                    bins = 30
+                    self.ax_uncertainity[0].hist(y, bins=bins, edgecolor='black')
+                    #Labels
+                    output_with_line_breaks = "\n".join(textwrap.wrap(output_column, width=37, break_long_words=False))
+                    self.ax_uncertainity[0].set_xlabel(output_with_line_breaks)
+                    self.ax_uncertainity[0].set_ylabel("Frequency")
+                    
+                    ax2 = self.ax_uncertainity[0].twinx()
+                    x_sorted = np.sort(y)
+                    # Calcular la frecuencia acumulativa
+                    acum = np.arange(1, len(x_sorted) + 1) / len(x_sorted)
+                    # Graficar la frecuencia acumulativa con líneas
+                    ax2.plot(x_sorted, acum, linestyle='-', marker='',color = "black")
+                    ax2.set_ylabel("Cumulative Frequency")
+                    #Put ax2 in the front
+                    self.ax_uncertainity[0].set_zorder(1)
+                    ax2.set_zorder(2)
+                    #Delete grid
+                    ax2.grid(visible=False)
+                    
+                    #Box plot
+                    self.ax_uncertainity[1].boxplot(y)
+                    self.ax_uncertainity[1].set_xticks([])
+                    # Añadir título y etiquetas
+                    self.ax_uncertainity[1].set_ylabel(output_with_line_breaks)
+                    #Title to graph
+                    self.canvas_sensitivity_graph.figure.suptitle(f"Uncertainty of {output_column}", fontsize = 10)
+                    
+                    #Change background color
+                    self.canvas_sensitivity_graph.figure.set_facecolor('#f0f0f0')
+                    self.ax_uncertainity[0].set_facecolor('#f0f0f0')
+                    self.ax_uncertainity[1].set_facecolor('#f0f0f0')
+                    # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
+                    self.canvas_sensitivity_graph.figure.subplots_adjust(wspace=0.7) #spacing beteween two graphs
+                    self.canvas_sensitivity_graph.figure.subplots_adjust(left=0.1, bottom=0.2)
+                    #Draw canvas
+                    self.canvas_sensitivity_graph.draw()
+                
+            except:
+                # Clear canvas
+                self.canvas_sensitivity_graph.figure.clear()
+                self.ax_uncertainity[0].clear()
+                self.ax_uncertainity[1].clear()
+                self.canvas_sensitivity_graph.draw()
+        
+        
+        #Save figure
+        self.dlg_results_sensitivity.print_graph_sensitivity.clicked.connect(lambda _, b= [self.dlg_results_sensitivity,self.canvas_sensitivity_graph]:self.figure_settings(b))
     
+    
+    def figure_settings(self, information):
+        """Method to select the settings of the image that is going to be saved"""
+        self.dlg_figure_settings.show()
+        self.information_figure_save = information
+        
+        
     def resample_rasters(self):
         #Metod to resample rasters
         orden_pixel = list(self.dic_data.keys()).index("Pixel Size") #columna en la que están los valores de tamaño de pixel
@@ -6942,10 +7296,8 @@ class Sensitivity_Parallelization(QgsTask):
     def ejecucion_completa_sensitivity(self):
         #Esta función es en donde se ejecuta el modelo
         #EJECUCIÓN DE TOPAGNPS
-        print(3)
         if self.execute_preprocessing_sensitivity:
             #Se crea la carpeta de Preprocessing_inputs si no estaba creada. Ahí se meten los inputs y se ejecuta TopAGNPS y luego los outputs se meten a Preprocessing_outputs
-            print(4)
             
             #Función para que se le diga el nombre del archivo y te devuelva la dirección completa
             def fichero(nombre):
@@ -6963,24 +7315,26 @@ class Sensitivity_Parallelization(QgsTask):
                 self.end_execution = 1
                 return
             #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs.
+            self.registrar_numero("uno_uno")
             for j,k in enumerate(self.dic_data.keys()):
                 self.change_inputs_sensitivity(self.param_values[self.n-1],j,k,spatial =True) #cambio de los inputs espaciales
-            
+            self.registrar_numero("uno_dos")
             #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
             self.time_start_preprocessing = datetime.now()
             #EJECUCIÓN DE TOPAGNPS            
             def main():
                 f = open(self.executable_directory+"\\"+f"EjecutarTopagnps_{self.core}.bat","w+")
-                linea_uno = "CD {}".format(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs")
+                linea_uno = "CD /d {}".format(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs")
                 linea_dos = r"CALL {}\TopAGNPS_v6.00.a.025_release_64-bit.exe".format(self.executable_directory)
                 f.write("{} \n".format(linea_uno))
                 f.write("{} \n".format(linea_dos))
                 f.close()
             main()
+            self.registrar_numero("uno_tres")
             subprocess.call(self.executable_directory+"\\"+f"EjecutarTopagnps_{self.core}.bat")
+            self.registrar_numero("uno_cuatro")
             #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarTopagnps.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             #stdout, stderr = proc.communicate()
-            print(12)
             #If error file of TopAGNPS is opened, then return a error message
             try:
                 open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.csv", "r+") 
@@ -7029,7 +7383,10 @@ class Sensitivity_Parallelization(QgsTask):
             self.save_files_preprocessing_in_folder_sensitivity()
             
             #Move the outputs of TopAGNPS to use as inputs of AnnAGNPS
-            self.create_folder_processing_and_move_files()
+            try:    
+                self.create_folder_processing_and_move_files()
+            except Exception as e:
+                self.registrar_numero(str(e))
             
         #EJECUCIÓN DE ANNAGNPS
 
@@ -7049,7 +7406,7 @@ class Sensitivity_Parallelization(QgsTask):
         def execute_bat():
            def main():
                f = open(self.executable_directory+"\\"+f"EjecutarAnnAGNPS_{self.core}.bat","w+")
-               linea_uno = "CD {}".format(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs")
+               linea_uno = "CD /d {}".format(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs")
                linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
                f.write("{} \n".format(linea_uno))
                f.write("{} \n".format(linea_dos))
@@ -7314,7 +7671,7 @@ class Sensitivity_Parallelization(QgsTask):
     
     def registrar_numero(self,numero):
         # Definimos la ruta de la carpeta y del archivo
-        ruta_carpeta = r"C:\Users\inigo.barberena\Documents\Prueba"
+        ruta_carpeta = r"D:\Prueba"
         nombre_archivo = "mensajes.txt"
         ruta_completa = os.path.join(ruta_carpeta, nombre_archivo)
         
@@ -7615,168 +7972,21 @@ class Sensitivity_Parallelization(QgsTask):
     
     def create_folder_processing_and_move_files(self):
         """Method to create the preprocessing folders (if they dont exist) and move the input files here"""
+        self.registrar_numero("seis")
         #Move the outputs generated by topagnps to the inputs of annagnps
         names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
         names_in_master = ["Cell Data","Ephemeral Gully Data","Reach Data","Riparian Buffer Data","Wetland Data"]
-        
+        master = pd.read_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\annagnps_master.csv",encoding = "ISO-8859-1",delimiter=",")
+        self.registrar_numero("siete")
         for i in range(len(names_list)):
-            try: #if the file doesn't exist
-                #Comprobar si se ejecuta en el proyecto
-                if not pd.isna(self.project_df[names_in_master[i]]):
-                    shutil.copyfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs\\"+names_list[i],self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\watershed\\"+names_list[i])
-                    cambiar en el master para que el sitio de cada uno sea en la carpeta watershed
-            except:
-                pass
-        
-        carpeta = self.direccion+"\\Processing_inputs"
-        Path(carpeta).mkdir(parents=True, exist_ok=True)
-        
-            
-        
-
-        #METER ARCHIVOS EN CARPETAS DE INPUTS CORRESPONDIENTES. Completar cuales van a cada carpeta con el input editor.
-        #Primero se asigna la dirección, si es que se ha elegido la opción de que se obtengan de la ejecución de TopAGNPS
-        checks_list= [self.inputs.checkBox,self.inputs.checkBox_2,self.inputs.checkBox_3,self.inputs.checkBox_4,self.inputs.checkBox_5]
-        sections_list = [cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data]
-        names_list = ["AnnAGNPS_Cell_Data_Section.csv",self.ephemeral_gully_file(),"AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
-        for i in range(len(checks_list)):
-            if checks_list[i].isChecked():
-                sections_list[i]=self.direccion+"\\Preprocessing_outputs"+"\\"+names_list[i]
-        cell_data,ephemeral_gully,reach_data,riparian_buffer,wetland_data = sections_list
-        #Función para que se le diga el nombre del archivo y te devuelva la dirección completa, en este caso para los inputs que usará AnnAGNPS
-        def fichero_input(file_name,direct):
-            if os.path.isabs(file_name):
-                return   self.direccion+"\\Processing_inputs\\" + direct + "/" +os.path.basename(file_name)
-            else:
-                return self.direccion+"\\Processing_inputs\\" + direct + "/" +file_name
-        
-        #Listas de los nombres de archivos para cada tipo de input. Se elminan aquellos que no han sido escogidos ("")
-        #Clima
-        climate_files = [EI_pct_data,climate_data_daily,climate_data_station,storm_type_rfd,storm_type_updrc]
-        climate_files = [x for x in climate_files if x !=""]
-        #General
-        general_files = [crop_data,crop_growth,fertilizer_application,fertilizer_reference,hydraulic_geometry,management_field,
-                         management_operation,management_schedule_data,non_crop,riparian_buffer,runoff_curve,soil_data,soil_layer_data,
-                         strip_crop,tile_drain,aquaculture_schedule_data,contour_data,feedlot_management,geology_data,
-                         irrigation_application,pesticide_application,pesticide_reference,reach_nutrient,
-                         ]
-        general_files = [x for x in general_files if x !=""]
-        #Simulation
-        simulation_files = [annagnps_id,global_id,simulation_period_data,output_global,output_options_aa,output_options_tbl,
-                            global_error,pesticide_initial,pl_calibration,rcn_calibration,soil_initial_conditions,output_options_csv,
-                            output_options_dpp,output_options_npt, output_options_sim,output_options_mn,rusle2_data,output_options_ev]
-        simulation_files = [x for x in simulation_files if x !=""]
-        #Watershed
-        watershed_files = [cell_data,ephemeral_gully,reach_data,watershed_data,wetland_data,aquaculture_pond_data,
-                           classic_gully,feedlot_data,field_pond_data,impoundment_data,
-                           point_source,output_options_cell,output_options_feedlot,output_options_field,
-                           output_options_classic_gully,output_options_ephemeral_gully,output_options_impoundment,
-                           output_options_point_source,output_options_reach,output_options_wetland,ricewq_data]
-        watershed_files = [x for x in watershed_files if x !=""]
-        #Lista de listas
-        tipes_of_files = [climate_files,general_files,simulation_files,watershed_files]
-        
-        #Bucle para mover los inputs desde donde se encontraba el arcivo mdt a las carpetas necesarias
-        #Función para tener la dirección completa dependiendo de la carpeta en la que se encuentra o de si está la dirección completa puesta
-        def origin_direction(input_path, section):
-            if os.path.isabs(input_path):
-                return input_path
-            else:
-                if section == "watershed":
-                    return self.inputs.l_1.text()+"/"+input_path
-                elif section == "general":
-                    return self.inputs.l_23.text()+"/"+input_path
-                elif section == "climate":
-                    return self.inputs.l_47.text()+"/"+input_path
-                elif section == "simulation":
-                    return self.inputs.l_53.text()+"/"+input_path
-        #Bucle para mover los archivos inputs de AnnAGNPS
-        for t in tipes_of_files:
-            for f in t:
-                try:
-                    if t == climate_files and os.path.normpath(origin_direction(f,"climate"))!=os.path.normpath(fichero_input(f,"climate")):#esta última condición es porque si no hay que mover el archivo, da error
-                        shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
-                except:
-                    self.warning_message("Error AnnAGNPS\n{} file not found".format(origin_direction(f,"climate")))
-                    self.end_execution = 1
-                    return
-                try:
-                    if t == general_files and os.path.normpath(origin_direction(f,"general"))!= os.path.normpath(fichero_input(f,"general")):
-                       shutil.copyfile(origin_direction(f,"general"),fichero_input(f,"general"))
-                except:
-                    self.warning_message("Error AnnAGNPS\n{} file not found".format(origin_direction(f,"general")))
-                    self.end_execution = 1
-                    return
-                try:
-                    if t == simulation_files and os.path.normpath(origin_direction(f,"simulation"))!=os.path.normpath(fichero_input(f,"simulation")):
-                       shutil.copyfile(origin_direction(f,"simulation"),fichero_input(f,"simulation"))
-                except:
-                    self.warning_message("Error AnnAGNPS\n{} file not found".format(origin_direction(f,"simulation")))
-                    self.end_execution = 1
-                    return
-                try:
-                    if t == watershed_files and os.path.normpath(origin_direction(f,"watershed"))!=os.path.normpath(fichero_input(f,"watershed")):
-                        shutil.copyfile(origin_direction(f,"watershed"),fichero_input(f,"watershed"))
-                except:
-                    self.warning_message("Error AnnAGNPS\n{} file not found".format(origin_direction(f,"watershed")))
-                    self.end_execution = 1
-                    return
-                    
-        #CREACIÓN DEL ARCHIVO annagnps_master.csv
-        def fichero_master(nombre):
-            try:
-                if nombre in climate_files:
-                    directory = "climate"
-                if nombre in general_files:
-                    directory = "general"
-                if nombre in simulation_files:
-                    directory = "simulation"
-                if nombre in watershed_files:
-                    directory = "watershed"
-                if not os.path.isabs(nombre):
-                    return ".\\"+ directory + "\\" + nombre
-                if os.path.isabs(nombre):
-                    return ".\\"+ directory + "\\" + os.path.basename(nombre)
-            except:
-                return nombre 
-        master_dict = {"AnnAGNPS ID":annagnps_id,"Aquaculture Pond Data":aquaculture_pond_data,
-                       "Aquaculture Schedule Data":aquaculture_schedule_data,"Cell Data":cell_data,"Classic Gully Data":classic_gully,
-                       "Contour Data":contour_data,"Crop Data":crop_data,"Crop Growth Data":crop_growth,
-                       "Ephemeral Gully Data":ephemeral_gully,"Feedlot Data":feedlot_data,"Feedlot Management Data":feedlot_management,
-                       "Fertilizer Application Data":fertilizer_application,"Fertilizer Reference Data":fertilizer_reference,
-                       "Field Pond Data":field_pond_data,"Geology Data":geology_data,
-                       "Global Error and Warning Limits Data":global_error,"Global IDs Factors and Flags Data":global_id,
-                       "Hydraulic Geometry Data":hydraulic_geometry,"Impoundment Data":impoundment_data,
-                       "Irrigation Application Data":irrigation_application,"Management Field Data":management_field,
-                       "Management Operation Data":management_operation,"Management Schedule Data":management_schedule_data,
-                       "Non-Crop Data":non_crop,
-                       "Pesticide Application Data":pesticide_application,"Pesticide Initial Conditions Data":pesticide_initial,
-                       "Pesticide Reference Data":pesticide_reference,"PL Calibration Data":pl_calibration,
-                       "Point Source Data":point_source,"RCN Calibration Data":rcn_calibration,"Reach Data":reach_data,
-                       "Reach Nutrient Half-life Data":reach_nutrient,"Runoff Curve Number Data":runoff_curve,
-                       "Simulation Period Data":simulation_period_data,"Soil Data":soil_data,"Soil Layer Data":soil_layer_data,
-                       "Soil Initial Conditions Data":soil_initial_conditions,"Strip Crop Data":strip_crop,
-                       "Tile Drain Data":tile_drain,"Watershed Data":watershed_data,"EI Pct Data":EI_pct_data,
-                       "STORM TYPE DATA - RFD":storm_type_rfd,"STORM TYPE DATA - UPDRC":storm_type_updrc,
-                       "Output Options - Global":output_global,"Output Options - AA":output_options_aa, "Output Options - EV":output_options_ev,
-                       "Output Options - CSV":output_options_csv,"Output Options - DPP":output_options_dpp,
-                       "Output Options - NPT":output_options_npt,"Output Options - SIM":output_options_sim,
-                       "Output Options - TBL":output_options_tbl,"Output Options - MN/MX":output_options_mn,
-                       "Output Options - Cell":output_options_cell,"Output Options - Feedlot":output_options_feedlot,
-                       "Output Options - Field Pond":output_options_field,
-                       "Output Options - Classic Gully":output_options_classic_gully,
-                       "Output Options - Ephemeral Gully":output_options_ephemeral_gully,
-                       "Output Options - Impoundment":output_options_impoundment,
-                       "Output Options - Point Source":output_options_point_source,
-                       "Output Options - Reach":output_options_reach,
-                       "Output Options - Wetland":output_options_wetland,
-                       "CLIMATE DATA - STATION":climate_data_station,
-                       "CLIMATE DATA - DAILY":climate_data_daily,"Wetland Data":wetland_data,"Riparian Buffer Data":riparian_buffer,
-                       "RUSLE2 Data":rusle2_data,"RiceWQ Data":ricewq_data}
-        data_section = [list(master_dict)[x] for x in range(len(master_dict)) if master_dict[list(master_dict)[x]] !=""]
-        file_name = [fichero_master(master_dict[x]) for x in data_section]
-        master = pd.DataFrame(data = {"Data Section ID":data_section,"File Name":file_name})
-        master.to_csv(self.direccion +"\\Processing_inputs\\" + "annagnps_master.csv", encoding='utf-8', index=False)
-        
-        #MOVER EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS de procesamiento
-        shutil.copyfile(self.plugin_dir+"\\Executables"  + "\\" +"AnnAGNPS.fil" ,self.direccion +"\\Processing_inputs\\" +"AnnAGNPS.fil")
+            #Comprobar si se ejecuta en el proyecto
+            if not pd.isna(self.project_df[self.project_df.iloc[:,0]==names_in_master[i]].iloc[0,1]) and os.path.exists(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs\\"+names_list[i]): 
+                #Move files
+                shutil.copyfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs\\"+names_list[i],self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\watershed\\"+names_list[i])
+                #Change annagnps_master
+                master[master.iloc[:,0]==names_in_master[i]].iloc[0,1] = f'.\\watershed\\{names_list[i]}'
+                master.to_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\annagnps_master.csv", encoding='utf-8', index=False)
+            else: 
+                master = master[master.iloc[:,0]!=names_in_master[i]]
+                master.to_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\annagnps_master.csv", encoding='utf-8', index=False)
+        self.registrar_numero("ocho")

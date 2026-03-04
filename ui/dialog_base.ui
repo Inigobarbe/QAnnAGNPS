@@ -342,7 +342,7 @@ QPushButton:hover {
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-237</y>
+            <y>0</y>
             <width>641</width>
             <height>602</height>
            </rect>
@@ -1400,13 +1400,6 @@ QCheckBox::indicator:unchecked {
               <enum>QFrame::Raised</enum>
              </property>
              <layout class="QGridLayout" name="gridLayout_15">
-              <item row="1" column="0">
-               <widget class="Line" name="line_8">
-                <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
-                </property>
-               </widget>
-              </item>
               <item row="0" column="0">
                <widget class="QLabel" name="label_20">
                 <property name="font">
@@ -1421,10 +1414,23 @@ QCheckBox::indicator:unchecked {
                 </property>
                </widget>
               </item>
-              <item row="2" column="0">
+              <item row="1" column="0" colspan="2">
+               <widget class="Line" name="line_8">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0" colspan="2">
                <layout class="QHBoxLayout" name="horizontalLayout">
                 <item>
                  <widget class="QLabel" name="label_21">
+                  <property name="minimumSize">
+                   <size>
+                    <width>260</width>
+                    <height>0</height>
+                   </size>
+                  </property>
                   <property name="font">
                    <font>
                     <weight>75</weight>
@@ -1432,7 +1438,7 @@ QCheckBox::indicator:unchecked {
                    </font>
                   </property>
                   <property name="text">
-                   <string>Design sensitivity analysis</string>
+                   <string>Execute sensitivity and uncertainty analysis</string>
                   </property>
                  </widget>
                 </item>
@@ -1468,7 +1474,54 @@ QPushButton:hover {
                 </item>
                </layout>
               </item>
-              <item row="3" column="0">
+              <item row="3" column="0" colspan="2">
+               <layout class="QHBoxLayout" name="horizontalLayout_18">
+                <item>
+                 <widget class="QLabel" name="label_35">
+                  <property name="font">
+                   <font>
+                    <weight>75</weight>
+                    <bold>true</bold>
+                   </font>
+                  </property>
+                  <property name="text">
+                   <string>Results of sensitivity and uncertainty analysis</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="results_sensitivity">
+                  <property name="styleSheet">
+                   <string notr="true">QPushButton {
+    background-color: #becbd1;
+    color: black;
+}
+
+QPushButton:hover {
+    color: white;
+}</string>
+                  </property>
+                  <property name="text">
+                   <string/>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="horizontalSpacer_2">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </item>
+              <item row="4" column="1">
                <spacer name="verticalSpacer_5">
                 <property name="orientation">
                  <enum>Qt::Vertical</enum>

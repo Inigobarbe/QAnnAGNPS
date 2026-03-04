@@ -1,0 +1,15 @@
+TopAGNPS,INFO   , 1000,Opened message file: TopAGNPS_log.CSV
+TopAGNPS,INFO   , 1000,Opened message file: TopAGNPS_wrn.CSV
+TopAGNPS,INFO   , 1000,Opened message file: TopAGNPS_err.CSV
+TopAGNPS,INFO   ,    0,EXECUTION START DATE: 03/04/2026
+TopAGNPS,INFO   ,    0,EXECUTION START TIME: 10:19:12 - Module: TopAGNPS
+TopAGNPS,INFO   , 1003,*** BEGIN EXECUTION: TopAGNPS v6.00.a.025_2024.01.10  64-bit execution ***
+TopAGNPS,INFO   , 1008,No command line arguments were detected; all modules will be executed in sequence unless superceded by a "MODULE" keyword in the control file.
+TopAGNPS,INFO   , 1005,Control file "" does not exist; will check for existence of "DEDNM.INP" and "DNMCNT.INP".
+TopAGNPS,WARNING, 2000,The required input files "DEDNM.INP" and/or "DNMCNT.INP" was not found in the executable path. Skipping execution of DEDNM; RASPRO; RASFOR; and AgFlow.
+TopAGNPS,ERROR  , 3000,An error occurred while trying to open input DEM file "DEDNM.INP". Not found or perhaps open in another application.
+TopAGNPS,INFO   , 1003,Executing module "TopAGNPS_Clean_Up"
+TopAGNPS,INFO   , 1003,Completed module "TopAGNPS_Clean_Up"
+TopAGNPS,INFO   ,    0,Opened status file: TopAGNPS_status.CSV
+TopAGNPS,INFO   ,    0,Status reported as: Abnormal; Errors; Warnings
+TopAGNPS,INFO   , 1003,*** ENDING EXECUTION: TopAGNPS v6.00.a.025_2024.01.10  64-bit execution ***
