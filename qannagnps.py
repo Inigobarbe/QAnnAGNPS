@@ -35,6 +35,7 @@ from qgis.PyQt.QtWidgets import QApplication, QMainWindow, QProgressBar, QLabel,
 from qgis.core import QgsTask, QgsApplication
 from PyQt5.QtGui import QPixmap
 from pathlib import Path
+import seaborn as sns
 
 import subprocess
 import os
@@ -59,6 +60,7 @@ import sys
 import chardet
 import glob
 import textwrap
+import matplotlib.ticker as ticker
 
 import traceback
 
@@ -94,6 +96,8 @@ from .ui.warning_message import warning_message
 from .ui.overwrite_project import overwrite_project
 from .ui.results_sensitivity import results_sensitivity
 from .ui.figure_settings import figure_settings
+from .ui.calibration import CalibrationDialog
+from .ui.calibration_inputs import calibration_inputs
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -204,6 +208,8 @@ class qannagnps():
         self.dlg_overwrite_project = overwrite_project()
         self.dlg_results_sensitivity = results_sensitivity()
         self.dlg_figure_settings = figure_settings()
+        self.dlg_calibration = CalibrationDialog()
+        self.dlg_calibration_inputs = calibration_inputs()
         
         
         #Boton principal
@@ -278,6 +284,18 @@ class qannagnps():
         self.dlg.comboBox_3.currentIndexChanged.connect(self.instantiate_vegetation)
         self.dlg.cbSoil.currentIndexChanged.connect(self.instantiate_soil)
         self.dlg.cbMan.currentIndexChanged.connect(self.instantiate_management)
+        
+        #Abrir calibracion y sus inputs
+        self.dlg.calibration.clicked.connect(self.dlg_calibration.show)
+        self.dlg_calibration.runoff_push.clicked.connect(self.dlg_calibration_inputs.show)
+        self.dlg_calibration.erosion_push.clicked.connect(self.dlg_calibration_inputs.show)
+        self.dlg_calibration.nitrogen_push.clicked.connect(self.dlg_calibration_inputs.show)
+        self.dlg_calibration.carbon_push.clicked.connect(self.dlg_calibration_inputs.show)
+        self.dlg_calibration.phosphorus_push.clicked.connect(self.dlg_calibration_inputs.show)
+        
+        #Browse calibration inputs
+        self.dlg_calibration_inputs.browse.clicked.connect(self.browse_inputs_calibration)
+        self.dlg_calibration_inputs.lineEdit.textChanged.connect(self.update_graph_calibration_inputs)
         
         
         #Cambiar el nombre en el control file de AGBUF.csv de las columnas Buffer y Vegetation al seleccionar una capa
@@ -612,23 +630,34 @@ class qannagnps():
         self.sensitivity_dialog.Climate.clicked.connect(lambda _,b = "Climate":self.annagnps_inputs(b))
         self.sensitivity_dialog.Simulation.clicked.connect(lambda _,b = "Simulation":self.annagnps_inputs(b))
         
+        #Show inputs in sensitivity analysis dialog
+        self.dlg_calibration.Spatial.clicked.connect(lambda _,b = "Spatial":self.calibration_inputs(b))
+        self.dlg_calibration.Watershed.clicked.connect(lambda _,b = "Watershed":self.calibration_inputs(b))
+        self.dlg_calibration.General.clicked.connect(lambda _,b = "General":self.calibration_inputs(b))
+        self.dlg_calibration.Climate.clicked.connect(lambda _,b = "Climate":self.calibration_inputs(b))
+        self.dlg_calibration.Simulation.clicked.connect(lambda _,b = "Simulation":self.calibration_inputs(b))
+        
         #Add distributions to combobox
         self.sensitivity_dialog.distributions.addItems(["Uniform","Logaritmic uniform","Triangular","Normal","Lognormal","Normal truncated"])
         
-        #Button to add information to the sensitivity table 
+        #Button to add information to the sensitivity table and calibration
         self.sensitivity_dialog.add.clicked.connect(self.add_sensitivity_table)
+        self.dlg_calibration.add.clicked.connect(self.add_calibration_table)
         
-        #Button to delete information of the sensitivity table
+        #Button to delete information of the sensitivity table and calibration
         self.sensitivity_dialog.delete_row.clicked.connect(self.delete_sensitivity_table)
+        self.dlg_calibration.delete_row.clicked.connect(self.delete_calibration_table)
         
-        #Run sensitivity analysis
+        #Run sensitivity analysis and calibration
         self.sensitivity_dialog.accept.clicked.connect(self.run_sensitivity_analysis)
+        self.dlg_calibration.accept.clicked.connect(self.run_calibration)
         
         #Por defecto, cuando se sobreescribe se sobreescibe con el CSV no con la tabla del diálogo
         self.overwriting_input =False
         
-        #Search inputs in sensitivity analysis
+        #Search inputs in sensitivity analysis and calibration
         self.sensitivity_dialog.search.textChanged.connect(self.search_sensitiviy_input)
+        self.dlg_calibration.search.textChanged.connect(self.search_calibration_input)
         
         #Diccionario analisis de sensibilidad nombre en el dialogo - [nombre del archivo, nombre de la columna]
         dic_spatial = {'Pixel Size':['Spatial','TOPAGNPS.csv','FILENAME'],'Critical Source Area':['Spatial','TOPAGNPS.csv','CSA'],'Minimum Source Channel \nLength':['Spatial','TOPAGNPS.csv','MSCL'],'Absolute CTI':['Spatial','PEG.csv','CTI_value'],'Relative CTI':['Spatial','PEG.csv','Accum_pct'],'Cell Threshold':['Spatial','AGBUF.csv','C_THRESHOLD'],'Reach Threshold':['Spatial','AGBUF.csv','R_THRESHOLD'],'Drainage area \nto concentrated flow':['Spatial','AGFLOW.csv','Area'],'Maximum profile length \nuntil deposition':['Spatial','AGFLOW.csv','Length'],'Maximum Profile Slope':['Spatial','AGFLOW.csv','MxSlope'],'Wetness Index Threshold':['Spatial','AGWET.csv','WI_Threshold'],'Erosion Index Threshold':['Spatial','AGWET.csv','Erosion_Index_Threshold'],'Drainage Area Threshold':['Spatial','AGWET.csv','DA_Threshold'],'Maximum Wetland Ratio':['Spatial','AGWET.csv','Max_Wetland_Ratio'],'Minimum Wetland Ratio':['Spatial','AGWET.csv','Min_Wetland_Ratio'],'Barrier Height':['Spatial','AGWET.csv','Barrier_Height'],'Barrier Height Increment':['Spatial','AGWET.csv','Barrier_Height_Increment'],'Barrier Height Maximum':['Spatial','AGWET.csv','Barrier_Height_Max'],'Buffer width':['Spatial','AGWET.csv','Buffer_Width'],'Pothole Surface Area':['Spatial','POTHOLE.csv','POTHOLE_SURFACE_AREA']}
@@ -728,6 +757,106 @@ class qannagnps():
             #Update graph
             self.update_sensitivity_graph_global()
     
+    def browse_inputs_calibration(self):
+        """Method to browse inputs for calibration"""
+        try:
+            fname = QFileDialog.getOpenFileName(self.dlg_calibration_inputs, f"Select Inputs for calibration",self.direccion, "CSV files (*.csv)")
+        except:
+            fname = QFileDialog.getOpenFileName(self.dlg_calibration_inputs, f"Select Inputs for calibration","C:\\" , "CSV files (*.csv)")
+        #Disconnect signal
+        self.dlg_calibration_inputs.lineEdit.textChanged.disconnect(self.update_graph_calibration_inputs)
+        if fname[0]!="":
+            self.dlg_calibration_inputs.lineEdit.setText(fname[0])
+            #Update graph
+            self.update_graph_calibration_inputs()
+        #Connect signal again
+        self.dlg_calibration_inputs.lineEdit.textChanged.connect(self.update_graph_calibration_inputs)
+    
+    
+    def update_graph_calibration_inputs(self):
+        """Method to update the graph of the inputs of calibration"""
+        #Create and clear axis before drawing
+        if not hasattr(self, 'canvas_calibration_graph'):
+            # Si no existe, crear el canvas y añadirlo al layout
+            self.canvas_calibration_graph = FigureCanvas(plt.Figure(figsize=(15, 6)))
+            
+            # Asignar un layout al QFrame si no tiene uno
+            layout = QVBoxLayout(self.dlg_calibration_inputs.frame)
+            self.dlg_calibration_inputs.frame.setLayout(layout)
+            
+            # Añadir el canvas al layout
+            layout.addWidget(self.canvas_calibration_graph)
+        else:
+            # Si ya existe, simplemente limpiar el canvas
+            self.canvas_calibration_graph.figure.clear()
+            
+        try:
+                
+            self.ax_calibration_inputs = self.canvas_calibration_graph.figure.subplots()
+            self.canvas_calibration_graph.figure.set_facecolor('#87CEEB') # Fondo exterior
+            self.ax_calibration_inputs.set_facecolor('#87CEEB')
+            
+            file_path = self.dlg_calibration_inputs.lineEdit.text()
+            df = pd.read_csv(file_path, sep=',', header=None)
+            df.columns = ['date', 'value']
+
+            # 2. Conversión y Limpieza
+            df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y', errors='coerce')
+            df['value'] = pd.to_numeric(df['value'], errors='coerce')
+            df = df.dropna().sort_values('date')
+
+            # 3. Configuración del Gráfico
+            # IMPORTANTE: Usamos .values para evitar el ValueError
+            line_color = '#2C3E50'
+            self.ax_calibration_inputs.plot(
+                df['date'].values, 
+                df['value'].values, 
+                color=line_color, 
+                marker='o', 
+                markersize=4, 
+                linewidth=1.5, 
+                label='Data'
+            )
+
+            # 4. Personalización de Ejes (Sin título)
+            self.ax_calibration_inputs.set_ylabel('Observed value', fontsize=12, color='#333333')
+            self.ax_calibration_inputs.set_xlabel('Time', fontsize=12, color='#333333')
+
+            # --- ESTILO "AXIS" (MARCO CERRADO) ---
+            for spine in self.ax_calibration_inputs.spines.values():
+                spine.set_visible(True)
+                spine.set_color('#333333')
+                spine.set_linewidth(1)
+
+            # Separador de miles
+            self.ax_calibration_inputs.yaxis.set_major_formatter(
+                ticker.FuncFormatter(lambda x, p: format(int(x), ','))
+            )
+
+            # --- CONFIGURACIÓN DEL EJE X ---
+            self.ax_calibration_inputs.xaxis.set_major_locator(mdates.YearLocator())
+            self.ax_calibration_inputs.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+            self.ax_calibration_inputs.xaxis.set_minor_locator(mdates.MonthLocator())
+
+            # Estética de Ticks (direction='in' para estilo técnico)
+            self.ax_calibration_inputs.tick_params(axis='x', which='major', length=10, width=1.2, labelsize=11, bottom=True, top=True, direction='in')
+            self.ax_calibration_inputs.tick_params(axis='x', which='minor', length=5, width=0.8, bottom=True, top=True, direction='in')
+            self.ax_calibration_inputs.tick_params(axis='y', which='major', length=6, left=True, right=True, direction='in')
+
+            # Rejilla muy sutil
+            self.ax_calibration_inputs.grid(axis='y', linestyle='--', alpha=0.15)
+
+            # Ajustar márgenes y dibujar
+            self.canvas_calibration_graph.figure.subplots_adjust(left=0.15, bottom=0.2, right=0.95, top=0.9)
+            self.canvas_calibration_graph.draw()
+            
+        except:
+            #If output doesnt exist, then stop with the code
+            if len(mu_star) == 0:
+                self.canvas_calibration_graph.figure.clear()
+                #If I clear but not .draw() then is changed but only when dialog is maximized or minimized
+                self.canvas_calibration_graph.draw()
+                return
     
     
     def open_annagnps_folder(self):
@@ -5741,6 +5870,13 @@ class qannagnps():
             #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive. 
             self.sensitivity_dialog.project_sensitivity.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
         
+        #In calibration
+        self.dlg_calibration.project_calibration.clear()
+        self.dlg_calibration.project_calibration.addItems(project_names)
+        if self.dlg.name_of_project.text()!="":
+            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive. 
+            self.dlg_calibration.project_calibration.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
+        
             
     def search_document(self,line):
         #Método para elegir en el buscador de archivos el archivo de cada input de AnnAGNPS
@@ -5955,6 +6091,70 @@ class qannagnps():
                 boton.setSizePolicy(política_tamaño)
                 boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
     
+    
+    
+    def calibration_inputs(self,section):
+        #Metod to add calibration inputs in the dialog depending on section selection
+        
+        #Delete all elements of vertical layout of scroll area
+        while self.dlg_calibration.verticalLayout_2.count():
+            child = self.dlg_calibration.verticalLayout_2.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        
+        #Add elements depending on selection
+        
+        if section == "Spatial":
+            inputs_spatial = ["TopAgnps","Ephemeral Gully","Riparian Buffers","Hydraulics and hydrology \nfor cells and reaches","Wetland","Pothole"]
+            dic = {"TopAgnps":["Pixel Size","Critical Source Area","Minimum Source Channel \nLength"],"Ephemeral Gully":["Absolute CTI","Relative CTI"],"Riparian Buffers":["Cell Threshold","Reach Threshold"],"Hydraulics and hydrology \nfor cells and reaches":["Drainage area \nto concentrated flow","Maximum profile length \nuntil deposition","Maximum Profile Slope"],"Wetland":["Wetness Index Threshold","Erosion Index Threshold","Drainage Area Threshold","Maximum Wetland Ratio","Minimum Wetland Ratio","Barrier Height","Barrier Height Increment","Barrier Height Maximum","Buffer width"],"Pothole":["Pothole Surface Area"]}
+            for nombre in inputs_spatial:
+                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
+                boton.setObjectName(nombre)
+                self.dlg_calibration.verticalLayout_2.addWidget(boton)
+                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                boton.setSizePolicy(política_tamaño)
+                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
+        if section == "Watershed":
+            inputs_watershed = ["Aquaculture pond","Cell","Classic Gully","Ephemeral Gully","Feedlot","Field Pond", "Impoundment", "Point Source", "Reach", "Watershed", "Wetland"]
+            dic = {"Aquaculture pond":["Pond area","Pond Depth", "Seepage Rate", "Sediment Delivery Ratio Pond", "Organic Carbon \nCalibration Factor Pond", "Nitrogen Calibration Factor Pond", "Phosphorus Calibration Factor Pond", "Erosion Calibration Factor Pond"],"Cell":["Sheet flow Manning’s n","Concentrated flow \nhydraulic depth","Concentrated flow Manning’s n","Delivery Ratio Pond","Constant USLE C factor","Constant USLE P factor","All Organic Carbon \nCalibration Factor","All Nitrogen Calibration Factor","All Phosphorus Calibration Factor","Sheet and Rill Erosion \nCalibration Factor","Gullies Erosion Calibration Factor"],"Classic Gully":["Head Cut Depth","Erosion Coefficient","Erosion Exponent","Delivery Ratio Gully","Organic Carbon \nCalibration Factor Gully","Nitrogen Calibration Factor Gully","Phosphorus Calibration Factor Gully","Erosion Calibration Factor Gully"],"Ephemeral Gully":["Critical Shear Stress \nEphemeral Gully","Erosion Depth","Delivery Ratio Ephemeral Gully","Manning’s n Ephemeral Gully","Re Plant Period","Organic Carbon","Nitrogen","Phosphorus","Erosion","Headcut detachment leading \ncoefficient a","Headcut erodibility \nleading coefficient a","Headcut detachment exponent \ncoefficient b","Headcut erodibility exponent \ncoefficient b","Maximum Buffer Trapping \nEfficiency TE m"],"Feedlot":["Open Area","Paved Ratio","Roof Area","Upslope Area","Feedlot Initial N","Feedlot Initial P","Feedlot Initial OrgC","Delta N","Delta P","Delta OrgC","Feedlot Max N","Feedlot Max P","Feedlot Max OrgC","Feedlot Pack N","Feedlot Pack P","Feedlot Pack OrgC","Organic Carbon Calibration \nFactor Feedlot","Nitrogen Calibration \nFactor Feedlot","Phosphorus Calibration \nFactor Feedlot","Erosion Calibration \nFactor Feedlot","Cell Buffer Length"],"Field Pond":["Field Pond area","Number of rotation years","Number gate operations","Delivery Ratio Field Pond","Volume of release water","Drain Time","Release rate","Sediment Concentration","Clay content Field Pond","Silt content Field Pond","Organic Carbon Calibration Factor Field Pond","Nitrogen Calibration Factor Field Pond","Phosphorus Calibration Factor Field Pond","Erosion Calibration Factor Field Pond"], "Impoundment":["Impoundment Infiltration","Impoundment Seepage","Permanent Pool Depth","Impound Volume Coefficient","Impound Volume Exponent","Impound Discharge Coefficient","Impound Discharge Exponent","Sediment Clean Out Depth","Sediment Clean Out Year"], "Point Source":["Point Flow","Point Nitrogen","Point Phosphorus","Point Organic Carbon","Organic Carbon Calibration Factor","Nitrogen Calibration Factor","Phosphorus Calibration Factor","Erosion Calibration Factor"], "Reach":["Reach Manning’s n","Reach Flow Depth","Valley Width","Valley n","Delivery Ratio Reach"], "Watershed":["Latitude","Longitude"], "Wetland":["Wetland Area","Initial Water Depth","Minimum Water Depth","Maximum Water Depth","Water Temperature","Potential Daily Infiltration","Weir Coefficient","Weir Width","Weir Height","Soluble N Concentration","Nitrate Loss Rate","Nitrate Loss Rate Coefficient","Temperature Coefficient","Weir Exponent"]}
+            for nombre in inputs_watershed:
+                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
+                boton.setObjectName(nombre)
+                self.dlg_calibration.verticalLayout_2.addWidget(boton)
+                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                boton.setSizePolicy(política_tamaño)
+                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
+        if section == "General":
+            inputs_general = ["Management Aquaculture \n Pond Schedule", "Contour", "Crop", "Crop Growth", "Feedlot Management","Fertilizer application", "Fertilizer reference", "Geology", "Hydraulic Geometry", "Irrigation Application", "Management Field", "Management Operation", "Management Schedule", "Non-crop","Pesticide Application", "Pesticide Reference","Reach Nutrient Half-life", "Riparian Buffer", "Runoff Curve", "Soil", "Soil Layers", "Strip Crop", "Tile Drain"]
+            dic = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
+            for nombre in inputs_general:
+                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
+                boton.setObjectName(nombre)
+                self.dlg_calibration.verticalLayout_2.addWidget(boton)
+                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                boton.setSizePolicy(política_tamaño)
+                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
+        if section == "Climate":
+            inputs_climate = ["Climate Station", "EI Percentage"]
+            dic = {"Climate Station":["Station Latitude","Station Longitude","Station Elevation","Adiabatic Air Temperature \nLapse Rate","Precipitation Nitrogen","Elevation Difference (1)","Elevation Rain Factor (1)","Elevation Difference (2)","Elevation Rain Factor (2)","2 Yr 24 Hr Precipitation","Rainfall Calibration or Areal \nCorrection Coefficient","Areal Rainfall \nCorrection Exponent","Minimum interception \nevaporation station","Maximum interception \nevaporation station"], "EI Percentage":["EI_Pct_01","EI_Pct_02","EI_Pct_03","EI_Pct_04","EI_Pct_05","EI_Pct_06","EI_Pct_07","EI_Pct_08","EI_Pct_09","EI_Pct_10","EI_Pct_11","EI_Pct_12","EI_Pct_13","EI_Pct_14","EI_Pct_15","EI_Pct_16","EI_Pct_17","EI_Pct_18","EI_Pct_19","EI_Pct_20","EI_Pct_21","EI_Pct_22","EI_Pct_23","EI_Pct_24"]}
+            for nombre in inputs_climate:
+                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
+                boton.setObjectName(nombre)
+                self.dlg_calibration.verticalLayout_2.addWidget(boton)
+                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                boton.setSizePolicy(política_tamaño)
+                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
+        if section == "Simulation":
+            inputs_simulation = ["Global IDs Factors \n and Flags","Pesticide Initial Conditions","PL Calibration","RCN Calibration","Simulation Period","Soil Initial Conditions"]
+            dic = {"Global IDs Factors \n and Flags":["Headcut detachment leading coefficient (a)","Headcut detachment exponent coefficient (b)","Headcut erodibility leading coefficient (a)","Headcut erodibility exponent coefficient (b)","Minimum Interception Evaporation Global","Maximum Interception Evaporation Global","Detention Coefficient “a”","Detention Coefficient “b”","RCN Convergence Tolerance","RCN Maximum Number of Iterations","Available Soil Moisture Ratio for AMC II","Maximum Available Sediment Concentration for Sheet Flow","Maximum Available Sediment Concentration for Concentrated Flow","Critical Shear Stress"],"Pesticide Initial Conditions":["Crop Initial Pesticide Amount 1","Crop Initial Pesticide Amount 2","Non-crop Initial Pesticide Amount 1","Non-crop Initial Pesticide Amount 2"],"PL Calibration":["Organic carbon from all sources","Organic carbon from sheet & rill","Organic carbon from feedlot","Organic carbon from point source","Organic carbon from gully","Organic carbon from pond","Organic carbon from irrigation","Nitrogen from all sources","Nitrogen from sheet & rill","Nitrogen from feedlot","Nitrogen from point source","Nitrogen from gully","Nitrogen from pond","Nitrogen from irrigation","Phosphorus from all sources","Phosphorus from sheet & rill","Phosphorus from feedlot","Phosphorus from point source","Phosphorus from gully","Phosphorus from pond","Phosphorus from irrigation","Sediment from all sources","Sediment from sheet & rill","Sediment from feedlot","Sediment from point source","Sediment from gully","Sediment from pond","Sediment from irrigation"],"RCN Calibration":["Target Average Annual Direct Runoff Load","RCN Retention factor","Reach Ratio","Available Soil Moisture, AMC-II"],"Simulation Period":["Rainfall factor","10-yr EI","EI Number","Initialization Method Code"],"Soil Initial Conditions":["Inorganic_N_1" ,"Inorganic_N_2", "Inorganic_P_1","Inorganic_P_2", "Soil_Moisture_1","Soil_Moisture_2", "Organic_Matter_1","Organic_Matter_2","Organic_N_1","Organic_N_2", "Organic_P_1","Organic_P_2","Surface Residue","Manning’s n","Snow Depth","Snow Density","Surface Constant"]}
+            for nombre in inputs_simulation:
+                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
+                boton.setObjectName(nombre)
+                self.dlg_calibration.verticalLayout_2.addWidget(boton)
+                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                boton.setSizePolicy(política_tamaño)
+                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
+    
     def annagnps_parameters(self, parameters):
         #Metod to add parameters in the dialog depending on input selection
         #Delete all elements of vertical layout of scroll area
@@ -5970,6 +6170,23 @@ class qannagnps():
             política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
             boton.setSizePolicy(política_tamaño)
             boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label(b))
+    
+    
+    def calibration_parameters(self, parameters):
+        #Metod to add parameters in the dialog depending on input selection
+        #Delete all elements of vertical layout of scroll area
+        while self.dlg_calibration.verticalLayout_3.count():
+            child = self.dlg_calibration.verticalLayout_3.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        #Add elements
+        for nombre in parameters:
+            boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents_3)
+            boton.setObjectName(nombre)
+            self.dlg_calibration.verticalLayout_3.addWidget(boton)
+            política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+            boton.setSizePolicy(política_tamaño)
+            boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label_calibration(b))
     
     def add_sensitivity_table(self):
         #Metod to add sensitivity analysis parameters to table
@@ -6009,7 +6226,37 @@ class qannagnps():
         add_element(3,self.sensitivity_dialog.row.text())
         
         #Update number of samples
-        self.change_sensitivity_metod()
+        self.change_sensitivity_metod
+    
+    
+    def add_calibration_table(self):
+        #Metod to add calibration analysis parameters to table
+        if self.dlg_calibration.table.columnCount() == 0:
+            #Añadir columnas
+            nombres_columnas = ["Parameter","Minimum","Maximum","Row"]
+            self.dlg_calibration.table.setColumnCount(len(nombres_columnas))
+            self.dlg_calibration.table.setHorizontalHeaderLabels(nombres_columnas)
+            #Cambiar el ancho de las columnas
+            self.dlg_calibration.table.setColumnWidth(nombres_columnas.index("Parameter"), 180)
+            
+        #Añadir filas
+        def add_element(columna,texto):
+            item = QTableWidgetItem(texto)
+            self.dlg_calibration.table.setItem(numero_filas, columna, item)
+            item.setTextAlignment(Qt.AlignCenter)
+        
+        #Primero la información de los lineEdits
+        numero_filas = self.dlg_calibration.table.rowCount()
+        self.dlg_calibration.table.setRowCount(numero_filas + 1)
+        #Add parameter
+        add_element(0,self.dlg_calibration.parameter.text())
+        #Add minimum
+        add_element(1,self.dlg_calibration.first.text())
+        #Add maximum
+        add_element(2,self.dlg_calibration.second.text())
+        #Add row
+        add_element(3,self.dlg_calibration.row.text())
+
     
     
     def delete_sensitivity_table(self):
@@ -6023,9 +6270,24 @@ class qannagnps():
         #Update number of samples
         self.change_sensitivity_metod()
     
+    def delete_calibration_table(self):
+        #Metod to delete sensitivity analysis parameters to table
+        numero_filas = self.dlg_calibration.table.rowCount()
+        if numero_filas > 0:
+            self.dlg_calibration.table.removeRow(numero_filas - 1)
+        if numero_filas == 1:
+            self.dlg_calibration.table.setColumnCount(0)
+        
+        #Update number of samples
+        self.change_sensitivity_metod()
+    
     def add_parameter_label(self,nombre):
         #Metod to add the parameter to the lineEdit
         self.sensitivity_dialog.parameter.setText(str(nombre))
+    
+    def add_parameter_label_calibration(self,nombre):
+        #Metod to add the parameter to the lineEdit
+        self.dlg_calibration.parameter.setText(str(nombre))
     
     def create_dictionary_sensitivity_analysis(self):
         """Method to create the dictionary of the sensitivity analysis"""
@@ -6076,22 +6338,40 @@ class qannagnps():
             self.param_values = saltelli.sample(self.problem, int(self.sensitivity_dialog.trajectories.text()))
         elif self.sensitivity_dialog.morris.isChecked():
             self.param_values = sample_morris(self.problem, int(self.sensitivity_dialog.trajectories.text()))
+    
+    
+    def create_dictionary_calibration(self):
+        """Method to create the dictionary of the calibration"""
+        #Diccionario nombre en el diálogo - [parametros del análisis de sensibilidad]
+        self.dic_data = {}
+        for i in range(self.dlg_calibration.table.rowCount()):
+            #Diccionario [Parametro] = (Minimo, Maximo, Row)
+            name = self.dlg_calibration.table.item(i, 0).text()
+            minimum = self.dlg_calibration.table.item(i, 1).text()
+            maximum = self.dlg_calibration.table.item(i, 2).text()
+            row = self.dlg_calibration.table.item(i, 3).text()
+            if name in self.dic_data:name = name+"__1"
+            self.dic_data[name] = [minimum,maximum,row]
+        
         
     
-    def move_files_to_working_directory_sensitivity_analysis(self):
+    def move_files_to_working_directory_sensitivity_analysis(self,information):
         """Method to move the files from the selected project to the working directory"""
         #Se abre el archivo
-        selected_project = self.sensitivity_dialog.project_sensitivity.currentText()
+        if information == "Sensitivity_analysis":
+            selected_project = self.sensitivity_dialog.project_sensitivity.currentText()
+        elif information == "Calibration":
+            selected_project = self.dlg_calibration.project_sensitivity.currentText()
         
         #Move all the folders to the new folder
         for core in range(1,self.number_cores+1):
             origen = Path(self.carpeta_guardar_proyectos +"\\"+selected_project)
-            destino = Path(self.dlg.project.text()+"\\"+selected_project+f"\\Sensitivity_analysis\\Core_{core}")
+            destino = Path(self.dlg.project.text()+"\\"+selected_project+f"\\{information}\\Core_{core}")
 
             destino.mkdir(parents=True, exist_ok=True)
             
             for carpeta in origen.iterdir() :
-                if carpeta.is_dir() and carpeta.name != "Sensitivity_analysis":
+                if carpeta.is_dir() and carpeta.name != f"{information}":
                     try:
                         shutil.copytree(
                             carpeta,
@@ -6123,7 +6403,7 @@ class qannagnps():
             
             
     
-    def modify_input_sensitivity_match_output(self):
+    def modify_input_sensitivity_match_output(self,information):
         """Method to change the input files so that the output appears"""
         #Method to crete the needed files to have the desired outputs
         def modify_input(name_master,column,new_columns,name_new_file):
@@ -6167,39 +6447,122 @@ class qannagnps():
 
             data.to_csv(file, index=False,float_format='%.5f')
         
-        for core in range(1,self.number_cores+1):
-        
-            if self.sensitivity_dialog.runoff.isChecked(): 
-                columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
-                modify_input("Output Options - SIM","Insitu_Soil_Moist_Daily",columns,"out_sim")
+        if information == "Sensitivity_analysis":
+            for core in range(1,self.number_cores+1):
             
-            if self.sensitivity_dialog.total_erosion.isChecked() or self.sensitivity_dialog.gully.isChecked() or self.sensitivity_dialog.sheet.isChecked() or self.sensitivity_dialog.pond.isChecked(): 
-                columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-                modify_input("Output Options - EV","EV_Sed_Yld_Mass",columns,"out_ev")
+                if self.sensitivity_dialog.runoff.isChecked(): 
+                    columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
+                    modify_input("Output Options - SIM","Insitu_Soil_Moist_Daily",columns,"out_sim")
+                
+                if self.sensitivity_dialog.total_erosion.isChecked() or self.sensitivity_dialog.gully.isChecked() or self.sensitivity_dialog.sheet.isChecked() or self.sensitivity_dialog.pond.isChecked(): 
+                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                    modify_input("Output Options - EV","EV_Sed_Yld_Mass",columns,"out_ev")
+                    
+                    
+                if self.sensitivity_dialog.ephemeral.isChecked():
+                    #poner aqui que se ponga el input units code de AnnAGNPSID, y que si en AnnAGNPSID no hay entonces se pone el 0 qu es el por defecto
+                    columns = ["Hdct_Detachment_Coef_a", "Hdct_Detachment_Exp_Coef_b", "Urban_Repair_Month", "Urban_Repair_Day", "Urban_Repair_Year", "Cropland_Repair_Month", "Cropland_Repair_Day", "Cropland_Repair_Year", "Forest_Repair_Month", "Forest_Repair_Day", "Forest_Repair_Year", "Pasture_Repair_Month", "Pasture_Repair_Day", "Pasture_Repair_Year", "Rangeland_Repair_Month", "Rangeland_Repair_Day", "Rangeland_Repair_Year", "Hdct_Erodibility_Coef_a", "Hdct_Erodibility_Exp_Coef_b", "Width_Nachtergaele", "Width_Hydraulic_Geometry", "Width_Non-submerging_Tailwater", "Width_Woodwards_Equilibrium", "Width_Woodwards_Ultimate", "Width_Wells_Eq.9", "Erosion_Vrfy", "Hydrograph_Vrfy", "Nickpoint_Vrfy", "Repair_Dates_Vrfy", "Sed_Yield_to_Gully_Mouth_Vrfy", "Sed_Yield_to_Rcvg_Reach_Vrfy", "Min_Interception_Evaporation", "Max_Interception_Evaporation", "Detention_Coef_a", "Detention_Coef_b", "RCN_Convergence_Tolerance", "RCN_Max_Iterations", "Avbl_Soil_Moist_Ratio_AMC_II", "Max_Avbl_Sed_Conc_for_Sht_Flw", "Max_Avbl_Sed_Conc_for_Conc_Flw", "AA_Unit_Area_Baseflow", "RCN_Calib_Only", "Calculate_Baseflow", "FAO_ET_Enhancement", "Basal_Crop_Coef_Climate_Adjust", "Wshd_Storm_Type_ID", "Dflt_Geology_ID", "Dflt_Hydraulic_Geom_ID", "Dflt_Init_Soil_Conditions_ID", "Dflt_Crop_RCN_ID", "Dflt_Non-Crop_RCN_ID", "Width_Wells_Eq.8", "Width_Reserved_i", "Width_Reserved_j", "Width_Reserved_k", "Critical_Shear_Stress", "RUSLE2_Flag", "Dflt_RUSLE2_ID", "Input_Units_Code"]
+                    modify_input("Global IDs Factors and Flags Data","Erosion_Vrfy",columns,"global_factors")
+                    select_input_code()
+                    columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
+                    modify_input("Output Options - SIM","Gully",columns,"out_sim")
+                    
+                if self.sensitivity_dialog.nitrogen.isChecked(): 
+                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                    modify_input("Output Options - EV","EV_N_Yld_Mass",columns,"out_ev")
                 
                 
-            if self.sensitivity_dialog.ephemeral.isChecked():
-                #poner aqui que se ponga el input units code de AnnAGNPSID, y que si en AnnAGNPSID no hay entonces se pone el 0 qu es el por defecto
-                columns = ["Hdct_Detachment_Coef_a", "Hdct_Detachment_Exp_Coef_b", "Urban_Repair_Month", "Urban_Repair_Day", "Urban_Repair_Year", "Cropland_Repair_Month", "Cropland_Repair_Day", "Cropland_Repair_Year", "Forest_Repair_Month", "Forest_Repair_Day", "Forest_Repair_Year", "Pasture_Repair_Month", "Pasture_Repair_Day", "Pasture_Repair_Year", "Rangeland_Repair_Month", "Rangeland_Repair_Day", "Rangeland_Repair_Year", "Hdct_Erodibility_Coef_a", "Hdct_Erodibility_Exp_Coef_b", "Width_Nachtergaele", "Width_Hydraulic_Geometry", "Width_Non-submerging_Tailwater", "Width_Woodwards_Equilibrium", "Width_Woodwards_Ultimate", "Width_Wells_Eq.9", "Erosion_Vrfy", "Hydrograph_Vrfy", "Nickpoint_Vrfy", "Repair_Dates_Vrfy", "Sed_Yield_to_Gully_Mouth_Vrfy", "Sed_Yield_to_Rcvg_Reach_Vrfy", "Min_Interception_Evaporation", "Max_Interception_Evaporation", "Detention_Coef_a", "Detention_Coef_b", "RCN_Convergence_Tolerance", "RCN_Max_Iterations", "Avbl_Soil_Moist_Ratio_AMC_II", "Max_Avbl_Sed_Conc_for_Sht_Flw", "Max_Avbl_Sed_Conc_for_Conc_Flw", "AA_Unit_Area_Baseflow", "RCN_Calib_Only", "Calculate_Baseflow", "FAO_ET_Enhancement", "Basal_Crop_Coef_Climate_Adjust", "Wshd_Storm_Type_ID", "Dflt_Geology_ID", "Dflt_Hydraulic_Geom_ID", "Dflt_Init_Soil_Conditions_ID", "Dflt_Crop_RCN_ID", "Dflt_Non-Crop_RCN_ID", "Width_Wells_Eq.8", "Width_Reserved_i", "Width_Reserved_j", "Width_Reserved_k", "Critical_Shear_Stress", "RUSLE2_Flag", "Dflt_RUSLE2_ID", "Input_Units_Code"]
-                modify_input("Global IDs Factors and Flags Data","Erosion_Vrfy",columns,"global_factors")
-                select_input_code()
-                columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
-                modify_input("Output Options - SIM","Gully",columns,"out_sim")
+                if self.sensitivity_dialog.organic.isChecked(): 
+                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                    modify_input("Output Options - EV","EV_OC_Yld_Mass",columns,"out_ev")
                 
-            if self.sensitivity_dialog.nitrogen.isChecked(): 
-                columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-                modify_input("Output Options - EV","EV_N_Yld_Mass",columns,"out_ev")
+                if self.sensitivity_dialog.phosphorus.isChecked(): 
+                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                    modify_input("Output Options - EV","EV_P_Yld_Mass",columns,"out_ev")
+        
+        elif information == "Calibration":
+            for core in range(1,self.number_cores+1):
             
-            
-            if self.sensitivity_dialog.organic.isChecked(): 
-                columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-                modify_input("Output Options - EV","EV_OC_Yld_Mass",columns,"out_ev")
-            
-            if self.sensitivity_dialog.phosphorus.isChecked(): 
-                columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-                modify_input("Output Options - EV","EV_P_Yld_Mass",columns,"out_ev")
+                if self.dlg_calibration.runoff.isChecked(): 
+                    columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
+                    modify_input("Output Options - SIM","Insitu_Soil_Moist_Daily",columns,"out_sim")
+                
+                elif self.dlg_calibration.total_erosion.isChecked(): 
+                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                    modify_input("Output Options - EV","EV_Sed_Yld_Mass",columns,"out_ev")
+                    
+                    
+                elif self.dlg_calibration.nitrogen.isChecked(): 
+                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                    modify_input("Output Options - EV","EV_N_Yld_Mass",columns,"out_ev")
+                
+                
+                elif self.dlg_calibration.organic.isChecked(): 
+                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                    modify_input("Output Options - EV","EV_OC_Yld_Mass",columns,"out_ev")
+                
+                elif self.dlg_calibration.phosphorus.isChecked(): 
+                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
+                    modify_input("Output Options - EV","EV_P_Yld_Mass",columns,"out_ev")
+        
+    
+    def run_calibration(self): 
+        #Metod to run sensitiviy analysis
+        self.end_execution = 0
+        #If there is not working directory selected then error
+        if self.dlg.project.text()=="":
+            self.warning_message("Please select a working directory where the files are going to be loaded")
+            return
+        
+        #Close dialogs
+        self.dlg_calibration.close()
+        self.dlg.close()
+
+        #Start with the progress bar
+        self.progress_metod(start = True)
+        
+        #Create the dictionary with the input data and the parameter values
+        self.create_dictionary_calibration()        
+        
+        #Obtain the number of cores to work with
+        self.number_cores = QThreadPool.globalInstance().maxThreadCount() - 1
+        
+        #Obtener la direccoin de los raster ahora que están en la carpeta de "Sensitivity_analysis"
+        self.declare_rasters_sensitivity_analysis("Calibration")
+        
+        #Move the files from the save project to working directory + name of the project + "Sensitivity_analysis"
+        self.progress_dialog.setLabelText("Moving files to the working directory...")
+        self.move_files_to_working_directory_sensitivity_analysis("Calibration")
+        if self.end_execution:
+            return
         
         
+        #Modifiy the inputs so that the required output are displayed
+        self.modify_input_sensitivity_match_output("Calibration")
+        
+        return
+        
+        #Results are obtained
+        self.resultados = []
+        self.numero_ejecucion = 0
+        self.end_execution = False
+        
+        
+        #Check if preprocessing is going to be executed
+        self.execute_preprocessing_sensitivity = False
+        for i in self.dic_data.keys():
+            if self.dic_name_column[i][0]=="Spatial":
+                self.execute_preprocessing_sensitivity = True
+        
+        
+        #We do the sensitivity analysis
+        self.manager = QgsApplication.instance().taskManager()
+        self.carpetas_libres = list(range(1,self.number_cores+1))  # IDs de tus carpetas
+        self.tareas_pendientes = list(range(len(self.param_values)))
+        self.terminadas = 0
+        self.tareas_activas = []
+        self.lanzar_siguiente_sensitivity()
+    
             
     def run_sensitivity_analysis(self): 
         #Metod to run sensitiviy analysis
@@ -6224,17 +6587,17 @@ class qannagnps():
         self.number_cores = QThreadPool.globalInstance().maxThreadCount() - 1
         
         #Obtener la direccoin de los raster ahora que están en la carpeta de "Sensitivity_analysis"
-        self.declare_rasters_sensitivity_analysis()
+        self.declare_rasters_sensitivity_analysis("Sensitivity_analysis")
         
         #Move the files from the save project to working directory + name of the project + "Sensitivity_analysis"
         self.progress_dialog.setLabelText("Moving files to the working directory...")
-        self.move_files_to_working_directory_sensitivity_analysis()
+        self.move_files_to_working_directory_sensitivity_analysis("Sensitivity_analysis")
         if self.end_execution:
             return
         
         
         #Modifiy the inputs so that the required output are displayed
-        self.modify_input_sensitivity_match_output()
+        self.modify_input_sensitivity_match_output("Sensitivity_analysis")
         
         
         #Si se ha escogido la opción de "Pixel Size" se obtienen todos los DEMs con todos los tamaños de píxeles
@@ -6261,7 +6624,6 @@ class qannagnps():
                 self.execute_preprocessing_sensitivity = True
         
         
-        print(1)
         #We do the sensitivity analysis
         self.manager = QgsApplication.instance().taskManager()
         self.carpetas_libres = list(range(1,self.number_cores+1))  # IDs de tus carpetas
@@ -6572,7 +6934,7 @@ class qannagnps():
         self.warning_message("Succes in the sensitiviy analysis ")
         
        
-    def declare_rasters_sensitivity_analysis(self):
+    def declare_rasters_sensitivity_analysis(self,information):
         """Method to declare the values of the rasters in sensitivity analysis"""
         #Function to transform from the path where the file is saved to the new path where sensitivity analysis is going to be performed
         def change_direction(name):
@@ -6582,21 +6944,24 @@ class qannagnps():
                     return "nan"
                 ruta_nueva = Path(ruta).parts[-2:]
                 resultado = str(Path(*ruta_nueva))
-                return self.dlg.project.text()+"\\"+selected_project +"\\Sensitivity_analysis\\Core_1" +"\\"+resultado
+                return self.dlg.project.text()+"\\"+selected_project +f"\\{information}\\Core_1" +"\\"+resultado
             except:
                 return "nan"
         
         
         
         #Obtain CSV
-        selected_project = self.sensitivity_dialog.project_sensitivity.currentText()
+        if information =="Sensitivity_analysis":
+            selected_project = self.sensitivity_dialog.project_sensitivity.currentText()
+        elif information == "Calibration":
+            selected_project = self.dlg_calibration.project_sensitivity.currentText()
         csv_file = self.carpeta_guardar_proyectos +"\\"+selected_project+"\\"+selected_project+".csv"
         project_df = pd.read_csv(csv_file,encoding = "ISO-8859-1",delimiter=",")
         self.project_df = project_df
         
         #Obtain the direction of sensitivity analysis
         #no hay que usar el self direccion porque se puede dar el caso en el que el se hace un analisis de sensibilidad sin haber escogido el nombre del proyecto en el dialogo base, es por eso que hay que crear otra variable que sea igual a working directory mas el nombre que se ha escogido en sensitivity
-        self.direccion_sensitivity = self.dlg.project.text()+"\\"+selected_project +"\\Sensitivity_analysis"
+        self.direccion_sensitivity = self.dlg.project.text()+"\\"+selected_project +f"\\{information}"
         
         #DEM
         self.fichero_mdt_sensitivity =  change_direction("dem")
@@ -6705,6 +7070,37 @@ class qannagnps():
                     política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
                     boton.setSizePolicy(política_tamaño)
                     boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label(b))
+            except:
+                pass
+    
+    def search_calibration_input(self):
+        #Metod to search a sensitiviy input in the dialog writing
+        texto = str(self.dlg_calibration.search.text())
+        #If text == "" then delete every button
+        if texto =="":
+            while self.dlg_calibration.verticalLayout_3.count():
+                child = self.dlg_calibration.verticalLayout_3.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+        else:
+            elementos = []
+            for i in self.dic_name_column.keys():
+                if texto.lower() in i.lower():
+                    elementos.append(i)
+            try: #if it doesnt find a name
+                #Delete all elements of vertical layout of scroll area
+                while self.dlg_calibration.verticalLayout_3.count():
+                    child = self.dlg_calibration.verticalLayout_3.takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+                #Add new button to the scroll area
+                for nombre in elementos:
+                    boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents_3)
+                    boton.setObjectName(nombre)
+                    self.dlg_calibration.verticalLayout_3.addWidget(boton)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    boton.setSizePolicy(política_tamaño)
+                    boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label_calibration(b))
             except:
                 pass
     
@@ -7315,10 +7711,8 @@ class Sensitivity_Parallelization(QgsTask):
                 self.end_execution = 1
                 return
             #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs.
-            self.registrar_numero("uno_uno")
             for j,k in enumerate(self.dic_data.keys()):
                 self.change_inputs_sensitivity(self.param_values[self.n-1],j,k,spatial =True) #cambio de los inputs espaciales
-            self.registrar_numero("uno_dos")
             #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
             self.time_start_preprocessing = datetime.now()
             #EJECUCIÓN DE TOPAGNPS            
@@ -7330,9 +7724,7 @@ class Sensitivity_Parallelization(QgsTask):
                 f.write("{} \n".format(linea_dos))
                 f.close()
             main()
-            self.registrar_numero("uno_tres")
             subprocess.call(self.executable_directory+"\\"+f"EjecutarTopagnps_{self.core}.bat")
-            self.registrar_numero("uno_cuatro")
             #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarTopagnps.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
             #stdout, stderr = proc.communicate()
             #If error file of TopAGNPS is opened, then return a error message
@@ -7378,15 +7770,11 @@ class Sensitivity_Parallelization(QgsTask):
                 
                 
                 return
-            self.registrar_numero("HECHOOOOOOOOOOOOOO")
             #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
             self.save_files_preprocessing_in_folder_sensitivity()
             
-            #Move the outputs of TopAGNPS to use as inputs of AnnAGNPS
-            try:    
-                self.create_folder_processing_and_move_files()
-            except Exception as e:
-                self.registrar_numero(str(e))
+            #Move the outputs of TopAGNPS to use as inputs of AnnAGNPS 
+            self.create_folder_processing_and_move_files()
             
         #EJECUCIÓN DE ANNAGNPS
 
@@ -7509,9 +7897,7 @@ class Sensitivity_Parallelization(QgsTask):
                 columna = self.dic_name_column[nombre_parametro][2]
             elif self.dic_name_column[nombre_parametro][0]!="Spatial" and not spatial:
                 direccion = self.file_input(self.dic_name_column[nombre_parametro][0])
-                self.registrar_numero(f"direccion_{direccion}")
                 columna = self.dic_name_column[nombre_parametro][1]
-                self.registrar_numero(f"columna_{columna}")
                 
         except KeyError: #misma columna, distintas filas
             if self.dic_name_column[nombre_parametro.split("__")[0]][0]=="Spatial" and spatial:
@@ -7578,14 +7964,12 @@ class Sensitivity_Parallelization(QgsTask):
             try:
                 direccion#Check if "direccion" and "columna" exist. If they don't, then do anything
                 
-                self.registrar_numero("tres")
                 df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
                 if self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
                     df[columna] = [param_values[numero_parametro] for x in range(len(df))]
                 else:#si solo se ha elegido una fila entonces se cambia una única fila
                     df[columna].iloc[int(self.dic_data[nombre_parametro][2])] = param_values[numero_parametro]
                 #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
-                self.registrar_numero("cuatro")
                 def float_to_str(df,column):
                     #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
                     lista = []
@@ -7595,7 +7979,6 @@ class Sensitivity_Parallelization(QgsTask):
                         except:
                             lista.append("")
                     df[column] = lista
-                self.registrar_numero("cinco")
                 if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
                 if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
                 df.to_csv(direccion, index=False, float_format='%.5f')
@@ -7972,12 +8355,10 @@ class Sensitivity_Parallelization(QgsTask):
     
     def create_folder_processing_and_move_files(self):
         """Method to create the preprocessing folders (if they dont exist) and move the input files here"""
-        self.registrar_numero("seis")
         #Move the outputs generated by topagnps to the inputs of annagnps
         names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
         names_in_master = ["Cell Data","Ephemeral Gully Data","Reach Data","Riparian Buffer Data","Wetland Data"]
         master = pd.read_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\annagnps_master.csv",encoding = "ISO-8859-1",delimiter=",")
-        self.registrar_numero("siete")
         for i in range(len(names_list)):
             #Comprobar si se ejecuta en el proyecto
             if not pd.isna(self.project_df[self.project_df.iloc[:,0]==names_in_master[i]].iloc[0,1]) and os.path.exists(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs\\"+names_list[i]): 
@@ -7989,4 +8370,3 @@ class Sensitivity_Parallelization(QgsTask):
             else: 
                 master = master[master.iloc[:,0]!=names_in_master[i]]
                 master.to_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\annagnps_master.csv", encoding='utf-8', index=False)
-        self.registrar_numero("ocho")
