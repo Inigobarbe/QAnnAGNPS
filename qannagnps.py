@@ -743,7 +743,6 @@ class qannagnps():
     
     def browse_files_sensitivity_results(self,information):
         """Method to select the file for sensitivity analysis graph between the local files for Morris and Sobol"""
-        print("a")
         sensitivity_method, checkbox = information
         fname = QFileDialog.getOpenFileName(self.dlg_results_sensitivity, f"Select {sensitivity_method} Sensitivity Analysis Results File","C:\\" , "CSV files (*.csv)")
         if fname[0]!="":
@@ -1250,7 +1249,7 @@ class qannagnps():
         else:
             file_path = file_input(button)
             if self.dic_line_table[button].text() == "-- Provided by TopAGNPS --":
-                file_path = self.direccion+"\\Preprocessing_inputs"+"\\"+ os.path.basename(self.file_input(self.dic_line_table[button]))
+                file_path = self.direccion+"\\Preprocessing_outputs"+"\\"+ os.path.basename(self.file_input(self.dic_line_table[button]))
             if os.path.exists(file_path) and os.path.getsize(file_path)>0: 
                 #Add files and columns
                 #Add columns
@@ -1302,7 +1301,7 @@ class qannagnps():
         table_input = getattr(self, f"table_input_{numero_table_input}")
         #Then we determine the file path
         if self.dic_line_table[button].text()=="-- Provided by TopAGNPS --":
-            file_path = self.direccion+"\\Preprocessing_inputs"+"\\"+os.path.basename(self.file_input(self.dic_line_table[button]))    
+            file_path = self.direccion+"\\Preprocessing_outputs"+"\\"+os.path.basename(self.file_input(self.dic_line_table[button]))    
         elif os.path.isabs(self.dic_line_table[button].text()):
             file_path =  self.dic_line_table[button].text()
         else:
@@ -3044,6 +3043,16 @@ class qannagnps():
     def ejecuciones(self):
         #Método para las ejecuciones
         self.end_execution = 0
+        
+        #Error if folder was not selected
+        if not hasattr(self,"direccion"):
+            self.warning_message("Please select a working directory before executing")
+            return
+        #Error if name of project not selected
+        if self.dlg.name_of_project.text() == "":
+            self.warning_message("Please select the name of the project before executing")
+            return
+        
         #Ejecutar
         self.ejecucion_completa()
             
@@ -3066,12 +3075,6 @@ class qannagnps():
             
             #Se cambia de directorio al directorio del proyecto y se establece el directorio donde están los ejecutables
             self.executable_directory  = self.plugin_dir+"\\Executables"            
-            try:
-                os.chdir(self.direccion)
-            except:
-                self.end_execution = 1
-                iface.messageBar().pushMessage("Error Input data", "Please select a valid project folder" ,level=Qgis.Warning)
-                return
         
         #EJECUCIÓN DE TOPAGNPS
         if self.dlg.cbTop.isChecked():
@@ -3188,7 +3191,7 @@ class qannagnps():
             
             #Mensaje de éxito si se ha ejecutado TOPAGNPS con éxito si no se ha escogido ejecutar AnnAGNPS
             if not self.dlg.cbAnn.isChecked() and ((not self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 0)or (self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 1)):
-                self.iface.messageBar().pushMessage("Success", "Succes in the modeling ",level=Qgis.Success, duration=5)
+                self.warning_message("Preprocessing executed succesfully!")
             #Mensaje para que selecciones las coordenadas
             if not self.dlg.cbAnn.isChecked() and self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 0:
                 self.iface.messageBar().pushMessage("Coordinate selection", "Please move the mouse to the outlet and click on it",level=Qgis.Info)
@@ -3274,7 +3277,9 @@ class qannagnps():
             
             #Los outputs de AnnAGNPS se guardan en Processing_outputs
             self.save_files_processing_in_folder()
-    
+            
+            #Warning message
+            self.warning_message("Processing executed succesfully!")
             
             
         
@@ -3440,8 +3445,6 @@ class qannagnps():
             #Se aplica el suelo al fichero de cells
             try:
                 suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil,self.soil_field_names[self.dlg.cbColumnSoil.currentIndex()],1)
-                print("suelos",suelos)
-                print("dic_conv",dic_conv)
             except:
                 self.end_execution = 1
                 if self.epsg_dem != self.epsg_soil:
@@ -3593,7 +3596,6 @@ class qannagnps():
     
     def add_soil_and_management_cell_sensitivity(self):
         """Method to add soil type and management to cell"""
-        print(19)
         def fichero(nombre):
             return self.direccion_sensitivity+"\\Preprocessing_inputs"+"\\"+nombre
         #A esta función le das la capa de celdas y la que se superpone (tipo de suelo o uso) y devuelve el diccionario en el que se muestra a cada celda que valor (de suelo o de uso) le corresponde
@@ -3711,9 +3713,7 @@ class qannagnps():
                 return
             #Se aplica el suelo al fichero de cells
             try:
-                print(21)
                 suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil_sensitivity,self.column_soil_sensitivity,1)
-                print(22)
             except:
                 self.end_execution = 1
                 raise Exception(f"Error with soil layer: The DEM and the soil layer have to overlap")
@@ -3916,7 +3916,6 @@ class qannagnps():
         #Create folder
         carpeta = self.direccion+"\\Preprocessing_inputs"
         Path(carpeta).mkdir(parents=True, exist_ok=True)
-        
         
         
         #Move the files that are in the interface to this file
@@ -5520,7 +5519,8 @@ class qannagnps():
         except:
             iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
             return
-             
+        
+        
         #First we move the inputs of preprocessing
         if os.path.exists(self.direccion+"\\Preprocessing_inputs"):
             #Create folder
@@ -5532,19 +5532,20 @@ class qannagnps():
             self.create_folder_preprocessing_and_move_files()
             
             #Move all files
+            
             for elemento in os.listdir(self.direccion+"\\Preprocessing_inputs"):
-                try:
-                    ruta_origen = os.path.join(self.direccion+"\\Preprocessing_inputs", elemento)
-                    ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_inputs", elemento)
+                #try:
+                ruta_origen = os.path.join(self.direccion+"\\Preprocessing_inputs", elemento)
+                ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_inputs", elemento)
 
-                    if os.path.isfile(ruta_origen):
-                        # Copiar archivos
-                        shutil.copy2(ruta_origen, ruta_destino)
-                    elif os.path.isdir(ruta_origen):
-                        # Copiar carpetas completas
-                        shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
-                except:
-                    pass
+                if os.path.isfile(ruta_origen):
+                    # Copiar archivos
+                    shutil.copy2(ruta_origen, ruta_destino)
+                elif os.path.isdir(ruta_origen):
+                    # Copiar carpetas completas
+                    shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
+                r'''except:
+                    pass'''
             
         #Now the preprocessing outputs
         if os.path.exists(self.direccion+"\\Preprocessing_outputs"):
@@ -7738,7 +7739,6 @@ class Sensitivity_Parallelization(QgsTask):
                 return
             except:
                 pass
-            print(13)
             #Cuando se eligen coordenadas automáticamente con el plugin primero se ejecuta Topagnps y da error (se ejecuta la primera para poner el reaches en QGIS) osea que no queremos que python salte si hay error en la primera ronda. Queremos que salte python cuando hay error y si se ha seleccionado que no se elige automaticamente. O sino cuando hay error y se ha elegido automáticamente pero la segunda ejecución de Topagnps da error. 
             if os.path.isfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV") and os.path.getsize(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV")>0:
                 self.end_execution = 1
