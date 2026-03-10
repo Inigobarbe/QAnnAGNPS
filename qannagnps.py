@@ -5359,7 +5359,54 @@ class qannagnps():
                 fname = QFileDialog.getExistingDirectory(self.inputs, "Select folder", "C/")
             if fname!="":
                 self.inputs.l_53.setText(fname)
-                
+    
+    def information_in_folder(self,carpeta):
+        """Method to check if a folder has information about a QAnnAGNPS project"""
+        carpetas_control = {
+            "Preprocessing_inputs", 
+            "Preprocessing_output", 
+            "Processing_inputs", 
+            "Processing_outputs"
+        }
+        if not carpeta.exists():
+            return False
+        # Listamos solo los nombres de lo que hay dentro de la subcarpeta
+        contenido = {f.name for f in carpeta.iterdir() if f.is_dir()}
+        # Si hay intersección entre los conjuntos, es válida
+        return not contenido.isdisjoint(carpetas_control)
+    
+    
+    def obtain_last_modified_folder(self):
+        """Method to obtain the latest modified folder"""
+        # Carpetas que sirven como "marca" de que es una carpeta de ejecución válida
+        carpetas_control = {
+            "Preprocessing_inputs", 
+            "Preprocessing_output", 
+            "Processing_inputs", 
+            "Processing_outputs"
+        }
+        
+        ruta_padre = Path(self.dlg.project.text())
+        
+        #try:
+        # 1. Buscamos todas las subcarpetas
+        todas_las_subcarpetas = [d for d in ruta_padre.iterdir() if d.is_dir()]
+        
+        # 2. Filtramos solo las que cumplen tu condición técnica
+        carpetas_validas = [d for d in todas_las_subcarpetas if self.information_in_folder(d)]
+    
+        if carpetas_validas:
+            # 3. De las válidas, obtenemos la última modificada
+            ultima_carpeta = max(carpetas_validas, key=lambda f: f.stat().st_mtime)
+            
+            return ultima_carpeta.name
+            
+        else:
+            self.warning_message("No folders with the needed information where obtained")
+        
+        r'''except:
+            return'''
+    
     def save_project(self,overwrite = False):
         #Método para guardar el proyecto
         
@@ -5373,6 +5420,16 @@ class qannagnps():
         if name_of_project =="":
             self.warning_message("Please select a name for the project before saving")
             return
+        
+        
+        #Si el usuario hace una ejecucion con un nombre de proyecto y luego escoge otro nombre porque quiere que se guarde con otro nombre, entonces el nuevo nombre no tendrá una carpeta. Habrá que coger la información de la última carpeta que se ha modificado
+        #Check if the name was selected has information
+        if not self.information_in_folder(Path(self.direccion)):
+            name_of_folder = self.obtain_last_modified_folder()
+            print("a")
+        else:
+            name_of_folder = name_of_project
+        print(name_of_folder)
         
         #Create folder where the data of the proyect is going to be saved
         Path(self.carpeta_guardar_proyectos).mkdir(parents=True, exist_ok=True)
@@ -5522,7 +5579,7 @@ class qannagnps():
         
         
         #First we move the inputs of preprocessing
-        if os.path.exists(self.direccion+"\\Preprocessing_inputs"):
+        if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_inputs"):
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_inputs").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
@@ -5533,30 +5590,30 @@ class qannagnps():
             
             #Move all files
             
-            for elemento in os.listdir(self.direccion+"\\Preprocessing_inputs"):
-                #try:
-                ruta_origen = os.path.join(self.direccion+"\\Preprocessing_inputs", elemento)
-                ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_inputs", elemento)
+            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_inputs"):
+                try:
+                    ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_inputs", elemento)
+                    ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_inputs", elemento)
 
-                if os.path.isfile(ruta_origen):
-                    # Copiar archivos
-                    shutil.copy2(ruta_origen, ruta_destino)
-                elif os.path.isdir(ruta_origen):
-                    # Copiar carpetas completas
-                    shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
-                r'''except:
-                    pass'''
+                    if os.path.isfile(ruta_origen):
+                        # Copiar archivos
+                        shutil.copy2(ruta_origen, ruta_destino)
+                    elif os.path.isdir(ruta_origen):
+                        # Copiar carpetas completas
+                        shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
+                except:
+                    pass
             
         #Now the preprocessing outputs
-        if os.path.exists(self.direccion+"\\Preprocessing_outputs"):
+        if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_outputs"):
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_outputs").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
             delete_files_and_folders(f"{name_of_project}\\"+"Preprocessing_outputs")
             #Move all files
-            for elemento in os.listdir(self.direccion+"\\Preprocessing_outputs"):
+            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_outputs"):
                 try:
-                    ruta_origen = os.path.join(self.direccion+"\\Preprocessing_outputs", elemento)
+                    ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_outputs", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_outputs", elemento)
 
                     if os.path.isfile(ruta_origen):
@@ -5569,7 +5626,7 @@ class qannagnps():
                     pass
         
         #Now Processing inputs
-        if os.path.exists(self.direccion+"\\Processing_inputs"):
+        if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_inputs"):
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Processing_inputs").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
@@ -5579,9 +5636,9 @@ class qannagnps():
             self.create_folder_processing_and_move_files()
             
             #Move all files
-            for elemento in os.listdir(self.direccion+"\\Processing_inputs"):
+            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_inputs"):
                 try:
-                    ruta_origen = os.path.join(self.direccion+"\\Processing_inputs", elemento)
+                    ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_inputs", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Processing_inputs", elemento)
 
                     if os.path.isfile(ruta_origen):
@@ -5594,15 +5651,15 @@ class qannagnps():
                     pass
         
         #Processing outputs
-        if os.path.exists(self.direccion+"\\Processing_outputs"):
+        if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_outputs"):
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Processing_outputs").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
             delete_files_and_folders(f"{name_of_project}\\"+"Processing_outputs")
             #Move all files
-            for elemento in os.listdir(self.direccion+"\\Processing_outputs"):
+            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_outputs"):
                 try:
-                    ruta_origen = os.path.join(self.direccion+"\\Processing_outputs", elemento)
+                    ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_outputs", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Processing_outputs", elemento)
 
                     if os.path.isfile(ruta_origen):
@@ -5617,15 +5674,15 @@ class qannagnps():
         
         
         #Sensitivity analysis
-        if os.path.exists(self.direccion+"\\Sensitivity_analysis"):
+        if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis"):
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Sensitivity_analysis").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
             delete_files_and_folders(f"{name_of_project}\\"+"Sensitivity_analysis")
             #Move all files
-            for elemento in os.listdir(self.direccion+"\\Sensitivity_analysis"):
+            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis"):
                 try:
-                    ruta_origen = os.path.join(self.direccion+"\\Sensitivity_analysis", elemento)
+                    ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Sensitivity_analysis", elemento)
 
                     if os.path.isfile(ruta_origen):
