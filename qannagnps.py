@@ -5388,24 +5388,24 @@ class qannagnps():
         
         ruta_padre = Path(self.dlg.project.text())
         
-        #try:
-        # 1. Buscamos todas las subcarpetas
-        todas_las_subcarpetas = [d for d in ruta_padre.iterdir() if d.is_dir()]
-        
-        # 2. Filtramos solo las que cumplen tu condición técnica
-        carpetas_validas = [d for d in todas_las_subcarpetas if self.information_in_folder(d)]
-    
-        if carpetas_validas:
-            # 3. De las válidas, obtenemos la última modificada
-            ultima_carpeta = max(carpetas_validas, key=lambda f: f.stat().st_mtime)
+        try:
+            # 1. Buscamos todas las subcarpetas
+            todas_las_subcarpetas = [d for d in ruta_padre.iterdir() if d.is_dir()]
             
-            return ultima_carpeta.name
-            
-        else:
-            self.warning_message("No folders with the needed information where obtained")
+            # 2. Filtramos solo las que cumplen tu condición técnica
+            carpetas_validas = [d for d in todas_las_subcarpetas if self.information_in_folder(d)]
         
-        r'''except:
-            return'''
+            if carpetas_validas:
+                # 3. De las válidas, obtenemos la última modificada
+                ultima_carpeta = max(carpetas_validas, key=lambda f: f.stat().st_mtime)
+                
+                return ultima_carpeta.name
+                
+            else:
+                self.warning_message("No folders with the needed information where obtained")
+        
+        except:
+            return
     
     def save_project(self,overwrite = False):
         #Método para guardar el proyecto
@@ -5426,10 +5426,8 @@ class qannagnps():
         #Check if the name was selected has information
         if not self.information_in_folder(Path(self.direccion)):
             name_of_folder = self.obtain_last_modified_folder()
-            print("a")
         else:
             name_of_folder = name_of_project
-        print(name_of_folder)
         
         #Create folder where the data of the proyect is going to be saved
         Path(self.carpeta_guardar_proyectos).mkdir(parents=True, exist_ok=True)
@@ -5510,43 +5508,45 @@ class qannagnps():
         
         #A este diccionario se le añaden los inputs de AnnAGNPS
         master_dict = {"AnnAGNPS ID":self.inputs.l_54,"Aquaculture Pond Data":self.inputs.l_2,
-                               "Aquaculture Schedule Data":self.inputs.l_24,"Cell Data":self.inputs.l_3,"Classic Gully Data":self.inputs.l_4,
-                               "Contour Data":self.inputs.l_25,"Crop Data":self.inputs.l_26,"Crop Growth Data":self.inputs.l_27,
-                               "Ephemeral Gully Data":self.inputs.l_5,"Feedlot Data":self.inputs.l_6,"Feedlot Management Data":self.inputs.l_28,
-                               "Fertilizer Application Data":self.inputs.l_29,"Fertilizer Reference Data":self.inputs.l_30,
-                               "Field Pond Data":self.inputs.l_7,"Geology Data":self.inputs.l_31,
-                               "Global Error and Warning Limits Data":self.inputs.l_55,"Global IDs Factors and Flags Data":self.inputs.l_56,
-                               "Hydraulic Geometry Data":self.inputs.l_32,"Impoundment Data":self.inputs.l_8,
-                               "Irrigation Application Data":self.inputs.l_33,"Management Field Data":self.inputs.l_34,
-                               "Management Operation Data":self.inputs.l_35,"Management Schedule Data":self.inputs.l_36,
-                               "Non-Crop Data":self.inputs.l_37,
-                               "Pesticide Application Data":self.inputs.l_38,"Pesticide Initial Conditions Data":self.inputs.l_57,
-                               "Pesticide Reference Data":self.inputs.l_39,"PL Calibration Data":self.inputs.l_58,
-                               "Point Source Data":self.inputs.l_9,"RCN Calibration Data":self.inputs.l_59,"Reach Data":self.inputs.l_10,
-                               "Reach Nutrient Half-life Data":self.inputs.l_40,"Runoff Curve Number Data":self.inputs.l_42,
-                               "Simulation Period Data":self.inputs.l_60,"Soil Data":self.inputs.l_43,"Soil Layer Data":self.inputs.l_44,
-                               "Soil Initial Conditions Data":self.inputs.l_61,"Strip Crop Data":self.inputs.l_45,
-                               "Tile Drain Data":self.inputs.l_46,"Watershed Data":self.inputs.l_12,"EI Pct Data":self.inputs.l_50,
-                               "STORM TYPE DATA - RFD":self.inputs.l_51,"STORM TYPE DATA - UPDRC":self.inputs.l_52,
-                               "Output Options - Global":self.inputs.l_63,"Output Options - AA":self.inputs.l_68,"Output Options - EV":self.inputs.l_69,
-                               "Output Options - CSV":self.inputs.l_64,"Output Options - DPP":self.inputs.l_65,
-                               "Output Options - NPT":self.inputs.l_66,"Output Options - SIM":self.inputs.l_67,
-                               "Output Options - TBL":self.inputs.l_70,"Output Options - MN/MX":self.inputs.l_71,
-                               "Output Options - Cell":self.inputs.l_14,"Output Options - Feedlot":self.inputs.l_15,
-                               "Output Options - Field Pond":self.inputs.l_16,
-                               "Output Options - Classic Gully":self.inputs.l_17,
-                               "Output Options - Ephemeral Gully":self.inputs.l_18,
-                               "Output Options - Impoundment":self.inputs.l_19,
-                               "Output Options - Point Source":self.inputs.l_20,
-                               "Output Options - Reach":self.inputs.l_21,
-                               "Output Options - Wetland":self.inputs.l_22,
-                               "CLIMATE DATA - STATION":self.inputs.l_48,
-                               "CLIMATE DATA - DAILY":self.inputs.l_49,"Wetland Data":self.inputs.l_13,"Riparian Buffer Data":self.inputs.l_41,
-                               "RUSLE2 Data":self.inputs.l_62,"RiceWQ Data":self.inputs.l_11}
-        
-       
+                           "Aquaculture Schedule Data":self.inputs.l_24,"Cell Data":self.inputs.l_3,"Classic Gully Data":self.inputs.l_4,
+                           "Contour Data":self.inputs.l_25,"Crop Data":self.inputs.l_26,"Crop Growth Data":self.inputs.l_27,
+                           "Ephemeral Gully Data":self.inputs.l_5,"Feedlot Data":self.inputs.l_6,"Feedlot Management Data":self.inputs.l_28,
+                           "Fertilizer Application Data":self.inputs.l_29,"Fertilizer Reference Data":self.inputs.l_30,
+                           "Field Pond Data":self.inputs.l_7,"Geology Data":self.inputs.l_31,
+                           "Global Error and Warning Limits Data":self.inputs.l_55,"Global IDs Factors and Flags Data":self.inputs.l_56,
+                           "Hydraulic Geometry Data":self.inputs.l_32,"Impoundment Data":self.inputs.l_8,
+                           "Irrigation Application Data":self.inputs.l_33,"Management Field Data":self.inputs.l_34,
+                           "Management Operation Data":self.inputs.l_35,"Management Schedule Data":self.inputs.l_36,
+                           "Non-Crop Data":self.inputs.l_37,
+                           "Pesticide Application Data":self.inputs.l_38,"Pesticide Initial Conditions Data":self.inputs.l_57,
+                           "Pesticide Reference Data":self.inputs.l_39,"PL Calibration Data":self.inputs.l_58,
+                           "Point Source Data":self.inputs.l_9,"RCN Calibration Data":self.inputs.l_59,"Reach Data":self.inputs.l_10,
+                           "Reach Nutrient Half-life Data":self.inputs.l_40,"Runoff Curve Number Data":self.inputs.l_42,
+                           "Simulation Period Data":self.inputs.l_60,"Soil Data":self.inputs.l_43,"Soil Layer Data":self.inputs.l_44,
+                           "Soil Initial Conditions Data":self.inputs.l_61,"Strip Crop Data":self.inputs.l_45,
+                           "Tile Drain Data":self.inputs.l_46,"Watershed Data":self.inputs.l_12,"EI Pct Data":self.inputs.l_50,
+                           "STORM TYPE DATA - RFD":self.inputs.l_51,"STORM TYPE DATA - UPDRC":self.inputs.l_52,
+                           "Output Options - Global":self.inputs.l_63,"Output Options - AA":self.inputs.l_68,"Output Options - EV":self.inputs.l_69,
+                           "Output Options - CSV":self.inputs.l_64,"Output Options - DPP":self.inputs.l_65,
+                           "Output Options - NPT":self.inputs.l_66,"Output Options - SIM":self.inputs.l_67,
+                           "Output Options - TBL":self.inputs.l_70,"Output Options - MN/MX":self.inputs.l_71,
+                           "Output Options - Cell":self.inputs.l_14,"Output Options - Feedlot":self.inputs.l_15,
+                           "Output Options - Field Pond":self.inputs.l_16,
+                           "Output Options - Classic Gully":self.inputs.l_17,
+                           "Output Options - Ephemeral Gully":self.inputs.l_18,
+                           "Output Options - Impoundment":self.inputs.l_19,
+                           "Output Options - Point Source":self.inputs.l_20,
+                           "Output Options - Reach":self.inputs.l_21,
+                           "Output Options - Wetland":self.inputs.l_22,
+                           "CLIMATE DATA - STATION":self.inputs.l_48,
+                           "CLIMATE DATA - DAILY":self.inputs.l_49,"Wetland Data":self.inputs.l_13,"Riparian Buffer Data":self.inputs.l_41,
+                           "RUSLE2 Data":self.inputs.l_62,"RiceWQ Data":self.inputs.l_11}
+
+
         #Union of dictionary
         dic_save = dic_save|dic_save_two|{k: v.text() for k, v in master_dict.items()}
+        
+    
         
         
         
@@ -5572,10 +5572,14 @@ class qannagnps():
         try:
             with open(file_path, 'w') as file:
                 for key, value in dic_save.items():
-                    file.write(f"{key},{value}\n")
-        except:
-            iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
-            return
+                    if key in master_dict and os.path.isabs(value):
+                        value = Path(value).name
+                        file.write(f"{key},{value}\n")
+                    else:
+                        file.write(f"{key},{value}\n")
+            except:
+                iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
+                return
         
         
         #First we move the inputs of preprocessing
@@ -5633,7 +5637,9 @@ class qannagnps():
             delete_files_and_folders(f"{name_of_project}\\"+"Processing_inputs")
             
             #First move the files selected in the interface to self.direccion+"\\Processing_inputs"
+            self.direccion = self.dlg.project.text()+f"\\{name_of_folder}"
             self.create_folder_processing_and_move_files()
+            self.direccion = self.dlg.project.text()+f"\\{name_of_project}"
             
             #Move all files
             for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_inputs"):
