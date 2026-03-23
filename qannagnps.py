@@ -61,7 +61,6 @@ import chardet
 import glob
 import textwrap
 import matplotlib.ticker as ticker
-
 import traceback
 
 #Local libraries
@@ -69,6 +68,7 @@ from .libraries.SALib.sample import saltelli
 from .libraries.SALib.analyze import sobol
 from .libraries.SALib.sample.morris import sample as sample_morris 
 from .libraries.SALib.analyze.morris import analyze as analyze_morris
+from .libraries.skopt.optimizer import Optimizer
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -797,6 +797,9 @@ class qannagnps():
             
             file_path = self.dlg_calibration_inputs.lineEdit.text()
             df = pd.read_csv(file_path, sep=',', header=None)
+            if len(df.columns)!=2:
+                self.warning_message("The selected file has not two columns of data. \nThe data must contain two columns, the first one for the date and the second one for the values")
+                return
             df.columns = ['date', 'value']
 
             # 2. Conversión y Limpieza
@@ -851,11 +854,10 @@ class qannagnps():
             
         except:
             #If output doesnt exist, then stop with the code
-            if len(mu_star) == 0:
-                self.canvas_calibration_graph.figure.clear()
-                #If I clear but not .draw() then is changed but only when dialog is maximized or minimized
-                self.canvas_calibration_graph.draw()
-                return
+            self.canvas_calibration_graph.figure.clear()
+            #If I clear but not .draw() then is changed but only when dialog is maximized or minimized
+            self.canvas_calibration_graph.draw()
+            return
     
     
     def open_annagnps_folder(self):
@@ -3963,7 +3965,7 @@ class qannagnps():
     def warning_message(self,message):
         """Method to put a warning message"""
         #Put text
-        self.dlg_warning_message.warning.setText(message)              
+        self.dlg_warning_message.warning.setText("\n".join(textwrap.wrap(message, width=100, break_long_words=False)))
         
         courier_font = QFont("Georgia")
         courier_font.setStyleHint(QFont.Monospace)  # Asegura el estilo monoespaciado
@@ -5577,9 +5579,9 @@ class qannagnps():
                         file.write(f"{key},{value}\n")
                     else:
                         file.write(f"{key},{value}\n")
-            except:
-                iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
-                return
+        except:
+            iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
+            return
         
         
         #First we move the inputs of preprocessing
@@ -5923,21 +5925,40 @@ class qannagnps():
         
         self.dlg.combo_created_projects.clear()
         self.dlg.combo_created_projects.addItems(project_names)
-        if self.dlg.name_of_project.text()!="":
+
+            
+        if self.dlg.name_of_project.text() == "": #we put the last modified folder
+            folders = [
+                os.path.join(self.carpeta_guardar_proyectos, f)
+                for f in os.listdir(self.carpeta_guardar_proyectos)
+                if os.path.isdir(os.path.join(self.carpeta_guardar_proyectos, f))
+            ]
+
+            # Carpeta más recientemente modificada
+            latest_folder = max(folders, key=os.path.getmtime)
+            # Solo el nombre (sin ruta completa)
+            latest_folder_name = os.path.basename(latest_folder)
+            self.dlg.combo_created_projects.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
+            
+        else:
             #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive. 
             self.dlg.combo_created_projects.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
         
         #In sensitivity
         self.sensitivity_dialog.project_sensitivity.clear()
         self.sensitivity_dialog.project_sensitivity.addItems(project_names)
-        if self.dlg.name_of_project.text()!="":
+        if self.dlg.name_of_project.text() == "": #we put the last modified folder
+            self.sensitivity_dialog.project_sensitivity.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
+        else:
             #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive. 
             self.sensitivity_dialog.project_sensitivity.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
         
         #In calibration
         self.dlg_calibration.project_calibration.clear()
         self.dlg_calibration.project_calibration.addItems(project_names)
-        if self.dlg.name_of_project.text()!="":
+        if self.dlg.name_of_project.text() == "": #we put the last modified folder
+            self.dlg_calibration.project_calibration.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
+        else:
             #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive. 
             self.dlg_calibration.project_calibration.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
         
@@ -6425,7 +6446,7 @@ class qannagnps():
         if information == "Sensitivity_analysis":
             selected_project = self.sensitivity_dialog.project_sensitivity.currentText()
         elif information == "Calibration":
-            selected_project = self.dlg_calibration.project_sensitivity.currentText()
+            selected_project = self.dlg_calibration.project_calibration.currentText()
         
         #Move all the folders to the new folder
         for core in range(1,self.number_cores+1):
@@ -6435,7 +6456,7 @@ class qannagnps():
             destino.mkdir(parents=True, exist_ok=True)
             
             for carpeta in origen.iterdir() :
-                if carpeta.is_dir() and carpeta.name != f"{information}":
+                if carpeta.is_dir() and carpeta.name != "Sensitivity_analysis" and carpeta.name != "Calibration":
                     try:
                         shutil.copytree(
                             carpeta,
@@ -6477,6 +6498,8 @@ class qannagnps():
             if name_master in project_df.iloc[:,0].values:
                 file = Path(self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==name_master].iloc[0,1])
                 data = pd.read_csv(file,encoding = "ISO-8859-1",delimiter=",")
+                # Eliminar espacios al inicio y final de los nombres de columnas
+                data.columns = data.columns.str.strip()
                 data[column].iloc[0] = "T"
                 data.to_csv(file, index=False, float_format='%.5f')
                 
@@ -6604,7 +6627,6 @@ class qannagnps():
         #Modifiy the inputs so that the required output are displayed
         self.modify_input_sensitivity_match_output("Calibration")
         
-        return
         
         #Results are obtained
         self.resultados = []
@@ -6613,19 +6635,35 @@ class qannagnps():
         
         
         #Check if preprocessing is going to be executed
-        self.execute_preprocessing_sensitivity = False
+        self.execute_preprocessing_calibration = False
         for i in self.dic_data.keys():
             if self.dic_name_column[i][0]=="Spatial":
-                self.execute_preprocessing_sensitivity = True
+                self.execute_preprocessing_calibration = True
         
         
         #We do the sensitivity analysis
         self.manager = QgsApplication.instance().taskManager()
         self.carpetas_libres = list(range(1,self.number_cores+1))  # IDs de tus carpetas
-        self.tareas_pendientes = list(range(len(self.param_values)))
+        try:
+            self.calibration_maximum_executions = int(self.dlg_calibration.trajectories.text())
+            self.tareas_pendientes = list(range(self.calibration_maximum_executions))
+        except:
+            self.warning_message("Please select a number for the maximum iterations")
+            return
         self.terminadas = 0
         self.tareas_activas = []
-        self.lanzar_siguiente_sensitivity()
+        
+        #Obtener la cantidad de tareas que se ve a hacer en cada ronda
+        self.tareas_por_ronda = self.number_cores-1
+        self.tareas_pendientes_ronda = list(range(self.tareas_por_ronda))
+        
+        #Do the calibration until the tareas pendientes is reached
+        espacio = [(x[0],x[1]) for x in self.dic_data.values()]
+        self.opt = Optimizer(dimensions=espacio, base_estimator="GP")
+        self.counter_calibration = 0
+        self.counter_calibration_round = 0
+        self.proximos_inputs = self.opt.ask(n_points=self.tareas_por_ronda)
+        self.lanzar_siguiente_calibration()
     
             
     def run_sensitivity_analysis(self): 
@@ -6750,7 +6788,7 @@ class qannagnps():
         self.carpetas_libres.append(id_carpeta)
         
         
-        if self.terminadas == len(self.param_values):
+        if self.terminadas >= len(self.param_values):
             #Se ponen los resultados en un dataframe, se guarda y se calculan los índices de sensibilidad
             self.run_sensitivity_analysis_two()
             
@@ -6759,6 +6797,63 @@ class qannagnps():
             if self.tareas_pendientes:
                 self.lanzar_siguiente_sensitivity()
     
+    def finalizar_tarea_calibration(self,task, id_carpeta,n):
+        """Method that will be executed after each execution in AnnAGNPS in the parallelization of the calibration"""
+    
+        # IMPORTANT: Remove from active list immediately
+        if task in self.tareas_activas:
+            self.tareas_activas.remove(task)
+            
+        # Check if the task failed or was canceled
+        if task.status() != QgsTask.Complete:
+            # Check if we already cleared the queue (to avoid multiple popups)
+            if len(self.tareas_pendientes) > 0:
+                self.stop_calibration_execution(task)
+            return # Stop this specific execution branch here
+        
+        # --- Normal Success Logic ---
+        # We save the result
+        resultado = self.obtain_nash_calibration(id_carpeta)
+        self.resultados.append(resultado)
+        
+        self.counter_calibration +=1
+        self.counter_calibration_round +=1
+        
+        # Return folder to pool
+        self.carpetas_libres.append(id_carpeta)
+        
+        
+        if self.counter_calibration >= self.calibration_maximum_executions:
+            #Se ponen los resultados en un dataframe, se guarda y se calculan los índices de sensibilidad
+            self.run_calibration_two()
+        
+        elif self.counter_calibration_round >= self.tareas_por_ronda:
+            self.counter_calibration_round = 0
+            self.lanzar_siguiente_calibration()
+            self.opt.tell(self.proximos_inputs, self.resultados_outputs_calibration)
+            self.proximos_inputs = self.opt.ask(n_points=self.tareas_por_ronda)
+            
+        
+        else:
+            # Only launch next if the queue hasn't been emptied by an error
+            if self.tareas_pendientes:
+                self.lanzar_siguiente_calibration()
+    
+    def obtain_nash_calibration(self,id_carpeta):
+        """Method to obtain the objective funciotn value in the calibration"""
+        file_path = self.dlg_calibration_inputs.lineEdit.text()
+        df = pd.read_csv(file_path, sep=',', header=None)
+        df.columns = ['date', 'value']
+
+
+        df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y', errors='coerce')
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
+        df = df.dropna().sort_values('date')
+        
+        file_output = "AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"
+        
+        return df.value.sum()
+        
     
     def stop_sensitivity_execution(self,task):
         """Método para detener el análisis de sensibilidad de forma segura"""
@@ -6786,6 +6881,62 @@ class qannagnps():
         
         #Close progress bar
         self.progress_dialog.close()
+    
+    
+    def stop_calibration_execution(self,task):
+        """Método para detener el análisis de sensibilidad de forma segura"""
+        self.tareas_pendientes = []  # Clear the queue
+        
+        # Use a copy [:] to iterate safely
+        for t in self.tareas_activas[:]:
+            try:
+                # We only cancel tasks that are still alive and are NOT the failed one
+                if t and t != task:
+                    t.cancel()
+            except (RuntimeError, ReferenceError):
+                pass
+                
+        self.tareas_activas = [] 
+        
+        # Try to build the error message safely
+        try:
+            msg = f"Analysis stopped in task {task.n}. Reason: {task.error_msg}"
+        except (RuntimeError, ReferenceError, AttributeError):
+            msg = "Calibration analysis stopped due to an unexpected error."
+
+        # Show the warning in English
+        self.warning_message(msg)
+        
+        #Close progress bar
+        self.progress_dialog.close()
+    
+    
+    def lanzar_siguiente_calibration(self):
+        """Method to run next execution in the parallelization of the calibration"""
+        
+        if not self.tareas_pendientes:
+            return
+        
+        # Mientras haya tareas por hacer y carpetas vacías...
+        while self.tareas_pendientes and self.carpetas_libres:
+            
+            n_tarea = self.tareas_pendientes.pop(0)
+            id_carpeta = self.carpetas_libres.pop(0) # Reservamos la carpeta
+            task = Calibration_Parallelization(n_tarea, id_carpeta,self.execute_preprocessing_calibration,self.direccion_sensitivity,
+                self.dic_data,self.proximos_inputs,self.executable_directory,self.plugin_dir,self.dic_name_column,
+                self.inputs,self.epsg_sensitivity,
+                self.unique_soil_sensitivity, self.fichero_soil_sensitivity,self.column_soil_sensitivity,self.unique_use_sensitivity,self.fichero_manag_sensitivity,
+                self.column_use_sensitivity,self.project_df,self.counter_calibration_round)
+            
+            self.tareas_activas.append(task)
+            
+            # Al finalizar, liberamos la carpeta y lanzamos la siguiente
+            task.taskCompleted.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n))
+            # Esto es por si hay error
+            task.taskTerminated.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n))
+            self.manager.addTask(task)
+    
+    
     
     def save_result(self,core,n):
         #Metod to save the results of the sensitivity analysis
@@ -6943,6 +7094,7 @@ class qannagnps():
             
         return new_df
     
+    
     def run_sensitivity_analysis_two(self):
         """Method to save the results of the sensitivity analysis and to calculate the sensitivity indexes"""
         #Organize the dataframe
@@ -6996,6 +7148,25 @@ class qannagnps():
         
         #MENSAJE DE ÉXITO
         self.warning_message("Succes in the sensitiviy analysis ")
+    
+    
+    def run_calibration_two(self):
+        """Method to save the results of the calibration"""
+        #Organize the dataframe
+        self.results_calibration = pd.DataFrame(self.resultados)
+        
+        
+        #Calculate sensitivity indexes
+        path = self.direccion_sensitivity + "\\"+self.dlg_calibration.file_save.text()
+        
+        #Append results
+        self.results_calibration.to_csv(path, index=False, float_format='%.10f')
+        
+        #Se cierra la barra de progreso
+        self.progress_dialog.close()
+        
+        #MENSAJE DE ÉXITO
+        self.warning_message("Succes in the calibration")
         
        
     def declare_rasters_sensitivity_analysis(self,information):
@@ -7018,7 +7189,7 @@ class qannagnps():
         if information =="Sensitivity_analysis":
             selected_project = self.sensitivity_dialog.project_sensitivity.currentText()
         elif information == "Calibration":
-            selected_project = self.dlg_calibration.project_sensitivity.currentText()
+            selected_project = self.dlg_calibration.project_calibration.currentText()
         csv_file = self.carpeta_guardar_proyectos +"\\"+selected_project+"\\"+selected_project+".csv"
         project_df = pd.read_csv(csv_file,encoding = "ISO-8859-1",delimiter=",")
         self.project_df = project_df
@@ -8114,6 +8285,707 @@ class Sensitivity_Parallelization(QgsTask):
             df = pd.read_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\AGBUF.csv",encoding = "ISO-8859-1",delimiter=",")
             df["VEGETATION"].iloc[0] = str(self.nombre_vegetation_sensitivity+f"_{round(i[j],2)}"+"."+self.extension_vegetation_sensitivity)
             df.to_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\AGBUF.csv", index=False, float_format='%.5f')
+    
+    def registrar_numero(self,numero):
+        # Definimos la ruta de la carpeta y del archivo
+        ruta_carpeta = r"D:\Prueba"
+        nombre_archivo = "mensajes.txt"
+        ruta_completa = os.path.join(ruta_carpeta, nombre_archivo)
+        
+        # 1. Verificamos si la carpeta existe; si no, la creamos para evitar errores
+        if not os.path.exists(ruta_carpeta):
+            os.makedirs(ruta_carpeta)
+            print(f"Carpeta creada en: {ruta_carpeta}")
+
+        # 2. Abrimos el archivo en modo 'a' (append)
+        # Usamos 'with' para que el archivo se cierre automáticamente
+        with open(ruta_completa, "a", encoding="utf-8") as archivo:
+            # Añadimos el número seguido de un salto de línea
+            archivo.write(f"{numero}\n")
+        
+    
+    
+    def add_soil_and_management_cell_sensitivity(self):
+        """Method to add soil type and management to cell"""
+        print(19)
+        def fichero(nombre):
+            return self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\"+nombre
+        #A esta función le das la capa de celdas y la que se superpone (tipo de suelo o uso) y devuelve el diccionario en el que se muestra a cada celda que valor (de suelo o de uso) le corresponde
+        def aplicar(fichero_celdas,fichero_superponer, columna_tipo,numero):
+            
+            numero = str(numero) #esto es porque no deja sobreescribir y tengo que crear otra capa por cada ejecución de sensibilidad
+            fichero_cell = fichero_celdas
+            fichero_suelo = fichero_superponer
+            #Esta función devuelve un diccionario en donde a cada suelo/uso se le asigna un numero entero y luego en la capa (de suelos o uso) a cada suelo/uso se le añade el valor del diccionario
+            def create_fid(file_layer):
+                layer = file_layer
+                tipos_suelo = []
+                for f in layer.getFeatures():
+                    tipos_suelo.append(f[columna_tipo])
+                tipos_suelo = np.unique(tipos_suelo)
+                tipos_suelo_dic = {tipos_suelo[x]:x+1 for x in range(len(tipos_suelo))}
+
+                pv = layer.dataProvider()
+                pv.addAttributes([QgsField("id_prueba",QVariant.Int)])
+                context = QgsExpressionContext()
+                with edit(layer):
+                    for f in layer.getFeatures():
+                        context.setFeature(f)
+                        f["id_prueba"] = tipos_suelo_dic[f[columna_tipo]]
+                        layer.updateFeature(f)
+                layer.updateFields()
+                return tipos_suelo_dic
+
+            #Pasar de shp a gpkg
+            with qgis_processing_lock: #esto es para que no se use más de un hilo en la paralelización que puede dar problemas en la paralelización. 
+                e = processing.run("native:reprojectlayer", 
+                    {'INPUT':fichero_suelo,
+                    'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg_sensitivity),
+                    'OPERATION':'+proj=noop','OUTPUT':fichero(f"reproyect_{self.n}")})
+            #Reproyectar celdas al epsg del proyecto
+            with qgis_processing_lock:
+                a = processing.run("gdal:warpreproject", 
+                    {'INPUT':fichero(fichero_cell),
+                    'SOURCE_CRS':None,'TARGET_CRS':QgsCoordinateReferenceSystem('{}'.format(self.epsg_sensitivity)),
+                    'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':None,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,
+                    'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OPTIONS': 'NUM_THREADS=1','OUTPUT':fichero(f"warp_{self.n}.tif")})
+            #Con esto se tiene el diccionario que te asigna para cada suelo/uso un valor numérico
+            capa_suelo = QgsVectorLayer(e["OUTPUT"], "temp_suelo", "ogr")
+            dic_conv = create_fid(capa_suelo)
+            #Rasterizar la capa de suelos
+            with qgis_processing_lock:
+                processing.run("gdal:rasterize", 
+                    {'INPUT':e["OUTPUT"],
+                    'FIELD':'id_prueba','BURN':0,'USE_Z':False,'UNITS':1,'WIDTH':self.pixelSizeX,
+                    'HEIGHT':self.pixelSizeY,'EXTENT':None,'NODATA':0,'OPTIONS':'','DATA_TYPE':4,'INIT':None,
+                    'INVERT':False,'EXTRA':'','OUTPUT':fichero("suelo_ras.tif")})
+            #Vectorizar la capa de celdas
+            with qgis_processing_lock:
+                c = processing.run("gdal:polygonize", 
+                    {'INPUT':a["OUTPUT"],
+                    'BAND':1,'FIELD':'DN','EIGHT_CONNECTEDNESS':False,'EXTRA':'',
+                    'OUTPUT':fichero(f"vec_{self.n}.gpkg")})
+                
+            r'''c = processing.run("grass7:r.to.vect", {'input':a["OUTPUT"],
+                'type':2,'column':'value','-s':False,
+                '-v':False,'-z':False,'-b':False,'-t':False,
+                'output':QgsProcessing.TEMPORARY_OUTPUT,'GRASS_REGION_PARAMETER':None,
+                'GRASS_REGION_CELLSIZE_PARAMETER':0,'GRASS_OUTPUT_TYPE_PARAMETER':0,
+                'GRASS_VECTOR_DSCO':'','GRASS_VECTOR_LCO':'',
+                'GRASS_VECTOR_EXPORT_NOCAT':False})'''
+            #Corregir geometrías porque luego sino en unión da error 
+            with qgis_processing_lock:
+                d = processing.run("native:fixgeometries", 
+                    {'INPUT':c["OUTPUT"],
+                    'OUTPUT':fichero(f"fixed_geometries_{self.n}")})   
+            #Se unen las capas de celdas de celdas con las de suelo/uso
+            with qgis_processing_lock:
+                processing.run("native:union", 
+                {'INPUT':d["OUTPUT"],
+                'OVERLAY':e["OUTPUT"],
+                'OVERLAY_FIELDS_PREFIX':'','OUTPUT':fichero("union_capas{}_{}.gpkg".format(numero,self.n))})
+            #Esta función es para crear una columna en una capa vectorial según la expresión que le pongas
+            def create_attribute(layer_name, expresion,nombre_columna):
+                layer = QgsVectorLayer(fichero(layer_name),"union")
+                pv = layer.dataProvider()
+                pv.addAttributes([QgsField(nombre_columna,QVariant.Double)])
+                expression1 = QgsExpression(expresion)
+                context = QgsExpressionContext()
+                context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
+                with edit(layer):
+                    for f in layer.getFeatures():
+                        context.setFeature(f)
+                        f[nombre_columna] = expression1.evaluate(context)
+                        layer.updateFeature(f)
+                layer.updateFields()
+            #De la capa de unión creada se calcula el área para cada zona
+            create_attribute("union_capas{}_{}.gpkg".format(numero,self.n),"$area","area_zona")
+            #Ahora se ve qué área de suelo/uso es la mayor para cada celda y esa será la que se escoja
+            layer = QgsVectorLayer(fichero("union_capas{}_{}.gpkg".format(numero,self.n)),"union")
+            tres_valores = []
+            valores_unicos_celdas = []
+            valores_unicos_suelos=[]
+            for f in layer.getFeatures():
+                        tres_valores.append((f["DN"],f["id_prueba"],f["area_zona"]))
+                        valores_unicos_celdas.append(f["DN"])
+                        valores_unicos_suelos.append(f["id_prueba"])
+            valores_unicos_celdas = list(np.unique(valores_unicos_celdas))
+            valores_unicos_suelos=list(np.unique(valores_unicos_suelos))
+            valores_unicos_celdas=[x for x in valores_unicos_celdas if isinstance(x, (int, float))]
+            valores_unicos_suelos=[x for x in valores_unicos_suelos if type(x)==np.int32 or type(x)==int ]
+            lista_final = []
+            for i in valores_unicos_celdas:
+                lista_maximos = []
+                for x in valores_unicos_suelos:
+                    try:
+                        suma = sum([f[2] for f in tres_valores if f[0] == i and f[1] == x])
+                        lista_maximos.append((x,suma))
+                    except:
+                        pass
+                lista_final.append((i,max(lista_maximos,key = lambda p:p[1])[0]))
+            
+            diccionario_conversion = {x[0]:x[1] for x in lista_final}
+            dic_conv = {v: k for k, v in dic_conv.items()}
+            diccionario_final = {list(diccionario_conversion.keys())[x]:dic_conv[diccionario_conversion[list(diccionario_conversion.keys())[x]]] for x in range(len(diccionario_conversion))}
+            return diccionario_final,dic_conv
+        #Se importa el data frame en el que se muestran las celdas 
+        annagnps_cell_data = pd.read_csv(fichero("AnnAGNPS_Cell_Data_Section.csv"),encoding = "ISO-8859-1",delimiter=",")
+        #Dar error si no se ha elegido ni capa de suelos ni se ha puesto un suelo único
+        
+        if pd.isna(self.unique_soil_sensitivity):
+            if self.fichero_soil_sensitivity=="nan":
+                self.end_execution = 1
+                self.error_msg = "Error with soil layer\nNo soil layer has been selected"
+                return
+            #Se aplica el suelo al fichero de cells
+            try:
+                suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil_sensitivity,self.column_soil_sensitivity,1)
+            except:
+                self.end_execution = 1
+                self.error_msg = f"Error with soil layer: The DEM and the soil layer have to overlap"
+                return
+            annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
+            annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
+            
+            
+            #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo PEG.csv
+            if path.exists(fichero("PEG.csv")):
+                eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
+                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                def create_layer():
+                    layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
+                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.updateFields()
+                    features = []
+                    for i in range(len(summary)):
+                        feature = QgsFeature()
+                        feature.setFields(layer.fields())
+                        x = summary.X.iloc[i]
+                        y = summary.Y.iloc[i]
+                        pt = QgsPointXY(x,y)
+                        geom = QgsGeometry.fromPointXY(pt)
+                        feature.setGeometry(geom)
+                        feature.setAttribute(0,summary.GULLY_ID.iloc[i])
+                        features.append(feature)
+                    layer.dataProvider().addFeatures(features)
+                    return layer
+                summary_layer = create_layer()
+                sampling = processing.run("native:rastersampling", 
+                    {'INPUT':summary_layer,
+                    'RASTERCOPY':fichero("suelo_ras.tif"),
+                    'COLUMN_PREFIX':'SAMPLE_','OUTPUT':fichero(f"sampling_{self.n}")})
+                capa = sampling["OUTPUT"]
+                dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
+                
+                annagnps_eg_data = pd.read_csv(eg_path,encoding = "ISO-8859-1",delimiter=",")
+                suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
+                try:
+                    annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
+                except:
+                    self.end_execution = 1
+                    self.error_msg =  "Error soil map\nThe soil type layer may not cover the full extent of the watershed"
+                    return
+                #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
+                def float_to_str(column):
+                    lista = []
+                    for i in annagnps_eg_data[column]:
+                        try:
+                            lista.append(str(int(i)))
+                        except:
+                            lista.append("")
+                    annagnps_eg_data[column] = lista
+                #Primero para la columna de celdas
+                float_to_str("Cell_ID")
+                #Ahora para la columna de reaches
+                float_to_str("Reach_ID")
+                annagnps_eg_data.to_csv(eg_path, index=False, float_format='%.5f')
+                
+            
+        #Dar error si no se ha elegido ni capa de usos ni se ha puesto un uso único
+        if pd.isna(self.unique_use_sensitivity):
+            if self.fichero_manag_sensitivity=="nan":
+                self.end_execution = 1
+                self.error_msg = "Error with soil management\nNo management layer has been selected."
+                return
+            try:
+                manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_manag_sensitivity,self.column_use_sensitivity,2)
+            except:
+                self.end_execution = 1
+                self.error_msg = f"Error with management layer: The DEM and the management layer have to overlap"
+                return
+                
+                    
+            annagnps_cell_data["Mgmt_Field_ID"] = [manejos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
+            annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
+            
+            
+            #Se aplica el uso al fichero de cárcavas efímeras
+            if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
+                eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
+                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                def create_layer():
+                    layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
+                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.updateFields()
+                    features = []
+                    for i in range(len(summary)):
+                        feature = QgsFeature()
+                        feature.setFields(layer.fields())
+                        x = summary.X.iloc[i]
+                        y = summary.Y.iloc[i]
+                        pt = QgsPointXY(x,y)
+                        geom = QgsGeometry.fromPointXY(pt)
+                        feature.setGeometry(geom)
+                        feature.setAttribute(0,summary.GULLY_ID.iloc[i])
+                        features.append(feature)
+                    layer.dataProvider().addFeatures(features)
+                    return layer
+                summary_layer = create_layer()
+                sampling = processing.run("native:rastersampling", 
+                    {'INPUT':summary_layer,
+                    'RASTERCOPY':fichero("suelo_ras.tif"),
+                    'COLUMN_PREFIX':'SAMPLE_','OUTPUT':'TEMPORARY_OUTPUT'})
+                capa = sampling["OUTPUT"]
+                dic_eg = {f["id"].split(" ")[0]:f["SAMPLE_1"] for f in capa.getFeatures()}
+                annagnps_eg_data = pd.read_csv(eg_path,encoding = "ISO-8859-1",delimiter=",")
+                suelos_eg = [dic_eg[x] for x in annagnps_eg_data["Gully_ID"]]
+                try:
+                    lista_tipos = []
+                    for eg_soil_i,eg_soil_k in enumerate([dic_conv[x] for x in suelos_eg]):
+                        if annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i]=="BUFFER" or annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i]=="WETLAND":
+                            lista_tipos.append(annagnps_eg_data["Mgmt_Field_ID"].iloc[eg_soil_i])
+                        else:
+                            lista_tipos.append(eg_soil_k)
+                    annagnps_eg_data["Mgmt_Field_ID"]= lista_tipos
+                except:
+                    self.end_execution = 1
+                    self.error_msg ="Error soil use map\nThe soil use layer may not cover the full extent of the watershed"
+                    return
+                    
+                #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
+                def float_to_str(column):
+                    lista = []
+                    for i in annagnps_eg_data[column]:
+                        try:
+                            lista.append(str(int(i)))
+                        except:
+                            lista.append("")
+                    annagnps_eg_data[column] = lista
+                #Primero para la columna de celdas
+                float_to_str("Cell_ID")
+                #Ahora para la columna de reaches
+                float_to_str("Reach_ID")
+                annagnps_eg_data.to_csv(eg_path, index=False, float_format='%.5f')
+            
+        #Si se ha puesto un suelo único entonces se añade a todas las celdas
+        if not pd.isna(self.unique_soil_sensitivity):
+            annagnps_cell_data["Soil_ID"] =str(self.unique_soil_sensitivity)
+            annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
+        #Si se ha puesto un uso único entonces se añade a todas las celdas
+        if not pd.isna(self.unique_use_sensitivity):
+            annagnps_cell_data["Mgmt_Field_ID"]=str(self.unique_use_sensitivity)
+            annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
+    
+    
+    def create_folder_processing_and_move_files(self):
+        """Method to create the preprocessing folders (if they dont exist) and move the input files here"""
+        #Move the outputs generated by topagnps to the inputs of annagnps
+        names_list = ["AnnAGNPS_Cell_Data_Section.csv","AnnAGNPS_Ephemeral_Gully_Data_Section.csv","AnnAGNPS_Reach_Data_Section.csv","AnnAGNPS_Riparian_Buffer_Data_Section_AgBuf.csv","AnnAGNPS_Wetland_Data_Section.csv"]
+        names_in_master = ["Cell Data","Ephemeral Gully Data","Reach Data","Riparian Buffer Data","Wetland Data"]
+        master = pd.read_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\annagnps_master.csv",encoding = "ISO-8859-1",delimiter=",")
+        for i in range(len(names_list)):
+            #Comprobar si se ejecuta en el proyecto
+            if not pd.isna(self.project_df[self.project_df.iloc[:,0]==names_in_master[i]].iloc[0,1]) and os.path.exists(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs\\"+names_list[i]): 
+                #Move files
+                shutil.copyfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs\\"+names_list[i],self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\watershed\\"+names_list[i])
+                #Change annagnps_master
+                master[master.iloc[:,0]==names_in_master[i]].iloc[0,1] = f'.\\watershed\\{names_list[i]}'
+                master.to_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\annagnps_master.csv", encoding='utf-8', index=False)
+            else: 
+                master = master[master.iloc[:,0]!=names_in_master[i]]
+                master.to_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\annagnps_master.csv", encoding='utf-8', index=False)
+    
+
+class Calibration_Parallelization(QgsTask):
+    def __init__(self, n, core,execute_preprocessing_sensitivity,direccion_sensitivity,dic_data,proximos_inputs,executable_directory,plugin_dir,dic_name_column,inputs, epsg_sensitivity,unique_soil_sensitivity,fichero_soil_sensitivity,column_soil_sensitivity,unique_use_sensitivity,fichero_manag_sensitivity,column_use_sensitivity,project_df,counter_calibration_round):
+        super().__init__(f"Tarea_{n}_Carpeta_{core}")
+        self.n = n
+        self.core = core
+        self.execute_preprocessing_sensitivity = execute_preprocessing_sensitivity
+        self.direccion_sensitivity = direccion_sensitivity
+        self.dic_data = dic_data
+        self.proximos_inputs = proximos_inputs
+        self.executable_directory = executable_directory
+        self.plugin_dir = plugin_dir
+        self.dic_name_column = dic_name_column
+        self.inputs = inputs
+        self.epsg_sensitivity = epsg_sensitivity
+        self.unique_soil_sensitivity = unique_soil_sensitivity
+        self.fichero_soil_sensitivity = fichero_soil_sensitivity
+        self.column_soil_sensitivity = column_soil_sensitivity
+        self.unique_use_sensitivity = unique_use_sensitivity
+        self.fichero_manag_sensitivity = fichero_manag_sensitivity
+        self.column_use_sensitivity = column_use_sensitivity
+        self.project_df = project_df
+        self.counter_calibration_round = counter_calibration_round
+        
+        
+    def run(self):
+        # Ajusta la ruta para que use la carpeta correspondiente al folder_id
+        
+        self.end_execution = 0
+        try:
+            self.ejecucion_completa_sensitivity()
+        except Exception as e:
+            self.error_msg = str(e)
+            return False
+        if self.end_execution ==1:
+            return False
+        
+        return True
+    
+    
+    def ejecucion_completa_sensitivity(self):
+        #Esta función es en donde se ejecuta el modelo
+        #EJECUCIÓN DE TOPAGNPS
+        if self.execute_preprocessing_sensitivity:
+            #Se crea la carpeta de Preprocessing_inputs si no estaba creada. Ahí se meten los inputs y se ejecuta TopAGNPS y luego los outputs se meten a Preprocessing_outputs
+            
+            #Función para que se le diga el nombre del archivo y te devuelva la dirección completa
+            def fichero(nombre):
+                return self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\"+nombre
+            
+            #Dar error si no existe el archivo TOPAGNPS.CSV
+            if not os.path.exists(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV"):
+                self.error_msg = "Error Input data\nControl file of TopAGNPS, TOPAGNPS.CSV, not found"
+                self.end_execution = 1
+                return
+            #Si el formato de la columna FILENAME no es str entonces dar error
+            topagnps_control_file = pd.read_csv(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
+            if type(topagnps_control_file["FILENAME"].iloc[0])!=str:
+                self.error_msg ="Error Input data\nPlease select a correct FILENAME in TOPAGNPS.CSV" 
+                self.end_execution = 1
+                return
+            #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs.
+            for j,k in enumerate(self.dic_data.keys()):
+                self.change_inputs_sensitivity(self.proximos_inputs[self.counter_calibration_round],j,k,spatial =True) #cambio de los inputs espaciales
+            #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
+            self.time_start_preprocessing = datetime.now()
+            #EJECUCIÓN DE TOPAGNPS            
+            def main():
+                f = open(self.executable_directory+"\\"+f"EjecutarTopagnps_{self.core}.bat","w+")
+                linea_uno = "CD /d {}".format(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs")
+                linea_dos = r"CALL {}\TopAGNPS_v6.00.a.025_release_64-bit.exe".format(self.executable_directory)
+                f.write("{} \n".format(linea_uno))
+                f.write("{} \n".format(linea_dos))
+                f.close()
+            main()
+            subprocess.call(self.executable_directory+"\\"+f"EjecutarTopagnps_{self.core}.bat")
+            #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarTopagnps.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+            #stdout, stderr = proc.communicate()
+            #If error file of TopAGNPS is opened, then return a error message
+            try:
+                open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.csv", "r+") 
+            except PermissionError:
+                self.error_msg ="Error TopAGNPS","Close TOPAGNPS_err.csv before the start of execution"
+                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                self.save_files_preprocessing_in_folder_sensitivity()
+                self.end_execution = 1
+                return
+            except:
+                pass
+            #Cuando se eligen coordenadas automáticamente con el plugin primero se ejecuta Topagnps y da error (se ejecuta la primera para poner el reaches en QGIS) osea que no queremos que python salte si hay error en la primera ronda. Queremos que salte python cuando hay error y si se ha seleccionado que no se elige automaticamente. O sino cuando hay error y se ha elegido automáticamente pero la segunda ejecución de Topagnps da error. 
+            if os.path.isfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV") and os.path.getsize(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV")>0:
+                self.end_execution = 1
+                error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
+                self.error_msg =f"Error TOPAGNPS\n{error.columns[3]}"
+                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                self.save_files_preprocessing_in_folder_sensitivity()
+                #Se abre el archivo de errores
+                try:
+                    os.startfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs"+"\\TopAGNPS_err.csv")
+                except:
+                    pass
+                #Este return es para parar el codigo
+                return
+            
+            #VALORES DEL TAMAÑO DE PIXEL
+            layer = QgsRasterLayer(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\"+topagnps_control_file["FILENAME"].iloc[0],"dednm")
+            self.pixelSizeX = round(layer.rasterUnitsPerPixelX(),2)
+            self.pixelSizeY = round(layer.rasterUnitsPerPixelY(),2)
+            #ASIGNAR LOS VALORES DE SUELO Y MANEJO A AnnAGNPS_Cell_Data_Section.csv
+            try:
+                self.add_soil_and_management_cell_sensitivity()
+            except Exception as e:
+                #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+                self.save_files_preprocessing_in_folder_sensitivity()
+                self.error_msg =str(e)
+                
+                error_completo = traceback.format_exc()
+                
+                
+                return
+            #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
+            self.save_files_preprocessing_in_folder_sensitivity()
+            
+            #Move the outputs of TopAGNPS to use as inputs of AnnAGNPS 
+            self.create_folder_processing_and_move_files()
+            
+        #EJECUCIÓN DE ANNAGNPS
+
+        #MOVER EL ANNAGNPS.FIL (CREO QUE ES EL CONTROL FILE DE ANNAGNPS) A LA CARPETA DE INPUTS de procesamiento
+        shutil.copyfile(self.plugin_dir+"\\Executables"  + "\\" +"AnnAGNPS.fil" ,self.direccion_sensitivity +f"\\Core_{self.core}"+"\\Processing_inputs\\" +"AnnAGNPS.fil")
+        #Se cambian los inputs
+        for j,k in enumerate(self.dic_data.keys()):
+            self.change_inputs_sensitivity(self.proximos_inputs[self.counter_calibration_round],j,k,spatial =False) #cambio de los inptus no espaciales
+        
+        
+        
+        #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
+        self.time_start_processing = datetime.now()
+        
+        #EJECUCIÓN DE ANNAGNPS
+        #os.chdir(self.direccion+"\\"+directory)
+        def execute_bat():
+           def main():
+               f = open(self.executable_directory+"\\"+f"EjecutarAnnAGNPS_{self.core}.bat","w+")
+               linea_uno = "CD /d {}".format(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs")
+               linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
+               f.write("{} \n".format(linea_uno))
+               f.write("{} \n".format(linea_dos))
+               f.close()
+           main()
+        execute_bat()
+        r'''env = os.environ.copy()
+        env['PATH'] = f'{self.executable_directory};' + env['PATH']
+        command = self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat"
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='latin-1', env=env)'''
+
+        subprocess.call(self.executable_directory+"\\"+f"EjecutarAnnAGNPS_{self.core}.bat")
+
+        
+                  
+        #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
+        time.sleep(1)
+        if path.exists(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv"):
+            if os.stat(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv").st_size>0:
+                self.end_execution =1
+                try:
+                    text = open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv", "r")
+                    text = ''.join([i for i in text]) 
+                    text = text.replace("\"", "/") 
+                    texto = text.splitlines()
+                    txt = texto[2].split(",")[-1]
+                    self.error_msg = f"Error AnnAGNPS\n{txt}"
+                except:
+                    pass
+                
+                self.end_execution = 1
+                #Se abre el archivo de errores
+                r'''try:
+                    os.startfile(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv")
+                except:
+                    pass'''
+                #Este return es para parar el codigo
+                return 
+        
+        #EJECUCIÓN DEL OUTPUT_TABLES
+        time.sleep(1)
+        shutil.copyfile(self.executable_directory + "\\" +"STEAD.fil" ,self.direccion_sensitivity+f"\\Core_{self.core}" + "\\Processing_inputs\\" +"STEAD.fil")
+        os.chdir(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs")
+        proc = subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        
+        #Los outputs de AnnAGNPS se guardan en Processing_outputs
+        self.save_files_processing_in_folder_sensitivity()
+    
+    
+    def save_files_preprocessing_in_folder_sensitivity(self):
+        """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
+        #First create the folder Preprocessing_outputs if it doesn´t exist
+        carpeta = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+        
+        
+        
+        #Then move the files that were modified or created after the start of the preprocessing
+        carpeta_origen = Path(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs")
+        carpeta_destino = Path(carpeta)
+
+        for f in carpeta_origen.iterdir():
+            try:
+                if f.is_file():
+                    t = datetime.fromtimestamp(max(f.stat().st_ctime, f.stat().st_mtime))
+                    if t > self.time_start_preprocessing:
+                        shutil.move(str(f), str(carpeta_destino / f.name))
+            except:
+                pass
+    
+    
+    def save_files_processing_in_folder_sensitivity(self):
+        """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
+        #First create the folder Processing_outputs if it doesn´t exist
+        carpeta = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_outputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+        
+
+        #Then move the files that were modified or created after the start of the preprocessing
+        carpeta_origen = Path(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs")
+        carpeta_destino = Path(carpeta)
+        
+        archivo_excluido = Path(self.direccion_sensitivity+f"\\Core_{self.core}") / "Processing_inputs" / "AnnAGNPS.fil"
+        
+        for f in carpeta_origen.iterdir():
+            try:
+                t = datetime.fromtimestamp(max(f.stat().st_ctime, f.stat().st_mtime))
+                if t > self.time_start_processing and f != archivo_excluido:
+                    shutil.move(str(f), str(carpeta_destino / f.name))
+            except:
+                pass
+    
+    
+    def change_inputs_sensitivity(self,proximos_inputs,numero_parametro,nombre_parametro,spatial):
+        #Metod to change the inputs of sensitivity analysis
+        try: #este try es para cuando cuando de error si elige la misma columna pero distintas filas
+            if self.dic_name_column[nombre_parametro][0]=="Spatial" and spatial:
+                direccion = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs\\"+self.dic_name_column[nombre_parametro][1]
+                columna = self.dic_name_column[nombre_parametro][2]
+            elif self.dic_name_column[nombre_parametro][0]!="Spatial" and not spatial:
+                direccion = self.file_input(self.dic_name_column[nombre_parametro][0])
+                columna = self.dic_name_column[nombre_parametro][1]
+                
+        except KeyError: #misma columna, distintas filas
+            if self.dic_name_column[nombre_parametro.split("__")[0]][0]=="Spatial" and spatial:
+                direccion = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs\\"+self.dic_name_column[nombre_parametro.split("__")[0]][1]
+                columna = self.dic_name_column[nombre_parametro.split("__")[0]][2]
+            elif self.dic_name_column[nombre_parametro.split("__")[0]][0]!="Spatial" and not spatial:
+                direccion = self.file_input(self.dic_name_column[nombre_parametro.split("__")[0]][0])
+                columna = self.dic_name_column[nombre_parametro.split("__")[0]][1]
+            
+
+        if self.dic_name_column[nombre_parametro][1]=="AGFLOW.csv" and spatial:#in the case of agflow the input change is different
+            #First we add the data of control files to the dialog. This is important because the rest of the values that are not changed need to be taken from the control file.
+            self.asignar_valores_control_dialogo()
+            #Then we change the inputs of agflow control file
+            fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
+            texto = fichero.read()
+            fichero.close()
+            
+            #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
+            try:
+                if self.agflow.lineEdit_4.text() =="":slope="1"
+                else:slope= str(int(self.agflow.lineEdit_4.text()))
+
+                if self.agflow.lineEdit_5.text()=="":maxim_d="0.99"
+                else:maxim_d=float(self.agflow.lineEdit_5.text())
+                if nombre_parametro=="Drainage area \nto concentrated flow": maxim_d=round(proximos_inputs[numero_parametro],2)
+
+                if self.agflow.lineEdit_6.text()=="":maxim_pl="300.0"
+                else:maxim_pl=float(self.agflow.lineEdit_6.text())
+                if nombre_parametro=="Maximum profile length \nuntil deposition": maxim_pl=round(proximos_inputs[numero_parametro],2)
+
+                if self.agflow.lineEdit_7.text()=="":maxim_ps="100.0"
+                else:maxim_ps=float(self.agflow.lineEdit_7.text())
+                if nombre_parametro=="Maximum Profile Slope": maxim_ps=round(proximos_inputs[numero_parametro],2)
+                
+                def funcion_t(numero):
+                    if numero==1:
+                        return "T"
+                    elif numero ==0:
+                        return "F"
+                
+                use=funcion_t(int(self.agflow.checkBox.isChecked()))
+                write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
+                arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
+                dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
+                use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
+            
+            except:
+                iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning,duration = 10)
+                return
+            
+            texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
+            try:
+                f = open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\"+"AGFCNT.inp","w+")
+            except:
+                iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
+                return 
+            f.write(texto_nuevo)
+            f.close()
+        
+        else:
+            try:
+                direccion#Check if "direccion" and "columna" exist. If they don't, then do anything
+                
+                df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
+                if self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
+                    df[columna] = [proximos_inputs[numero_parametro] for x in range(len(df))]
+                else:#si solo se ha elegido una fila entonces se cambia una única fila
+                    df[columna].iloc[int(self.dic_data[nombre_parametro][2])] = proximos_inputs[numero_parametro]
+                #Si está la columna de Cell_ID o Reach ID entonces no tiene que tener formato decimal
+                def float_to_str(df,column):
+                    #Función para cambiar una columna de float a formato para que cuando se guarde se vea en formato int
+                    lista = []
+                    for proximos_inputs in df[column]:
+                        try:
+                            lista.append(str(int(proximos_inputs)))
+                        except:
+                            lista.append("")
+                    df[column] = lista
+                if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
+                if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
+                df.to_csv(direccion, index=False, float_format='%.5f')
+            except:
+                pass
+    
+    def file_input(self,lineEdit):
+        #Metod to go from line edit to the final direction
+        
+        #First convert from lineEdit to the direction of the folder
+        master_dict = {"AnnAGNPS ID":self.inputs.l_54,"Aquaculture Pond Data":self.inputs.l_2,
+                               "Aquaculture Schedule Data":self.inputs.l_24,"Cell Data":self.inputs.l_3,"Classic Gully Data":self.inputs.l_4,
+                               "Contour Data":self.inputs.l_25,"Crop Data":self.inputs.l_26,"Crop Growth Data":self.inputs.l_27,
+                               "Ephemeral Gully Data":self.inputs.l_5,"Feedlot Data":self.inputs.l_6,"Feedlot Management Data":self.inputs.l_28,
+                               "Fertilizer Application Data":self.inputs.l_29,"Fertilizer Reference Data":self.inputs.l_30,
+                               "Field Pond Data":self.inputs.l_7,"Geology Data":self.inputs.l_31,
+                               "Global Error and Warning Limits Data":self.inputs.l_55,"Global IDs Factors and Flags Data":self.inputs.l_56,
+                               "Hydraulic Geometry Data":self.inputs.l_32,"Impoundment Data":self.inputs.l_8,
+                               "Irrigation Application Data":self.inputs.l_33,"Management Field Data":self.inputs.l_34,
+                               "Management Operation Data":self.inputs.l_35,"Management Schedule Data":self.inputs.l_36,
+                               "Non-Crop Data":self.inputs.l_37,
+                               "Pesticide Application Data":self.inputs.l_38,"Pesticide Initial Conditions Data":self.inputs.l_57,
+                               "Pesticide Reference Data":self.inputs.l_39,"PL Calibration Data":self.inputs.l_58,
+                               "Point Source Data":self.inputs.l_9,"RCN Calibration Data":self.inputs.l_59,"Reach Data":self.inputs.l_10,
+                               "Reach Nutrient Half-life Data":self.inputs.l_40,"Runoff Curve Number Data":self.inputs.l_42,
+                               "Simulation Period Data":self.inputs.l_60,"Soil Data":self.inputs.l_43,"Soil Layer Data":self.inputs.l_44,
+                               "Soil Initial Conditions Data":self.inputs.l_61,"Strip Crop Data":self.inputs.l_45,
+                               "Tile Drain Data":self.inputs.l_46,"Watershed Data":self.inputs.l_12,"EI Pct Data":self.inputs.l_50,
+                               "STORM TYPE DATA - RFD":self.inputs.l_51,"STORM TYPE DATA - UPDRC":self.inputs.l_52,
+                               "Output Options - Global":self.inputs.l_63,"Output Options - AA":self.inputs.l_68,"Output Options - EV":self.inputs.l_69,
+                               "Output Options - CSV":self.inputs.l_64,"Output Options - DPP":self.inputs.l_65,
+                               "Output Options - NPT":self.inputs.l_66,"Output Options - SIM":self.inputs.l_67,
+                               "Output Options - TBL":self.inputs.l_70,"Output Options - MN/MX":self.inputs.l_71,
+                               "Output Options - Cell":self.inputs.l_14,"Output Options - Feedlot":self.inputs.l_15,
+                               "Output Options - Field Pond":self.inputs.l_16,
+                               "Output Options - Classic Gully":self.inputs.l_17,
+                               "Output Options - Ephemeral Gully":self.inputs.l_18,
+                               "Output Options - Impoundment":self.inputs.l_19,
+                               "Output Options - Point Source":self.inputs.l_20,
+                               "Output Options - Reach":self.inputs.l_21,
+                               "Output Options - Wetland":self.inputs.l_22,
+                               "CLIMATE DATA - STATION":self.inputs.l_48,
+                               "CLIMATE DATA - DAILY":self.inputs.l_49,"Wetland Data":self.inputs.l_13,"Riparian Buffer Data":self.inputs.l_41,
+                               "RUSLE2 Data":self.inputs.l_62,"RiceWQ Data":self.inputs.l_11}
+        
+        invertided_dic = {value: key for key, value in master_dict.items()}
+        csv_file = invertided_dic[lineEdit]
+        
+        master_file = self.direccion_sensitivity+f"\\Core_{self.core}"+r"\Processing_inputs\annagnps_master.csv"
+        project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+        
+        return Path(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==csv_file].iloc[0,1])
+
+    
     
     def registrar_numero(self,numero):
         # Definimos la ruta de la carpeta y del archivo

@@ -313,6 +313,9 @@
               <property name="enabled">
                <bool>true</bool>
               </property>
+              <property name="text">
+               <string>100</string>
+              </property>
               <property name="alignment">
                <set>Qt::AlignCenter</set>
               </property>

@@ -343,7 +343,7 @@ QPushButton:hover {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>474</width>
+            <width>641</width>
             <height>602</height>
            </rect>
           </property>
@@ -1109,8 +1109,8 @@ QCheckBox::indicator:unchecked {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>469</width>
-            <height>242</height>
+            <width>658</width>
+            <height>365</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_3">
@@ -1817,6 +1817,11 @@ QPushButton:hover {
         </widget>
        </item>
       </layout>
+     </widget>
+     <widget class="QWidget" name="tab_6">
+      <attribute name="title">
+       <string>Scenario analysis</string>
+      </attribute>
      </widget>
     </widget>
    </item>
