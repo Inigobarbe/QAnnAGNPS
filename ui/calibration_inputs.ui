@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>719</width>
-    <height>555</height>
+    <height>574</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -63,7 +63,7 @@
    <item row="0" column="0">
     <widget class="QLabel" name="label">
      <property name="text">
-      <string>Please select a csv file with the first column being the date in dd/mm/yyy format and the second column the data, with headers</string>
+      <string>Please select a csv file with the first column being the date in dd/mm/yyyy format and the second column the data, with headers</string>
      </property>
     </widget>
    </item>

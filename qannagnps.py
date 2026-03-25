@@ -6571,8 +6571,8 @@ class qannagnps():
             for core in range(1,self.number_cores+1):
             
                 if self.dlg_calibration.runoff.isChecked(): 
-                    columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
-                    modify_input("Output Options - SIM","Insitu_Soil_Moist_Daily",columns,"out_sim")
+                    columns = ["CCHE1D", "CONCEPTS_XML", "Gaging_Station_Hyd", "REMM", "Gaging_Station_Evt"]
+                    modify_input("Output Options - TBL","Gaging_Station_Hyd",columns,"out_tbl")
                 
                 elif self.dlg_calibration.total_erosion.isChecked(): 
                     columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
@@ -6601,12 +6601,17 @@ class qannagnps():
             self.warning_message("Please select a working directory where the files are going to be loaded")
             return
         
+        #Check if the period of the observed is the same as the simulation
+        if self.check_period_match_observed_simulated_calibration():
+            self.warning_message("The observed data cover a period that is not simulated. \nPlease make sure that the observed period falls within the simulation period (Simulation period data).")
+            return
+        
         #Close dialogs
         self.dlg_calibration.close()
         self.dlg.close()
 
         #Start with the progress bar
-        self.progress_metod(start = True)
+        self.progress_metod("Calibration",start = True)
         
         #Create the dictionary with the input data and the parameter values
         self.create_dictionary_calibration()        
@@ -6662,6 +6667,7 @@ class qannagnps():
         self.opt = Optimizer(dimensions=espacio, base_estimator="GP")
         self.counter_calibration = 0
         self.counter_calibration_round = 0
+        self.resultados_outputs_calibration = []
         self.proximos_inputs = self.opt.ask(n_points=self.tareas_por_ronda)
         self.lanzar_siguiente_calibration()
     
@@ -6679,7 +6685,7 @@ class qannagnps():
         self.dlg.close()
 
         #Start with the progress bar
-        self.progress_metod(start = True)
+        self.progress_metod("Sensitivity",start = True)
         
         
         #Create the dictionary with the input data and the parameter values
@@ -6832,6 +6838,7 @@ class qannagnps():
             self.lanzar_siguiente_calibration()
             self.opt.tell(self.proximos_inputs, self.resultados_outputs_calibration)
             self.proximos_inputs = self.opt.ask(n_points=self.tareas_por_ronda)
+            self.resultados_outputs_calibration = []
             
         
         else:
@@ -6839,20 +6846,106 @@ class qannagnps():
             if self.tareas_pendientes:
                 self.lanzar_siguiente_calibration()
     
+    def check_period_match_observed_simulated_calibration(self):
+        """Method to check if observed and simulated periods are the same in the calibration"""
+        #Obtain observed date
+        file_path = self.dlg_calibration_inputs.lineEdit.text()
+        df_observed = pd.read_csv(file_path, sep=',', header=None)
+        df_observed.columns = ['date', 'value']
+
+
+        df_observed['date'] = pd.to_datetime(df_observed['date'], format='%d/%m/%Y', errors='coerce')
+        df_observed['value'] = pd.to_numeric(df_observed['value'], errors='coerce')
+        df_observed = df_observed.dropna().sort_values('date')
+        
+        start_date_observed = df_observed['date'].min()
+        end_date_observed = df_observed['date'].max()
+        
+        #Obtain simulated date
+        master_file = self.carpeta_guardar_proyectos+f"\\{self.dlg_calibration.project_calibration.currentText()}\\" +r"\Processing_inputs\annagnps_master.csv"
+        project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+
+        file_path = self.carpeta_guardar_proyectos+f"\\{self.dlg_calibration.project_calibration.currentText()}\\" +r"\\Processing_inputs\\"+project_df[project_df.iloc[:,0]=="Simulation Period Data"].iloc[0,1]
+        df_observed = pd.read_csv(file_path, sep=',')
+
+
+
+        start_date_simulated = pd.to_datetime({'year':[df_observed["Simulation_Begin_Year"].iloc[0]], 
+                                    'month':[df_observed["Simulation_Begin_Month"].iloc[0]], 
+                                    'day':[df_observed["Simulation_Begin_Day"].iloc[0]]})[0]
+
+        end_date_simulated = pd.to_datetime({'year':[df_observed["Simulation_End_Year"].iloc[0]], 
+                                    'month':[df_observed["Simulation_End_Month"].iloc[0]], 
+                                    'day':[df_observed["Simulation_End_Day"].iloc[0]]})[0]
+        
+        if start_date_observed<start_date_simulated or end_date_observed>end_date_simulated:
+            return True
+        
+        return False
+
+        
+        
+    
+    
     def obtain_nash_calibration(self,id_carpeta):
         """Method to obtain the objective funciotn value in the calibration"""
+        #Obtain df of observed
         file_path = self.dlg_calibration_inputs.lineEdit.text()
-        df = pd.read_csv(file_path, sep=',', header=None)
-        df.columns = ['date', 'value']
+        df_observed = pd.read_csv(file_path, sep=',', header=None)
+        df_observed.columns = ['date', 'value']
 
 
-        df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y', errors='coerce')
-        df['value'] = pd.to_numeric(df['value'], errors='coerce')
-        df = df.dropna().sort_values('date')
+        df_observed['date'] = pd.to_datetime(df_observed['date'], format='%d/%m/%Y', errors='coerce')
+        df_observed['value'] = pd.to_numeric(df_observed['value'], errors='coerce')
+        df_observed = df_observed.dropna().sort_values('date')
         
-        file_output = "AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"
         
-        return df.value.sum()
+        #Obtain df of simulated
+        fichero= self.direccion_sensitivity+f"\\Core_{id_carpeta}"+"\\Processing_outputs\AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"
+        first_column = "Gregorian Day"
+
+
+
+        file = open(fichero)
+        csvreader = csv.reader(file)
+        rows = []
+        for row in csvreader:
+               rows.append(row)
+        lista = []
+        a = 0
+        for i in rows:
+           try:
+               if i[0]==first_column:
+                   a = 1
+                   lista.append(i)
+               elif a ==1:
+                   lista.append(i[:-1])
+           except:
+               continue
+           
+        df_simulated = pd.DataFrame(columns = lista[0],data = lista[1:])
+        df_simulated = df_simulated[df_simulated["Reach ID"]=="OUTLET"]
+        df_simulated['date'] = pd.to_datetime(df_simulated[['Year', 'Month', 'Day']])
+        # Encontrar la columna que contiene "Total Streamflow"
+        total_col = [col for col in df_simulated.columns if "Total Streamflow" in col][0]
+        # Seleccionar solo la columna 'Date' y la columna de Total Streamflow
+        df_simulated = df_simulated[['date', total_col]]
+        df_simulated[total_col] = df_simulated[total_col].astype(float)
+        df_simulated = df_simulated.rename(columns={total_col: 'value'})
+
+
+
+        #Calculate nash
+        df_merged = pd.merge(df_observed, df_simulated, on='date', suffixes=('_obs', '_sim'))
+        obs = df_merged['value_obs'].values
+        sim = df_merged['value_sim'].values
+
+        # Calcular NSE
+        nse = 1 - np.sum((obs - sim)**2) / np.sum((obs - np.mean(obs))**2)
+        
+        self.resultados_outputs_calibration.append(-nse)
+        
+        return {"Execution":self.counter_calibration,"Nash_Sutcliffe":nse}
         
     
     def stop_sensitivity_execution(self,task):
@@ -7254,11 +7347,11 @@ class qannagnps():
             return self.dic_folder[lineEdit].text()+"/"+lineEdit.text()
         
     
-    def progress_metod(self,start=False,values=None,execution=None,close = False):
+    def progress_metod(self,type_analysis,start=False,values=None,execution=None,close = False):
         #Metod to add and update de progress bar
         if start == True:
             #Start of the progress bar
-            self.progress_dialog = QProgressDialog("Starting sensitivity analysis...", "Cancelar", 0, 101)
+            self.progress_dialog = QProgressDialog(f"Starting {type_analysis} analysis...", "Cancelar", 0, 101)
             self.progress_dialog.setWindowModality(Qt.WindowModal)
             self.progress_dialog.setWindowTitle("Progress")
             self.progress_dialog.show()
