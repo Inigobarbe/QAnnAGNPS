@@ -62,7 +62,8 @@ import glob
 import textwrap
 import matplotlib.ticker as ticker
 import traceback
-
+from scipy.stats import percentileofscore, geom
+from scipy import stats
 #Local libraries
 from .libraries.SALib.sample import saltelli
 from .libraries.SALib.analyze import sobol
@@ -98,6 +99,8 @@ from .ui.results_sensitivity import results_sensitivity
 from .ui.figure_settings import figure_settings
 from .ui.calibration import CalibrationDialog
 from .ui.calibration_inputs import calibration_inputs
+from .ui.calibration_results import calibration_results
+from .ui.fiteval_calibration import fiteval_calibration
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -210,6 +213,8 @@ class qannagnps():
         self.dlg_figure_settings = figure_settings()
         self.dlg_calibration = CalibrationDialog()
         self.dlg_calibration_inputs = calibration_inputs()
+        self.dlg_calibration_results = calibration_results()
+        self.dlg_fiteval_calibration= fiteval_calibration()
         
         
         #Boton principal
@@ -287,15 +292,28 @@ class qannagnps():
         
         #Abrir calibracion y sus inputs
         self.dlg.calibration.clicked.connect(self.dlg_calibration.show)
+        self.dlg.calibration_results.clicked.connect(self.dlg_calibration_results.show)
+        self.dlg_calibration_results.bootstraping.clicked.connect(self.calibration_bootstraping_show)
         self.dlg_calibration.runoff_push.clicked.connect(self.dlg_calibration_inputs.show)
         self.dlg_calibration.erosion_push.clicked.connect(self.dlg_calibration_inputs.show)
         self.dlg_calibration.nitrogen_push.clicked.connect(self.dlg_calibration_inputs.show)
         self.dlg_calibration.carbon_push.clicked.connect(self.dlg_calibration_inputs.show)
         self.dlg_calibration.phosphorus_push.clicked.connect(self.dlg_calibration_inputs.show)
         
+        
+        #Fiteval for calibration
+        self.dlg_fiteval_calibration.nash.textChanged.connect(self.calibration_bootstraping_update)
+        
+        
         #Browse calibration inputs
         self.dlg_calibration_inputs.browse.clicked.connect(self.browse_inputs_calibration)
         self.dlg_calibration_inputs.lineEdit.textChanged.connect(self.update_graph_calibration_inputs)
+        
+        #Browse calibration results
+        self.dlg_calibration_results.browse.clicked.connect(self.browse_results_calibration)
+        self.dlg_calibration_results.results.textChanged.connect(self.update_graph_calibration_results)
+        self.dlg_calibration_results.graph_fit.toggled.connect(lambda checked: self.update_graph_calibration_results() if checked else None)
+        self.dlg_calibration_results.one_one.toggled.connect(lambda checked: self.update_graph_calibration_results() if checked else None)
         
         
         #Cambiar el nombre en el control file de AGBUF.csv de las columnas Buffer y Vegetation al seleccionar una capa
@@ -770,6 +788,111 @@ class qannagnps():
             self.update_graph_calibration_inputs()
         #Connect signal again
         self.dlg_calibration_inputs.lineEdit.textChanged.connect(self.update_graph_calibration_inputs)
+    
+    
+    def browse_results_calibration(self):
+        """Method to browse Results for calibration"""
+        try:
+            fname = QFileDialog.getOpenFileName(self.dlg_calibration_results, f"Select Results for calibration",self.direccion+"\\Calibration", "CSV files (*.csv)")
+        except:
+            fname = QFileDialog.getOpenFileName(self.dlg_calibration_results, f"Select Results for calibration","C:\\" , "CSV files (*.csv)")
+        #Disconnect signal
+        self.dlg_calibration_results.results.textChanged.disconnect(self.update_graph_calibration_results)
+        if fname[0]!="":
+            self.dlg_calibration_results.results.setText(fname[0])
+            #Update graph
+            self.update_graph_calibration_results()
+        #Connect signal again
+        self.dlg_calibration_results.results.textChanged.connect(self.update_graph_calibration_results)
+    
+    
+    def update_graph_calibration_results(self):
+        """Method to update results"""
+        path = self.dlg_calibration_results.results.text()
+        if os.path.exists(path) and os.path.isfile(path):    
+            #First add the text
+            with open(path, "r") as archivo:
+                lineas = archivo.readlines()
+            contenido = ""
+            times = []
+            observed = []
+            simulated = []
+            
+            obtain_contenido = True
+            
+            for k,i in enumerate(lineas):
+                if obtain_contenido:
+                    contenido += i
+                
+                if "Nash-Sutcliffe efficiency" in i:
+                    obtain_contenido = False
+                    
+                if i[:5]=="date,":
+                    for m in range(k+1,len(lineas)):
+                        if "Results of each iteration" in lineas[m]:
+                            break
+                        try:
+                            times.append(pd.to_datetime(lineas[m].split(",")[0], errors='coerce'))
+                        except:
+                            times.append(0)
+                        try:
+                            observed.append(float(lineas[m].split(",")[1]))
+                        except:
+                            observed.append(0)
+                        try:
+                            simulated.append(float(lineas[m].split(",")[2]))
+                        except:
+                            simulated.append(0)
+                        
+            self.dlg_calibration_results.textEdit.setPlainText(contenido)
+            #Add the graph
+            if not hasattr(self, 'canvas_calibration_graph'):
+                #Create the canvas of the graph
+                # Si no existe, crear el canvas y añadirlo al layout
+                self.canvas_calibration_graph = FigureCanvas(plt.Figure(figsize=(15, 6)))
+                # Asignar un layout al QFrame si no tiene uno
+                layout = QVBoxLayout(self.dlg_calibration_results.frame)
+                self.dlg_calibration_results.frame.setLayout(layout)
+                #Add canvas to layout
+                layout.addWidget(self.canvas_calibration_graph)
+            
+            #Add graph
+            self.canvas_calibration_graph.figure.clear()
+            self.ax_calibration_graph = self.canvas_calibration_graph.figure.subplots()
+            
+            if self.dlg_calibration_results.one_one.isChecked():
+                self.ax_calibration_graph.scatter(simulated, observed,color = "blue")
+                #1:1 line
+                max_val = max(simulated + observed)
+                self.ax_calibration_graph.plot([0, max_val], [0, max_val], linestyle='--', color='black')
+                self.ax_calibration_graph.set_xlabel("Simulated",size = 12,family="arial",weight = "bold",color = "black")
+                self.ax_calibration_graph.set_ylabel("Observed",size = 12,family="arial",weight = "bold",color = "black")
+                self.ax_calibration_graph.tick_params(axis = "both",colors = "black",labelsize = 9)
+
+                
+            elif self.dlg_calibration_results.graph_fit.isChecked():
+                self.ax_calibration_graph.plot(times,simulated,label = "Simulated",linewidth=2,zorder = 1)
+                self.ax_calibration_graph.scatter(times,observed,label = "Observed",color = "orange",zorder = 2)
+                
+                
+                self.ax_calibration_graph.legend()
+                self.ax_calibration_graph.set_xlabel("Time (s)",size = 12,family="arial",weight = "bold",color = "black")
+                self.ax_calibration_graph.set_ylabel("Sediment (g/s)",size = 12,family="arial",weight = "bold",color = "black")
+                self.ax_calibration_graph.tick_params(axis = "both",colors = "black",labelsize = 9)
+            
+            #Change background color
+            self.canvas_calibration_graph.figure.set_facecolor('#f0f0f0')
+            self.ax_calibration_graph.set_facecolor('#f0f0f0')
+            
+            # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
+            self.canvas_calibration_graph.figure.subplots_adjust(wspace=0.7) #spacing beteween two graphs
+            self.canvas_calibration_graph.figure.subplots_adjust(left=0.2, bottom=0.2)
+            #Draw canvas
+            self.canvas_calibration_graph.draw()
+            
+            #Save figure
+            self.dlg_calibration_results.print_graph.clicked.connect(lambda _, b= [self.dlg_calibration_results,self.canvas_calibration_graph]:self.figure_settings(b))
+            
     
     
     def update_graph_calibration_inputs(self):
@@ -6663,7 +6786,7 @@ class qannagnps():
         self.tareas_pendientes_ronda = list(range(self.tareas_por_ronda))
         
         #Do the calibration until the tareas pendientes is reached
-        espacio = [(x[0],x[1]) for x in self.dic_data.values()]
+        espacio = [(float(x[0]),float(x[1])) for x in self.dic_data.values()]
         self.opt = Optimizer(dimensions=espacio, base_estimator="GP")
         self.counter_calibration = 0
         self.counter_calibration_round = 0
@@ -6803,7 +6926,7 @@ class qannagnps():
             if self.tareas_pendientes:
                 self.lanzar_siguiente_sensitivity()
     
-    def finalizar_tarea_calibration(self,task, id_carpeta,n):
+    def finalizar_tarea_calibration(self,task, id_carpeta,n,proximos_inputs,counter_round):
         """Method that will be executed after each execution in AnnAGNPS in the parallelization of the calibration"""
     
         # IMPORTANT: Remove from active list immediately
@@ -6819,7 +6942,7 @@ class qannagnps():
         
         # --- Normal Success Logic ---
         # We save the result
-        resultado = self.obtain_nash_calibration(id_carpeta)
+        resultado = self.obtain_nash_calibration(id_carpeta,proximos_inputs,counter_round)
         self.resultados.append(resultado)
         
         self.counter_calibration +=1
@@ -6887,8 +7010,16 @@ class qannagnps():
         
     
     
-    def obtain_nash_calibration(self,id_carpeta):
+    def obtain_nash_calibration(self,id_carpeta,proximos_inputs,counter_round):
         """Method to obtain the objective funciotn value in the calibration"""
+        #Put the values of the inputs
+        data_to_save = {}
+        
+        #We add input files
+        for k,i in enumerate(self.dic_data.keys()):  
+            data_to_save[i.replace("\n", " ")] = proximos_inputs[counter_round][k]
+        
+        
         #Obtain df of observed
         file_path = self.dlg_calibration_inputs.lineEdit.text()
         df_observed = pd.read_csv(file_path, sep=',', header=None)
@@ -6936,16 +7067,26 @@ class qannagnps():
 
 
         #Calculate nash
-        df_merged = pd.merge(df_observed, df_simulated, on='date', suffixes=('_obs', '_sim'))
-        obs = df_merged['value_obs'].values
-        sim = df_merged['value_sim'].values
+        df_merged = pd.merge(df_observed, df_simulated, on='date', suffixes=('_observed', '_simulated'))
+        obs = df_merged['value_observed'].values
+        sim = df_merged['value_simulated'].values
 
         # Calcular NSE
         nse = 1 - np.sum((obs - sim)**2) / np.sum((obs - np.mean(obs))**2)
         
         self.resultados_outputs_calibration.append(-nse)
         
-        return {"Execution":self.counter_calibration,"Nash_Sutcliffe":nse}
+        
+        data_to_save["Nash_Sutcliffe"]=nse
+        
+        #Save best result
+        if len(self.resultados)==0:
+            self.best_result_calibration = [df_merged,data_to_save]
+        
+        elif nse>=max(d["Nash_Sutcliffe"] for d in self.resultados):
+            self.best_result_calibration = [df_merged,data_to_save]
+        
+        return data_to_save
         
     
     def stop_sensitivity_execution(self,task):
@@ -7024,9 +7165,9 @@ class qannagnps():
             self.tareas_activas.append(task)
             
             # Al finalizar, liberamos la carpeta y lanzamos la siguiente
-            task.taskCompleted.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n))
+            task.taskCompleted.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n,self.proximos_inputs,self.counter_calibration_round))
             # Esto es por si hay error
-            task.taskTerminated.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n))
+            task.taskTerminated.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n,self.proximos_inputs,self.counter_calibration_round))
             self.manager.addTask(task)
     
     
@@ -7248,19 +7389,283 @@ class qannagnps():
         #Organize the dataframe
         self.results_calibration = pd.DataFrame(self.resultados)
         
-        
         #Calculate sensitivity indexes
         path = self.direccion_sensitivity + "\\"+self.dlg_calibration.file_save.text()
         
+        #Add best input combination and nash sutcliffe efficiency
+        with open(path, 'w') as f:
+            #Add first row
+            f.write("Calibration results" + '\n')
+            f.write("Optimized input values:" + '\n')
+            for i in self.dic_data:
+                f.write(f"{i}: "+str(self.best_result_calibration[1][i.replace('\n', ' ')]) + '\n')
+            
+            f.write(f"Nash-Sutcliffe efficiency: {self.best_result_calibration[1]['Nash_Sutcliffe']}" + '\n')
+            f.write("Best combination results:\n")
+        #Add best result
+        self.best_result_calibration[0].to_csv(path, mode='a', index=False, float_format='%.10f')
+        
+        with open(path, 'a') as f:
+            #Add first row
+            f.write("Results of each iteration" + '\n')
+            
         #Append results
-        self.results_calibration.to_csv(path, index=False, float_format='%.10f')
+        self.results_calibration.to_csv(path, mode='a', index=False, float_format='%.10f')
         
         #Se cierra la barra de progreso
         self.progress_dialog.close()
         
         #MENSAJE DE ÉXITO
         self.warning_message("Succes in the calibration")
+    
+    
+    def calibration_bootstraping_show(self):
+        """Method to make the bootstraping for the calibrated hydrograph and show dialog"""
+        #Obtain data
+        path = self.dlg_calibration_results.results.text()
+        if os.path.exists(path) and os.path.isfile(path):    
+            #First add the text
+            with open(path, "r") as archivo:
+                lineas = archivo.readlines()
+            contenido = ""
+            times = []
+            observed = []
+            simulated = []
+            
+            obtain_contenido = True
+            
+            for k,i in enumerate(lineas):
+                if obtain_contenido:
+                    contenido += i
+                
+                if "Nash-Sutcliffe efficiency" in i:
+                    obtain_contenido = False
+                    
+                if i[:5]=="date,":
+                    for m in range(k+1,len(lineas)):
+                        if "Results of each iteration" in lineas[m]:
+                            break
+                        try:
+                            times.append(pd.to_datetime(lineas[m].split(",")[0], errors='coerce'))
+                        except:
+                            times.append(0)
+                        try:
+                            observed.append(float(lineas[m].split(",")[1]))
+                        except:
+                            observed.append(0)
+                        try:
+                            simulated.append(float(lineas[m].split(",")[2]))
+                        except:
+                            simulated.append(0)
+            
+            
+            #Obtain the expected length of block for the stationary bootsrapping according to Automatic Block-Length Selection for the Dependent Bootstrap (Dimitris N. Politis1 and Halbert White)
+            def lambda_function(t):
+                if abs(t)>=0 and abs(t)<=0.5:
+                    return 1
+                elif abs(t)>=0.5 and abs(t)<=1:
+                    return 2*(1-abs(t))
+                else:
+                    0
+
+            def r_function(k):
+                n = len(observed)
+                average = np.sum(observed)/len(observed)
+                values = 0
+                for i in range(n-abs(k)):
+                    values += (observed[i]-average)/(observed[i+abs(k)]-average)
+                return values/n
+
+
+            def g_function(w):
+                values = 0
+                for i in range(-M,M):
+                    values += lambda_function(i/M)*r_function(i)*math.cos(w*i)
+                return values
+
+
+            #Calculate G
+            M = int(len(observed)/2)
+            G = 0
+            for i in range(-M,M):
+                G += lambda_function(i/M)*abs(i)*r_function(i)
+
+            #Calculate D
+            integration_step = 0.1
+            D = 4*(g_function(0)**2)
+            values = 0
+            w = -math.pi
+            while w<math.pi:
+                values += (1+math.cos(w))*(g_function(w)**2)*integration_step
+                w += integration_step
+
+            values = 2*values/math.pi
+            D = D + values
+
+            #Calculate optimal size of block
+            b = (((2*(G**2))/D)**(1/3))*(len(observed)**(1/3))
+
+            #Calculate probability for geometrical distribution after we calculated the expected length
+            p = 1/b
+            #if pequal or same as 1 then there is not distribution
+            if p>=1: p = 0.9
+            
+            #Do the bootstrapping
+            number_resamplings = 2000
+            nash_list = []
+            rmse_list = []
+            for i in range(number_resamplings):
+                observed_blocks = []
+                simulated_blocks = []
+                while len(observed_blocks)<len(observed):
+                    index = np.random.randint(0, len(observed), dtype=int)
+                    size = geom.rvs(p, size=1)[0]
+                    if index+size>=len(observed):
+                        block_observed = list(observed[index:])+list(observed[:(index+size)%len(observed)])
+                        block_simulated = list(simulated[index:])+list(simulated[:(index+size)%len(simulated)])
+                    else:
+                        block_observed = list(observed[index:index+size])
+                        block_simulated = list(simulated[index:index+size])
+                        
+                    observed_blocks += block_observed
+                    simulated_blocks += block_simulated
+                    
+                observed_blocks = observed_blocks[:len(observed)]
+                simulated_blocks = simulated_blocks[:len(simulated)]
+                
+                #Obtain indicators values
+                observed_sample = np.array(observed_blocks)
+                simulated_sample = np.array(simulated_blocks)
+                #Caclulate nash
+                mean_observed = np.mean(observed_sample)
+                numerator = np.sum((observed_sample - simulated_sample) ** 2)
+                denominator = np.sum((observed_sample - mean_observed) ** 2)
+                nse = 1 - (numerator / denominator)
+                nash_list.append(nse)
+                #Calculate RMSE
+                rmse = np.sqrt(np.mean((observed_sample - simulated_sample) ** 2))
+                rmse_list.append(rmse)
+            
+            
+            #Create variable to be obtained in other method
+            self.nashes_bootstraping= nash_list
+            self.rmse_bootstraping = rmse_list
+            
+            #Update graph
+            self.calibration_bootstraping_update()
+            
+            #Show dialog
+            self.dlg_fiteval_calibration.show()
+            self.dlg_fiteval_calibration.raise_()
+
+    
+    def update_values_bootstrapping(self):
+        """Method to update values in th evaluation of calibration"""
+        try:
+            dialog = self.dlg_fiteval_calibration
+
+                
+            #Obtain values
+            values = [x for x in self.nashes_bootstraping if not np.isnan(x)]
+            values_rmse = [x for x in self.rmse_bootstraping if not np.isnan(x)]
+
+            
+            #Put p value
+            p_value = sum(1 for nash in values if nash < float(dialog.nash.text())) / len(values)
+            dialog.p_value.setText(f"p-value: {str(round(p_value,2))}")
+            #Put confidence interval for nash
+            median = str(round(stats.scoreatpercentile(values,50),2))
+            percentile_25 = str(round(stats.scoreatpercentile(values,2.5),2))
+            percentile_975 = str(round(stats.scoreatpercentile(values,97.5),2))
+            
+            dialog.label_3.setText(f"NSE [95%CI]: {median}[{percentile_25} - {percentile_975}]")
+
+            #Same for RMSE
+            median = f"{stats.scoreatpercentile(values_rmse,50):.2e}"
+            percentile_25 = f"{stats.scoreatpercentile(values_rmse,2.5):.2e}"
+            percentile_975 = f"{stats.scoreatpercentile(values_rmse,97.5):.2e}"
+            
+            dialog.label_7.setText(f"RMSE [95%CI]: {median}[{percentile_25} - {percentile_975}]")
+            
+            
+        except:
+            pass
+    
+    def calibration_bootstraping_update(self):
+        """Method to update graph of bootstraping fo hydrograph"""
+        #Update values in lineEdits
+        self.update_values_bootstrapping()
         
+        #Add the graph
+        canvas = "canvas_calibration_bootstrap"
+        dialog = self.dlg_fiteval_calibration
+
+            
+        if not hasattr(self, canvas):
+            #Create the canvas of the graph
+            # Si no existe, crear el canvas y añadirlo al layout
+            setattr(self,canvas,FigureCanvas(plt.Figure(figsize=(15, 6))))
+            # Asignar un layout al QFrame si no tiene uno
+            layout = QVBoxLayout(dialog.frame)
+            dialog.frame.setLayout(layout)
+            #Add canvas to layout
+            layout.addWidget(getattr(self,canvas))
+        
+        #Add graph
+        getattr(self,canvas).figure.clear()
+        ax1 = getattr(self,canvas).figure.subplots()
+
+        # Histograma
+        finite_nse = [nse for nse in self.nashes_bootstraping if nse != -np.inf]
+        inf_count = len([nse for nse in self.nashes_bootstraping if nse == -np.inf])
+        
+        counts, bins, patches = ax1.hist(
+            finite_nse, bins=20, density=True, alpha=0.7, color="lightcoral", edgecolor="black", label="Histogram"
+        )
+
+        # Función acumulada
+        nashes = np.sort([x for x in self.nashes_bootstraping if not np.isnan(x)])
+        
+        cumulative = [np.searchsorted(nashes, b, side='right') / len(nashes) for b in bins]
+        ax2 = ax1.twinx()
+        ax2.plot(bins, cumulative, color="teal", lw=2, label="Cumulative")
+        
+        
+        if inf_count>0:
+            ax2.set_title(f"-Inf cases: {inf_count}")
+        
+        #Vertical line
+        try:
+            ax1.axvline(x=float(dialog.nash.text()), color='red', linestyle='--', linewidth=1.5)
+            ax2.hlines(y=float(dialog.p_value.text().split(":")[-1]), xmin=float(dialog.nash.text()), xmax=ax2.get_xlim()[1],transform=ax2.get_yaxis_transform(),color='red', linestyle='--', linewidth=1.5)
+        except:
+            pass
+
+        # Etiquetas de los ejes
+        ax1.set_xlabel("Nash–Sutcliffe Efficiency")
+        ax1.set_ylabel("Density")
+        ax2.set_ylabel("Cumulative Probability")
+
+
+        # Personalización de los grids
+        ax1.grid(visible=True, linestyle="--", linewidth=0.6, alpha=0.5)
+        ax2.grid(visible=False)
+
+        # Leyendas
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        legend = ax1.legend(lines1 + lines2, labels1 + labels2, loc="best")
+        
+        #Change background color
+        getattr(self,canvas).figure.set_facecolor('#f0f0f0')
+        ax1.set_facecolor('#f0f0f0')
+        # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
+        getattr(self,canvas).figure.subplots_adjust(left=0.2, bottom=0.2,right = 0.8)
+        #Draw canvas
+        getattr(self,canvas).draw()
+        
+        #Save figure
+        self.dlg_fiteval_calibration.print_graph.clicked.connect(lambda _, b= [self.dlg_fiteval_calibration,getattr(self,canvas)]:self.figure_settings(b))
        
     def declare_rasters_sensitivity_analysis(self,information):
         """Method to declare the values of the rasters in sensitivity analysis"""
