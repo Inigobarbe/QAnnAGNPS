@@ -21,7 +21,7 @@
 
     
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt
-from PyQt5.QtWidgets import QFrame,QTableWidgetItem,QProgressDialog,QLabel, QLineEdit, QMessageBox,QRadioButton
+from PyQt5.QtWidgets import QFrame,QTableWidgetItem,QProgressDialog,QLabel, QLineEdit, QMessageBox,QRadioButton,QCheckBox,QSizePolicy,QSpacerItem
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QFileDialog
 from qgis.core import QgsProject
@@ -101,6 +101,7 @@ from .ui.calibration import CalibrationDialog
 from .ui.calibration_inputs import calibration_inputs
 from .ui.calibration_results import calibration_results
 from .ui.fiteval_calibration import fiteval_calibration
+from .ui.scenario_analysis import scenario_analysis
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -215,6 +216,7 @@ class qannagnps():
         self.dlg_calibration_inputs = calibration_inputs()
         self.dlg_calibration_results = calibration_results()
         self.dlg_fiteval_calibration= fiteval_calibration()
+        self.dlg_scenario_analysis = scenario_analysis()
         
         
         #Boton principal
@@ -300,6 +302,20 @@ class qannagnps():
         self.dlg_calibration.carbon_push.clicked.connect(self.dlg_calibration_inputs.show)
         self.dlg_calibration.phosphorus_push.clicked.connect(self.dlg_calibration_inputs.show)
         
+        
+        #Open scenario analysis
+        self.dlg.scenario.clicked.connect(self.dlg_scenario_analysis_show)
+        
+        #Update graph scenario analysis when date changed
+        self.dlg_scenario_analysis.start_date.editingFinished.connect(lambda b=True:self.update_scenario_analysis_graph(b))
+        self.dlg_scenario_analysis.end_date.editingFinished.connect(lambda b=True:self.update_scenario_analysis_graph(b))
+        
+        #Update scenario analysis graph when output changed
+        for rb in self.dlg_scenario_analysis.frame_2.findChildren(QRadioButton):
+            rb.toggled.connect(lambda _, b=False: self.update_scenario_analysis_graph(b))
+        
+        #Button to run the scenarios that don´t have the required outptu
+        self.dlg_scenario_analysis.execute_scenario.clicked.connect(self.execute_scenario_analysis)
         
         #Fiteval for calibration
         self.dlg_fiteval_calibration.nash.textChanged.connect(self.calibration_bootstraping_update)
@@ -532,7 +548,7 @@ class qannagnps():
         self.dlg.pb_load.clicked.connect(self.load_project)
         
         #Cargar los proyectos existentes
-        self.update_saved_projects()
+        self.update_saved_projects(update_scenario = False)
         
         #Diccionario que relaciona cada linea de texto con la carpeta
         self.dic_folder = {self.inputs.l_2:self.inputs.l_1,self.inputs.l_3:self.inputs.l_1,self.inputs.l_4:self.inputs.l_1,self.inputs.l_5:self.inputs.l_1,self.inputs.l_6:self.inputs.l_1,self.inputs.l_7:self.inputs.l_1,self.inputs.l_8:self.inputs.l_1,self.inputs.l_9:self.inputs.l_1,self.inputs.l_10:self.inputs.l_1,self.inputs.l_11:self.inputs.l_1,self.inputs.l_12:self.inputs.l_1,self.inputs.l_13:self.inputs.l_1,self.inputs.l_14:self.inputs.l_1,self.inputs.l_15:self.inputs.l_1,self.inputs.l_16:self.inputs.l_1,self.inputs.l_17:self.inputs.l_1,self.inputs.l_18:self.inputs.l_1,self.inputs.l_19:self.inputs.l_1,self.inputs.l_20:self.inputs.l_1,self.inputs.l_21:self.inputs.l_1,self.inputs.l_22:self.inputs.l_1,self.inputs.l_24:self.inputs.l_23,self.inputs.l_25:self.inputs.l_23,self.inputs.l_26:self.inputs.l_23,self.inputs.l_27:self.inputs.l_23,self.inputs.l_28:self.inputs.l_23,self.inputs.l_29:self.inputs.l_23,self.inputs.l_30:self.inputs.l_23,self.inputs.l_31:self.inputs.l_23,self.inputs.l_32:self.inputs.l_23,self.inputs.l_33:self.inputs.l_23,self.inputs.l_34:self.inputs.l_23,self.inputs.l_35:self.inputs.l_23,self.inputs.l_36:self.inputs.l_23,self.inputs.l_37:self.inputs.l_23,self.inputs.l_38:self.inputs.l_23,self.inputs.l_39:self.inputs.l_23,self.inputs.l_40:self.inputs.l_23,self.inputs.l_41:self.inputs.l_23,self.inputs.l_42:self.inputs.l_23,self.inputs.l_43:self.inputs.l_23,self.inputs.l_44:self.inputs.l_23,self.inputs.l_45:self.inputs.l_23,self.inputs.l_46:self.inputs.l_23,self.inputs.l_48:self.inputs.l_47,self.inputs.l_49:self.inputs.l_47,self.inputs.l_50:self.inputs.l_47,self.inputs.l_51:self.inputs.l_47,self.inputs.l_52:self.inputs.l_47,self.inputs.l_54:self.inputs.l_53,self.inputs.l_55:self.inputs.l_53,self.inputs.l_56:self.inputs.l_53,self.inputs.l_57:self.inputs.l_53,self.inputs.l_58:self.inputs.l_53,self.inputs.l_59:self.inputs.l_53,self.inputs.l_60:self.inputs.l_53,self.inputs.l_61:self.inputs.l_53,self.inputs.l_62:self.inputs.l_53,self.inputs.l_63:self.inputs.l_53,self.inputs.l_64:self.inputs.l_53,self.inputs.l_65:self.inputs.l_53,self.inputs.l_66:self.inputs.l_53,self.inputs.l_67:self.inputs.l_53,self.inputs.l_68:self.inputs.l_53,self.inputs.l_69:self.inputs.l_53,self.inputs.l_70:self.inputs.l_53,self.inputs.l_71:self.inputs.l_53}
@@ -727,6 +743,285 @@ class qannagnps():
         #Open AnnAGNPS output folder
         self.output.open_folder.clicked.connect(self.open_annagnps_folder)
     
+    def select_projects_without_output_scenario(self):
+        """Method to select the projects without output in scenario analysis"""
+        proyectos_seleccionados = [name for name, cb in self.checkboxes_project_scenario.items() if cb.isChecked()]
+        
+        proyectos_sin_output = []
+        for proyecto in proyectos_seleccionados:
+            if not os.path.exists(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_outputs\AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"):
+                proyectos_sin_output.append(proyecto)
+        
+        return proyectos_sin_output
+    
+    def execute_scenario_analysis(self):
+        """Method to execute the project that don´t have the required output"""
+        #First select the projects that don´t have the required output
+        projects_without_output = self.select_projects_without_output_scenario()
+        if len(projects_without_output) == 0:
+            self.warning_message("All the projects have the required outputs, there is no need of execution")
+            return
+        
+        #Do the execution
+        #Function to modify or create the required file to display the required output
+        def modify_input(proyecto,name_master,column,new_columns,name_new_file):
+            master_file = self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs\\annagnps_master.csv"
+            project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+
+            if name_master in project_df.iloc[:,0].values:
+                file = Path(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==name_master].iloc[0,1])
+                data = pd.read_csv(file,encoding = "ISO-8859-1",delimiter=",")
+                # Eliminar espacios al inicio y final de los nombres de columnas
+                data.columns = data.columns.str.strip()
+                data[column].iloc[0] = "T"
+                data.to_csv(file, index=False, float_format='%.5f')
+                
+            else:
+                columns = new_columns
+                data = pd.DataFrame(columns=columns, data=[[""] * len(columns)])
+                data[column].iloc[0] = "T"
+                nombre = name_new_file
+                file = Path(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"\\simulation\\"+f"{nombre}.csv")
+                data.to_csv(file, index=False, float_format='%.5f')
+                project_df.loc[len(project_df)] = [name_master, f".\simulation\{nombre}.csv"]
+                project_df.to_csv(master_file, index=False, float_format='%.5f')
+        
+        
+        errors_projects = []
+        for proyecto in projects_without_output:
+            #Modify the master file
+            columns = ["CCHE1D", "CONCEPTS_XML", "Gaging_Station_Hyd", "REMM", "Gaging_Station_Evt"]
+            modify_input(proyecto,"Output Options - TBL","Gaging_Station_Hyd",columns,"out_tbl")
+            
+            #Execute
+            #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
+            self.time_start_processing = datetime.now()
+            
+            
+            #EJECUCIÓN DE ANNAGNPS
+            #os.chdir(self.direccion+"\\"+directory)
+            def execute_bat():
+               def main():
+                   f = open(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
+                   linea_uno = "CD /d {}".format(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs")
+                   linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
+                   f.write("{} \n".format(linea_uno))
+                   f.write("{} \n".format(linea_dos))
+                   f.close()
+               main()
+            execute_bat()
+
+            subprocess.call(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
+
+            
+            #If error file of AnnAGNPS is opened, then return a error message
+            try:
+                open(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"AnnAGNPS_LOG_Error.csv", "r+") 
+            except PermissionError:
+                self.warning_message("Error AnnAGNPS","Close AnnAGNPS_LOG_Error.csv before the start of execution")
+                return
+            except:
+                pass
+                        
+            #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
+            time.sleep(1)
+            if path.exists(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"AnnAGNPS_LOG_Error.csv"):
+                if os.stat(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"AnnAGNPS_LOG_Error.csv").st_size>0:
+                    errors_projects.append(proyecto)
+            
+            #Los outputs de AnnAGNPS se guardan en Processing_outputs
+            self.save_files_processing_in_folder_scenario(proyecto)
+        
+        
+        
+        if len(errors_projects)==0:
+            self.warning_message("Executions completed")
+        else:
+            project_error_string = '","'.join(errors_projects)
+            files_error = [self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_outputs\\AnnAGNPS_LOG_Error.csv" for proyecto in errors_projects]
+            files_error_string = '","'.join(files_error)
+            self.warning_message(f"The execution of the next projects gave error:{project_error_string}\nPlease check the next files to see the errors: {files_error_string}")
+
+        #Update graph
+        self.update_scenario_analysis_graph()
+        
+    def dlg_scenario_analysis_show(self):
+        """Method to show the scenario analysis with all the projects"""
+        lista = [
+            f for f in os.listdir(self.carpeta_guardar_proyectos)
+            if os.path.isdir(os.path.join(self.carpeta_guardar_proyectos, f))
+        ]
+
+        # Si ya tienes layout en Qt Designer
+        layout = self.dlg_scenario_analysis.frame.layout()
+        if layout is None:
+            layout = QVBoxLayout(self.dlg_scenario_analysis.frame)
+    
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.blockSignals(True)
+                widget.deleteLater()
+
+        # 1️Añadir el label arriba
+        label = QLabel("Available projects")
+        layout.addWidget(label)
+
+        #Update available projects
+        self.update_available_projects_scenario()
+        
+        #Update graph scenario analysis
+        self.update_scenario_analysis_graph()
+        
+        # Mostrar el diálogo
+        self.dlg_scenario_analysis.show()
+        
+    def update_available_projects_scenario(self):
+        """Method to update the available projects in scenario analysis"""
+        lista = [
+            f for f in os.listdir(self.carpeta_guardar_proyectos)
+            if os.path.isdir(os.path.join(self.carpeta_guardar_proyectos, f))
+        ]
+        
+        layout = self.dlg_scenario_analysis.frame.layout()
+        
+        # 2️Crear los checkboxes
+        self.checkboxes_project_scenario = {}
+
+        for name in lista:
+            checkbox = QCheckBox(name)
+            layout.addWidget(checkbox)
+            self.checkboxes_project_scenario[name] = checkbox
+            setattr(self.dlg_scenario_analysis, name, checkbox)
+            getattr(self.dlg_scenario_analysis, name).stateChanged.connect(lambda _: self.update_scenario_analysis_graph(False))
+
+        # 3️Añadir un vertical spacer para empujar todo hacia arriba
+        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+    
+    
+    def obtain_data_scenario_analysis(self,proyecto,date_changed):
+        """Method to obtain data from the scenario analysis"""
+        
+        #First select the column of the information you want to see
+        dictionary_columns = {self.dlg_scenario_analysis.total_discharge.text():"Total Streamflow",
+            self.dlg_scenario_analysis.total_pesticide.text():"Pesticide: Total",
+            self.dlg_scenario_analysis.total_carbon.text():"Organic Carbon: Total",
+            self.dlg_scenario_analysis.total_phosphorus.text():"Phosphorus: Total",
+            self.dlg_scenario_analysis.total_nitrogen.text():"Nitrogen: Total",
+            self.dlg_scenario_analysis.total_sediment.text():"Sediment: All: Total"}
+            
+            
+        selected_radio_button = next((w.text() for w in self.dlg_scenario_analysis.frame_2.findChildren(QRadioButton) if w.isChecked()), None)
+        column = dictionary_columns[selected_radio_button]
+        
+        fichero = self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_outputs\AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"
+        if os.path.exists(fichero):
+            first_column = "Gregorian Day"
+            file = open(fichero)
+            csvreader = csv.reader(file)
+            rows = []
+            for row in csvreader:
+               rows.append(row)
+            lista = []
+            a = 0
+            for i in rows:
+               try:
+                   if i[0]==first_column:
+                       a = 1
+                       lista.append(i)
+                   elif a ==1:
+                       lista.append(i[:-1])
+               except:
+                   continue
+               
+            df_simulated = pd.DataFrame(columns = lista[0],data = lista[1:])
+            df_simulated = df_simulated[df_simulated["Reach ID"]=="OUTLET"]
+            df_simulated['date'] = pd.to_datetime(df_simulated[['Year', 'Month', 'Day']])
+            # Encontrar la columna que contiene la información
+            total_col = [col for col in df_simulated.columns if column in col][0]
+            
+            # Seleccionar solo la columna 'Date' y la columna de la información
+            df_simulated = df_simulated[['date', total_col]]
+            df_simulated[total_col] = df_simulated[total_col].astype(float)
+            
+            #Filter by date
+            if date_changed:
+                try:
+                    fecha_inicio = pd.to_datetime(self.dlg_scenario_analysis.start_date.text())
+                    fecha_fin = pd.to_datetime(self.dlg_scenario_analysis.end_date.text())
+                    df_simulated = df_simulated[(df_simulated["date"] >= fecha_inicio) & (df_simulated["date"] <= fecha_fin)]
+                except:
+                    pass
+            
+            return df_simulated,total_col
+        
+        else:
+            return 0,0
+    
+    def update_scenario_analysis_graph(self,date_changed=False): 
+        """Method to udpate the graph of scenario analysis"""
+        #Create the graph
+        #Obtain data for all the checkboxes
+        proyectos_seleccionados = [name for name, cb in self.checkboxes_project_scenario.items() if cb.isChecked()]
+        
+        dictionary_results = {}
+        for proyecto in proyectos_seleccionados:
+            df_simulated,total_col = self.obtain_data_scenario_analysis(proyecto,date_changed)
+            if type(df_simulated) != int and type(total_col)!= int:
+                #Save values
+                dictionary_results[proyecto] = [df_simulated.date,df_simulated[total_col]]
+        
+        #Add the graph
+        if not hasattr(self, 'canvas_scenario'):
+            #Create the canvas of the graph
+            # Si no existe, crear el canvas y añadirlo al layout
+            self.canvas_scenario = FigureCanvas(plt.Figure(figsize=(15, 6)))
+            # Asignar un layout al QFrame si no tiene uno
+            layout = QVBoxLayout(self.dlg_scenario_analysis.frame_3)
+            self.dlg_scenario_analysis.frame_3.setLayout(layout)
+            #Add canvas to layout
+            layout.addWidget(self.canvas_scenario)
+        
+        #Add graph
+        if len(dictionary_results)>0:
+            self.canvas_scenario.figure.clear()
+            self.ax_scenario_graph = self.canvas_scenario.figure.subplots()
+            
+            
+            for i in dictionary_results.keys():
+                self.ax_scenario_graph.plot(dictionary_results[i][0].to_numpy(),dictionary_results[i][1].to_numpy(),label = i,linewidth=2)
+            
+            
+            self.ax_scenario_graph.legend()
+            self.ax_scenario_graph.set_xlabel("Time (s)",size = 12,family="arial",weight = "bold",color = "black")
+            self.ax_scenario_graph.set_ylabel(total_col,size = 12,family="arial",weight = "bold",color = "black")
+            self.ax_scenario_graph.tick_params(axis = "both",colors = "black",labelsize = 9)
+            
+            #Change background color
+            self.canvas_scenario.figure.set_facecolor('#f0f0f0')
+            self.ax_scenario_graph.set_facecolor('#f0f0f0')
+            
+            # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
+            self.canvas_scenario.figure.subplots_adjust(wspace=0.7) #spacing beteween two graphs
+            self.canvas_scenario.figure.subplots_adjust(left=0.2, bottom=0.2)
+            #Draw canvas
+            self.canvas_scenario.draw()
+            
+            #Put the dates in the text if another project was selected
+            if not date_changed and len(dictionary_results)>0:
+                xmin, xmax = self.ax_scenario_graph.get_xlim()
+                self.dlg_scenario_analysis.start_date.setText(mdates.num2date(xmin).strftime("%Y-%m-%d"))
+                self.dlg_scenario_analysis.end_date.setText(mdates.num2date(xmax).strftime("%Y-%m-%d"))
+            
+            
+            
+            #Save figure
+            self.dlg_scenario_analysis.print_graph.clicked.connect(lambda _, b= [self.dlg_scenario_analysis,self.canvas_scenario]:self.figure_settings(b))
+            
+       
+    
     def save_figures(self): 
         """Method to save figures to the computer"""
         
@@ -877,7 +1172,7 @@ class qannagnps():
                 
                 self.ax_calibration_graph.legend()
                 self.ax_calibration_graph.set_xlabel("Time (s)",size = 12,family="arial",weight = "bold",color = "black")
-                self.ax_calibration_graph.set_ylabel("Sediment (g/s)",size = 12,family="arial",weight = "bold",color = "black")
+                self.ax_calibration_graph.set_ylabel("Total streamflow",size = 12,family="arial",weight = "bold",color = "black")
                 self.ax_calibration_graph.tick_params(axis = "both",colors = "black",labelsize = 9)
             
             #Change background color
@@ -4031,9 +4326,27 @@ class qannagnps():
                     shutil.move(str(f), str(carpeta_destino / f.name))
             except:
                 pass
-         
-    
-    
+
+    def save_files_processing_in_folder_scenario(self,proyecto):
+        """Method to save the outputs of topagnps in the folder Preprocessing_outputs"""
+        #First create the folder Processing_outputs if it doesn´t exist
+        carpeta = self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_outputs"
+        Path(carpeta).mkdir(parents=True, exist_ok=True)
+        
+
+        #Then move the files that were modified or created after the start of the preprocessing
+        carpeta_origen = Path(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs")
+        carpeta_destino = Path(carpeta)
+        
+        archivo_excluido = Path(self.carpeta_guardar_proyectos) / f"{proyecto}"/ "Processing_inputs" / "AnnAGNPS.fil"
+        
+        for f in carpeta_origen.iterdir():
+            try:
+                t = datetime.fromtimestamp(max(f.stat().st_ctime, f.stat().st_mtime))
+                if t > self.time_start_processing and f != archivo_excluido:
+                    shutil.move(str(f), str(carpeta_destino / f.name))
+            except:
+                pass
     
     
     def create_folder_preprocessing_and_move_files(self):
@@ -6038,7 +6351,7 @@ class qannagnps():
             
         
         
-    def update_saved_projects(self):
+    def update_saved_projects(self,update_scenario = True):
         """Method to update the projects that are available in the computer"""
         #In the main windo. 
         project_names = [
@@ -6084,6 +6397,21 @@ class qannagnps():
         else:
             #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive. 
             self.dlg_calibration.project_calibration.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
+        
+        
+        #In scenario analysis
+        if update_scenario:
+            layout = self.dlg_scenario_analysis.frame.layout()
+            
+            if layout is not None:
+                while layout.count():
+                    item = layout.takeAt(0)
+                    widget = item.widget()
+                    if widget is not None:
+                        widget.blockSignals(True)   #evita que emita señales
+                        widget.deleteLater()
+            
+            self.update_available_projects_scenario()
         
             
     def search_document(self,line):
@@ -8805,7 +9133,6 @@ class Sensitivity_Parallelization(QgsTask):
     
     def add_soil_and_management_cell_sensitivity(self):
         """Method to add soil type and management to cell"""
-        print(19)
         def fichero(nombre):
             return self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\"+nombre
         #A esta función le das la capa de celdas y la que se superpone (tipo de suelo o uso) y devuelve el diccionario en el que se muestra a cada celda que valor (de suelo o de uso) le corresponde
@@ -9506,7 +9833,6 @@ class Calibration_Parallelization(QgsTask):
     
     def add_soil_and_management_cell_sensitivity(self):
         """Method to add soil type and management to cell"""
-        print(19)
         def fichero(nombre):
             return self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\"+nombre
         #A esta función le das la capa de celdas y la que se superpone (tipo de suelo o uso) y devuelve el diccionario en el que se muestra a cada celda que valor (de suelo o de uso) le corresponde
