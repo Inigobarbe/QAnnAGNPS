@@ -971,7 +971,7 @@ class qannagnps():
             df_simulated,total_col = self.obtain_data_scenario_analysis(proyecto,date_changed)
             if type(df_simulated) != int and type(total_col)!= int:
                 #Save values
-                dictionary_results[proyecto] = [df_simulated.date,df_simulated[total_col]]
+                dictionary_results[proyecto] = [df_simulated.date,df_simulated[total_col],df_simulated[total_col].sum()]
         
         #Add the graph
         if not hasattr(self, 'canvas_scenario'):
@@ -1006,6 +1006,26 @@ class qannagnps():
             # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
             self.canvas_scenario.figure.subplots_adjust(wspace=0.7) #spacing beteween two graphs
             self.canvas_scenario.figure.subplots_adjust(left=0.2, bottom=0.2)
+            
+            
+            #Put the sums in the graph
+            texto_sumas = ",".join([
+                f"{proyecto}: {dictionary_results[proyecto][2]:.2f}"
+                for proyecto in dictionary_results
+            ])
+
+            # Añadirlo debajo del gráfico
+            self.canvas_scenario.figure.text(
+                0.5, 0.01,
+                texto_sumas,
+                ha='center',
+                va='bottom',
+                fontsize=8,
+                weight='bold',
+                color='black'
+            )
+            
+            
             #Draw canvas
             self.canvas_scenario.draw()
             
@@ -1014,6 +1034,10 @@ class qannagnps():
                 xmin, xmax = self.ax_scenario_graph.get_xlim()
                 self.dlg_scenario_analysis.start_date.setText(mdates.num2date(xmin).strftime("%Y-%m-%d"))
                 self.dlg_scenario_analysis.end_date.setText(mdates.num2date(xmax).strftime("%Y-%m-%d"))
+            
+            
+            
+            self.canvas_scenario.figure.subplots_adjust(bottom=0.25)
             
             
             
@@ -6575,7 +6599,14 @@ class qannagnps():
                 child.widget().deleteLater()
         
         #Add elements depending on selection
+        #Import master file to check if the files exist
+        try:
+            master_file = self.carpeta_guardar_proyectos+f"\\{self.sensitivity_dialog.project_sensitivity.currentText()}\\Processing_inputs\\annagnps_master.csv"
+            project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+        except:
+            project_df = "nan"
         
+        #Add buttons
         if section == "Spatial":
             inputs_spatial = ["TopAgnps","Ephemeral Gully","Riparian Buffers","Hydraulics and hydrology \nfor cells and reaches","Wetland","Pothole"]
             dic = {"TopAgnps":["Pixel Size","Critical Source Area","Minimum Source Channel \nLength"],"Ephemeral Gully":["Absolute CTI","Relative CTI"],"Riparian Buffers":["Cell Threshold","Reach Threshold"],"Hydraulics and hydrology \nfor cells and reaches":["Drainage area \nto concentrated flow","Maximum profile length \nuntil deposition","Maximum Profile Slope"],"Wetland":["Wetness Index Threshold","Erosion Index Threshold","Drainage Area Threshold","Maximum Wetland Ratio","Minimum Wetland Ratio","Barrier Height","Barrier Height Increment","Barrier Height Maximum","Buffer width"],"Pothole":["Pothole Surface Area"]}
@@ -6590,43 +6621,105 @@ class qannagnps():
             inputs_watershed = ["Aquaculture pond","Cell","Classic Gully","Ephemeral Gully","Feedlot","Field Pond", "Impoundment", "Point Source", "Reach", "Watershed", "Wetland"]
             dic = {"Aquaculture pond":["Pond area","Pond Depth", "Seepage Rate", "Sediment Delivery Ratio Pond", "Organic Carbon \nCalibration Factor Pond", "Nitrogen Calibration Factor Pond", "Phosphorus Calibration Factor Pond", "Erosion Calibration Factor Pond"],"Cell":["Sheet flow Manning’s n","Concentrated flow \nhydraulic depth","Concentrated flow Manning’s n","Delivery Ratio Pond","Constant USLE C factor","Constant USLE P factor","All Organic Carbon \nCalibration Factor","All Nitrogen Calibration Factor","All Phosphorus Calibration Factor","Sheet and Rill Erosion \nCalibration Factor","Gullies Erosion Calibration Factor"],"Classic Gully":["Head Cut Depth","Erosion Coefficient","Erosion Exponent","Delivery Ratio Gully","Organic Carbon \nCalibration Factor Gully","Nitrogen Calibration Factor Gully","Phosphorus Calibration Factor Gully","Erosion Calibration Factor Gully"],"Ephemeral Gully":["Critical Shear Stress \nEphemeral Gully","Erosion Depth","Delivery Ratio Ephemeral Gully","Manning’s n Ephemeral Gully","Re Plant Period","Organic Carbon","Nitrogen","Phosphorus","Erosion","Headcut detachment leading \ncoefficient a","Headcut erodibility \nleading coefficient a","Headcut detachment exponent \ncoefficient b","Headcut erodibility exponent \ncoefficient b","Maximum Buffer Trapping \nEfficiency TE m"],"Feedlot":["Open Area","Paved Ratio","Roof Area","Upslope Area","Feedlot Initial N","Feedlot Initial P","Feedlot Initial OrgC","Delta N","Delta P","Delta OrgC","Feedlot Max N","Feedlot Max P","Feedlot Max OrgC","Feedlot Pack N","Feedlot Pack P","Feedlot Pack OrgC","Organic Carbon Calibration \nFactor Feedlot","Nitrogen Calibration \nFactor Feedlot","Phosphorus Calibration \nFactor Feedlot","Erosion Calibration \nFactor Feedlot","Cell Buffer Length"],"Field Pond":["Field Pond area","Number of rotation years","Number gate operations","Delivery Ratio Field Pond","Volume of release water","Drain Time","Release rate","Sediment Concentration","Clay content Field Pond","Silt content Field Pond","Organic Carbon Calibration Factor Field Pond","Nitrogen Calibration Factor Field Pond","Phosphorus Calibration Factor Field Pond","Erosion Calibration Factor Field Pond"], "Impoundment":["Impoundment Infiltration","Impoundment Seepage","Permanent Pool Depth","Impound Volume Coefficient","Impound Volume Exponent","Impound Discharge Coefficient","Impound Discharge Exponent","Sediment Clean Out Depth","Sediment Clean Out Year"], "Point Source":["Point Flow","Point Nitrogen","Point Phosphorus","Point Organic Carbon","Organic Carbon Calibration Factor","Nitrogen Calibration Factor","Phosphorus Calibration Factor","Erosion Calibration Factor"], "Reach":["Reach Manning’s n","Reach Flow Depth","Valley Width","Valley n","Delivery Ratio Reach"], "Watershed":["Latitude","Longitude"], "Wetland":["Wetland Area","Initial Water Depth","Minimum Water Depth","Maximum Water Depth","Water Temperature","Potential Daily Infiltration","Weir Coefficient","Weir Width","Weir Height","Soluble N Concentration","Nitrate Loss Rate","Nitrate Loss Rate Coefficient","Temperature Coefficient","Weir Exponent"]}
             for nombre in inputs_watershed:
-                boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
-                boton.setObjectName(nombre)
-                self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
+                if self.check_if_input_present_in_master(nombre,project_df):
+                    boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
+                    boton.setObjectName(nombre)
+                    self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    boton.setSizePolicy(política_tamaño)
+                    boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
         if section == "General":
             inputs_general = ["Management Aquaculture \n Pond Schedule", "Contour", "Crop", "Crop Growth", "Feedlot Management","Fertilizer application", "Fertilizer reference", "Geology", "Hydraulic Geometry", "Irrigation Application", "Management Field", "Management Operation", "Management Schedule", "Non-crop","Pesticide Application", "Pesticide Reference","Reach Nutrient Half-life", "Riparian Buffer", "Runoff Curve", "Soil", "Soil Layers", "Strip Crop", "Tile Drain"]
             dic = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
             for nombre in inputs_general:
-                boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
-                boton.setObjectName(nombre)
-                self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
+                if self.check_if_input_present_in_master(nombre,project_df):
+                    boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
+                    boton.setObjectName(nombre)
+                    self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    boton.setSizePolicy(política_tamaño)
+                    boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
         if section == "Climate":
             inputs_climate = ["Climate Station", "EI Percentage"]
             dic = {"Climate Station":["Station Latitude","Station Longitude","Station Elevation","Adiabatic Air Temperature \nLapse Rate","Precipitation Nitrogen","Elevation Difference (1)","Elevation Rain Factor (1)","Elevation Difference (2)","Elevation Rain Factor (2)","2 Yr 24 Hr Precipitation","Rainfall Calibration or Areal \nCorrection Coefficient","Areal Rainfall \nCorrection Exponent","Minimum interception \nevaporation station","Maximum interception \nevaporation station"], "EI Percentage":["EI_Pct_01","EI_Pct_02","EI_Pct_03","EI_Pct_04","EI_Pct_05","EI_Pct_06","EI_Pct_07","EI_Pct_08","EI_Pct_09","EI_Pct_10","EI_Pct_11","EI_Pct_12","EI_Pct_13","EI_Pct_14","EI_Pct_15","EI_Pct_16","EI_Pct_17","EI_Pct_18","EI_Pct_19","EI_Pct_20","EI_Pct_21","EI_Pct_22","EI_Pct_23","EI_Pct_24"]}
             for nombre in inputs_climate:
-                boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
-                boton.setObjectName(nombre)
-                self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
+                if self.check_if_input_present_in_master(nombre,project_df):
+                    boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
+                    boton.setObjectName(nombre)
+                    self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    boton.setSizePolicy(política_tamaño)
+                    boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
         if section == "Simulation":
             inputs_simulation = ["Global IDs Factors \n and Flags","Pesticide Initial Conditions","PL Calibration","RCN Calibration","Simulation Period","Soil Initial Conditions"]
             dic = {"Global IDs Factors \n and Flags":["Headcut detachment leading coefficient (a)","Headcut detachment exponent coefficient (b)","Headcut erodibility leading coefficient (a)","Headcut erodibility exponent coefficient (b)","Minimum Interception Evaporation Global","Maximum Interception Evaporation Global","Detention Coefficient “a”","Detention Coefficient “b”","RCN Convergence Tolerance","RCN Maximum Number of Iterations","Available Soil Moisture Ratio for AMC II","Maximum Available Sediment Concentration for Sheet Flow","Maximum Available Sediment Concentration for Concentrated Flow","Critical Shear Stress"],"Pesticide Initial Conditions":["Crop Initial Pesticide Amount 1","Crop Initial Pesticide Amount 2","Non-crop Initial Pesticide Amount 1","Non-crop Initial Pesticide Amount 2"],"PL Calibration":["Organic carbon from all sources","Organic carbon from sheet & rill","Organic carbon from feedlot","Organic carbon from point source","Organic carbon from gully","Organic carbon from pond","Organic carbon from irrigation","Nitrogen from all sources","Nitrogen from sheet & rill","Nitrogen from feedlot","Nitrogen from point source","Nitrogen from gully","Nitrogen from pond","Nitrogen from irrigation","Phosphorus from all sources","Phosphorus from sheet & rill","Phosphorus from feedlot","Phosphorus from point source","Phosphorus from gully","Phosphorus from pond","Phosphorus from irrigation","Sediment from all sources","Sediment from sheet & rill","Sediment from feedlot","Sediment from point source","Sediment from gully","Sediment from pond","Sediment from irrigation"],"RCN Calibration":["Target Average Annual Direct Runoff Load","RCN Retention factor","Reach Ratio","Available Soil Moisture, AMC-II"],"Simulation Period":["Rainfall factor","10-yr EI","EI Number","Initialization Method Code"],"Soil Initial Conditions":["Inorganic_N_1" ,"Inorganic_N_2", "Inorganic_P_1","Inorganic_P_2", "Soil_Moisture_1","Soil_Moisture_2", "Organic_Matter_1","Organic_Matter_2","Organic_N_1","Organic_N_2", "Organic_P_1","Organic_P_2","Surface Residue","Manning’s n","Snow Depth","Snow Density","Surface Constant"]}
             for nombre in inputs_simulation:
-                boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
-                boton.setObjectName(nombre)
-                self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
+                if self.check_if_input_present_in_master(nombre,project_df):
+                    boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
+                    boton.setObjectName(nombre)
+                    self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    boton.setSizePolicy(política_tamaño)
+                    boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
     
+    def check_if_input_present_in_master(self,fichero,project_df):
+        """Method to check if a file is present in a master file for the inputs of sensitivity and calibration"""
+        dictionary_master_file = {"Aquaculture pond":"Aquaculture Pond Data",
+                               "Management Aquaculture \n Pond Schedule":"Aquaculture Schedule Data","Cell":"Cell Data","Classic Gully":"Classic Gully Data",
+                               "Contour":"Contour Data","Crop":"Crop Data","Crop Growth":"Crop Growth Data",
+                               "Ephemeral Gully":"Ephemeral Gully Data","Feedlot":"Feedlot Data","Feedlot Management":"Feedlot Management Data",
+                               "Fertilizer application":"Fertilizer Application Data","Fertilizer reference":"Fertilizer Reference Data",
+                               "Field Pond":"Field Pond Data","Geology":"Geology Data",
+                               "Global IDs Factors \n and Flags":"Global IDs Factors and Flags Data",
+                               "Hydraulic Geometry":"Hydraulic Geometry Data","Impoundment":"Impoundment Data",
+                               "Irrigation Application":"Irrigation Application Data","Management Field":"Management Field Data",
+                               "Management Operation":"Management Operation Data","Management Schedule":"Management Schedule Data",
+                               "Non-crop":"Non-Crop Data",
+                               "Pesticide Application":"Pesticide Application Data","Pesticide Initial Conditions":"Pesticide Initial Conditions Data",
+                               "Pesticide Reference":"Pesticide Reference Data","PL Calibration":"PL Calibration Data",
+                               "Point Source":"Point Source Data","RCN Calibration":"RCN Calibration Data","Reach":"Reach Data",
+                               "Reach Nutrient Half-life":"Reach Nutrient Half-life Data","Runoff Curve":"Runoff Curve Number Data",
+                               "Simulation Period":"Simulation Period Data","Soil":"Soil Data","Soil Layers":"Soil Layer Data",
+                               "Soil Initial Conditions":"Soil Initial Conditions Data","Strip Crop":"Strip Crop Data",
+                               "Tile Drain":"Tile Drain Data","Watershed":"Watershed Data","EI Percentage":"EI Pct Data",
+                               "Climate Station":"CLIMATE DATA - STATION",
+                               "Wetland":"Wetland Data","Riparian Buffer":"Riparian Buffer Data"}
+        
+        
+        if type(project_df) == str:
+            return True
+        
+        if dictionary_master_file[fichero] in project_df.iloc[:, 0].values:
+            return True
+        else:
+            return False
+        
+        
+        
+        def modify_input(proyecto,name_master,column,new_columns,name_new_file):
+            master_file = self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs\\annagnps_master.csv"
+            project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+
+            if name_master in project_df.iloc[:,0].values:
+                file = Path(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==name_master].iloc[0,1])
+                data = pd.read_csv(file,encoding = "ISO-8859-1",delimiter=",")
+                # Eliminar espacios al inicio y final de los nombres de columnas
+                data.columns = data.columns.str.strip()
+                data[column].iloc[0] = "T"
+                data.to_csv(file, index=False, float_format='%.5f')
+                
+            else:
+                columns = new_columns
+                data = pd.DataFrame(columns=columns, data=[[""] * len(columns)])
+                data[column].iloc[0] = "T"
+                nombre = name_new_file
+                file = Path(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"\\simulation\\"+f"{nombre}.csv")
+                data.to_csv(file, index=False, float_format='%.5f')
+                project_df.loc[len(project_df)] = [name_master, f".\simulation\{nombre}.csv"]
+                project_df.to_csv(master_file, index=False, float_format='%.5f')
+                
+                
+                
     
     
     def calibration_inputs(self,section):
@@ -6640,6 +6733,14 @@ class qannagnps():
         
         #Add elements depending on selection
         
+        #Import master file to check if the files exist
+        try:
+            master_file = self.carpeta_guardar_proyectos+f"\\{self.sensitivity_dialog.project_sensitivity.currentText()}\\Processing_inputs\\annagnps_master.csv"
+            project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+        except:
+            project_df = "nan"
+            
+        #Add buttons
         if section == "Spatial":
             inputs_spatial = ["TopAgnps","Ephemeral Gully","Riparian Buffers","Hydraulics and hydrology \nfor cells and reaches","Wetland","Pothole"]
             dic = {"TopAgnps":["Pixel Size","Critical Source Area","Minimum Source Channel \nLength"],"Ephemeral Gully":["Absolute CTI","Relative CTI"],"Riparian Buffers":["Cell Threshold","Reach Threshold"],"Hydraulics and hydrology \nfor cells and reaches":["Drainage area \nto concentrated flow","Maximum profile length \nuntil deposition","Maximum Profile Slope"],"Wetland":["Wetness Index Threshold","Erosion Index Threshold","Drainage Area Threshold","Maximum Wetland Ratio","Minimum Wetland Ratio","Barrier Height","Barrier Height Increment","Barrier Height Maximum","Buffer width"],"Pothole":["Pothole Surface Area"]}
@@ -6654,42 +6755,46 @@ class qannagnps():
             inputs_watershed = ["Aquaculture pond","Cell","Classic Gully","Ephemeral Gully","Feedlot","Field Pond", "Impoundment", "Point Source", "Reach", "Watershed", "Wetland"]
             dic = {"Aquaculture pond":["Pond area","Pond Depth", "Seepage Rate", "Sediment Delivery Ratio Pond", "Organic Carbon \nCalibration Factor Pond", "Nitrogen Calibration Factor Pond", "Phosphorus Calibration Factor Pond", "Erosion Calibration Factor Pond"],"Cell":["Sheet flow Manning’s n","Concentrated flow \nhydraulic depth","Concentrated flow Manning’s n","Delivery Ratio Pond","Constant USLE C factor","Constant USLE P factor","All Organic Carbon \nCalibration Factor","All Nitrogen Calibration Factor","All Phosphorus Calibration Factor","Sheet and Rill Erosion \nCalibration Factor","Gullies Erosion Calibration Factor"],"Classic Gully":["Head Cut Depth","Erosion Coefficient","Erosion Exponent","Delivery Ratio Gully","Organic Carbon \nCalibration Factor Gully","Nitrogen Calibration Factor Gully","Phosphorus Calibration Factor Gully","Erosion Calibration Factor Gully"],"Ephemeral Gully":["Critical Shear Stress \nEphemeral Gully","Erosion Depth","Delivery Ratio Ephemeral Gully","Manning’s n Ephemeral Gully","Re Plant Period","Organic Carbon","Nitrogen","Phosphorus","Erosion","Headcut detachment leading \ncoefficient a","Headcut erodibility \nleading coefficient a","Headcut detachment exponent \ncoefficient b","Headcut erodibility exponent \ncoefficient b","Maximum Buffer Trapping \nEfficiency TE m"],"Feedlot":["Open Area","Paved Ratio","Roof Area","Upslope Area","Feedlot Initial N","Feedlot Initial P","Feedlot Initial OrgC","Delta N","Delta P","Delta OrgC","Feedlot Max N","Feedlot Max P","Feedlot Max OrgC","Feedlot Pack N","Feedlot Pack P","Feedlot Pack OrgC","Organic Carbon Calibration \nFactor Feedlot","Nitrogen Calibration \nFactor Feedlot","Phosphorus Calibration \nFactor Feedlot","Erosion Calibration \nFactor Feedlot","Cell Buffer Length"],"Field Pond":["Field Pond area","Number of rotation years","Number gate operations","Delivery Ratio Field Pond","Volume of release water","Drain Time","Release rate","Sediment Concentration","Clay content Field Pond","Silt content Field Pond","Organic Carbon Calibration Factor Field Pond","Nitrogen Calibration Factor Field Pond","Phosphorus Calibration Factor Field Pond","Erosion Calibration Factor Field Pond"], "Impoundment":["Impoundment Infiltration","Impoundment Seepage","Permanent Pool Depth","Impound Volume Coefficient","Impound Volume Exponent","Impound Discharge Coefficient","Impound Discharge Exponent","Sediment Clean Out Depth","Sediment Clean Out Year"], "Point Source":["Point Flow","Point Nitrogen","Point Phosphorus","Point Organic Carbon","Organic Carbon Calibration Factor","Nitrogen Calibration Factor","Phosphorus Calibration Factor","Erosion Calibration Factor"], "Reach":["Reach Manning’s n","Reach Flow Depth","Valley Width","Valley n","Delivery Ratio Reach"], "Watershed":["Latitude","Longitude"], "Wetland":["Wetland Area","Initial Water Depth","Minimum Water Depth","Maximum Water Depth","Water Temperature","Potential Daily Infiltration","Weir Coefficient","Weir Width","Weir Height","Soluble N Concentration","Nitrate Loss Rate","Nitrate Loss Rate Coefficient","Temperature Coefficient","Weir Exponent"]}
             for nombre in inputs_watershed:
-                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
-                boton.setObjectName(nombre)
-                self.dlg_calibration.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
+                if self.check_if_input_present_in_master(nombre,project_df):
+                    boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
+                    boton.setObjectName(nombre)
+                    self.dlg_calibration.verticalLayout_2.addWidget(boton)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    boton.setSizePolicy(política_tamaño)
+                    boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
         if section == "General":
             inputs_general = ["Management Aquaculture \n Pond Schedule", "Contour", "Crop", "Crop Growth", "Feedlot Management","Fertilizer application", "Fertilizer reference", "Geology", "Hydraulic Geometry", "Irrigation Application", "Management Field", "Management Operation", "Management Schedule", "Non-crop","Pesticide Application", "Pesticide Reference","Reach Nutrient Half-life", "Riparian Buffer", "Runoff Curve", "Soil", "Soil Layers", "Strip Crop", "Tile Drain"]
             dic = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
             for nombre in inputs_general:
-                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
-                boton.setObjectName(nombre)
-                self.dlg_calibration.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
+                if self.check_if_input_present_in_master(nombre,project_df):
+                    boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
+                    boton.setObjectName(nombre)
+                    self.dlg_calibration.verticalLayout_2.addWidget(boton)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    boton.setSizePolicy(política_tamaño)
+                    boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
         if section == "Climate":
             inputs_climate = ["Climate Station", "EI Percentage"]
             dic = {"Climate Station":["Station Latitude","Station Longitude","Station Elevation","Adiabatic Air Temperature \nLapse Rate","Precipitation Nitrogen","Elevation Difference (1)","Elevation Rain Factor (1)","Elevation Difference (2)","Elevation Rain Factor (2)","2 Yr 24 Hr Precipitation","Rainfall Calibration or Areal \nCorrection Coefficient","Areal Rainfall \nCorrection Exponent","Minimum interception \nevaporation station","Maximum interception \nevaporation station"], "EI Percentage":["EI_Pct_01","EI_Pct_02","EI_Pct_03","EI_Pct_04","EI_Pct_05","EI_Pct_06","EI_Pct_07","EI_Pct_08","EI_Pct_09","EI_Pct_10","EI_Pct_11","EI_Pct_12","EI_Pct_13","EI_Pct_14","EI_Pct_15","EI_Pct_16","EI_Pct_17","EI_Pct_18","EI_Pct_19","EI_Pct_20","EI_Pct_21","EI_Pct_22","EI_Pct_23","EI_Pct_24"]}
             for nombre in inputs_climate:
-                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
-                boton.setObjectName(nombre)
-                self.dlg_calibration.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
+                if self.check_if_input_present_in_master(nombre,project_df):
+                    boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
+                    boton.setObjectName(nombre)
+                    self.dlg_calibration.verticalLayout_2.addWidget(boton)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    boton.setSizePolicy(política_tamaño)
+                    boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
         if section == "Simulation":
             inputs_simulation = ["Global IDs Factors \n and Flags","Pesticide Initial Conditions","PL Calibration","RCN Calibration","Simulation Period","Soil Initial Conditions"]
             dic = {"Global IDs Factors \n and Flags":["Headcut detachment leading coefficient (a)","Headcut detachment exponent coefficient (b)","Headcut erodibility leading coefficient (a)","Headcut erodibility exponent coefficient (b)","Minimum Interception Evaporation Global","Maximum Interception Evaporation Global","Detention Coefficient “a”","Detention Coefficient “b”","RCN Convergence Tolerance","RCN Maximum Number of Iterations","Available Soil Moisture Ratio for AMC II","Maximum Available Sediment Concentration for Sheet Flow","Maximum Available Sediment Concentration for Concentrated Flow","Critical Shear Stress"],"Pesticide Initial Conditions":["Crop Initial Pesticide Amount 1","Crop Initial Pesticide Amount 2","Non-crop Initial Pesticide Amount 1","Non-crop Initial Pesticide Amount 2"],"PL Calibration":["Organic carbon from all sources","Organic carbon from sheet & rill","Organic carbon from feedlot","Organic carbon from point source","Organic carbon from gully","Organic carbon from pond","Organic carbon from irrigation","Nitrogen from all sources","Nitrogen from sheet & rill","Nitrogen from feedlot","Nitrogen from point source","Nitrogen from gully","Nitrogen from pond","Nitrogen from irrigation","Phosphorus from all sources","Phosphorus from sheet & rill","Phosphorus from feedlot","Phosphorus from point source","Phosphorus from gully","Phosphorus from pond","Phosphorus from irrigation","Sediment from all sources","Sediment from sheet & rill","Sediment from feedlot","Sediment from point source","Sediment from gully","Sediment from pond","Sediment from irrigation"],"RCN Calibration":["Target Average Annual Direct Runoff Load","RCN Retention factor","Reach Ratio","Available Soil Moisture, AMC-II"],"Simulation Period":["Rainfall factor","10-yr EI","EI Number","Initialization Method Code"],"Soil Initial Conditions":["Inorganic_N_1" ,"Inorganic_N_2", "Inorganic_P_1","Inorganic_P_2", "Soil_Moisture_1","Soil_Moisture_2", "Organic_Matter_1","Organic_Matter_2","Organic_N_1","Organic_N_2", "Organic_P_1","Organic_P_2","Surface Residue","Manning’s n","Snow Depth","Snow Density","Surface Constant"]}
             for nombre in inputs_simulation:
-                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
-                boton.setObjectName(nombre)
-                self.dlg_calibration.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
+                if self.check_if_input_present_in_master(nombre,project_df):
+                    boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
+                    boton.setObjectName(nombre)
+                    self.dlg_calibration.verticalLayout_2.addWidget(boton)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    boton.setSizePolicy(política_tamaño)
+                    boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
     
     def annagnps_parameters(self, parameters):
         #Metod to add parameters in the dialog depending on input selection
