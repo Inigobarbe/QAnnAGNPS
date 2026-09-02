@@ -1520,8 +1520,8 @@ class qannagnps():
         #Asignar los valores de los control files a los diálogos
         self.asignar_valores_control_dialogo()
         #Poner el nombre de la carpeta en los outputs
-        self.output.lineEdit.setText(self.direccion+r"\INPUTS")
-        self.output.lineEdit_2.setText(self.direccion)
+        self.output.lineEdit.setText(self.direccion+r"\Processing_outputs")
+        self.output.lineEdit_2.setText(self.direccion+r"\Preprocessing_outputs")
         #Update existing control files
         self.show_existing_control_files()
     
@@ -1598,8 +1598,8 @@ class qannagnps():
         #Make project directory
         self.direccion = str(self.dlg.project.text())+"\\"+self.dlg.name_of_project.text()
         #Poner el nombre de la carpeta en los outputs
-        self.output.lineEdit.setText(self.direccion+r"\INPUTS")
-        self.output.lineEdit_2.setText(self.direccion)
+        self.output.lineEdit.setText(self.direccion+r"\Processing_outputs")
+        self.output.lineEdit_2.setText(self.direccion+r"\Preprocessing_outputs")
         #Pone la dirección del proyecto en las direcciones de las carpetas de los inputs de annagnps
         self.files_directory()
         #Put the epsg of the project
@@ -1755,6 +1755,8 @@ class qannagnps():
             #Here we create a new file
             name_file = self.dic_table_filename[button]
             file_path = self.dic_folder[self.dic_line_table[button]].text()+"/"+name_file
+            #Create folder if it doesn´t exist
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'w', newline='') as csv_file:
                 csv_writer = csv.writer(csv_file)
                 # Get column names from the table
@@ -3674,7 +3676,7 @@ class qannagnps():
             env['PATH'] = f'{self.executable_directory};' + env['PATH']
             command = self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat"
             result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='latin-1', env=env)'''
-
+            
             subprocess.call(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
 
             
@@ -3799,9 +3801,14 @@ class qannagnps():
                 return tipos_suelo_dic
 
             #Pasar de shp a gpkg
+            crs = QgsVectorLayer(fichero_suelo, "temp", "ogr").crs()
+            if not crs.isValid():
+                epsg_soil = self.epsg
+            else:
+                epsg_soil = crs.authid()
             e = processing.run("native:reprojectlayer", 
                 {'INPUT':fichero_suelo,
-                'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg),
+                'TARGET_CRS':QgsCoordinateReferenceSystem(epsg_soil),
                 'OPERATION':'+proj=noop','OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
             #Reproyectar celdas al epsg del proyecto
             a = processing.run("gdal:warpreproject", 
@@ -4068,9 +4075,14 @@ class qannagnps():
                 return tipos_suelo_dic
 
             #Pasar de shp a gpkg
+            crs = QgsVectorLayer(fichero_suelo, "temp", "ogr").crs()
+            if not crs.isValid():
+                epsg_soil = self.epsg
+            else:
+                epsg_soil = crs.authid()
             e = processing.run("native:reprojectlayer", 
                 {'INPUT':fichero_suelo,
-                'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg_sensitivity),
+                'TARGET_CRS':QgsCoordinateReferenceSystem(epsg_soil),
                 'OPERATION':'+proj=noop','OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
             #Reproyectar celdas al epsg del proyecto
             a = processing.run("gdal:warpreproject", 
@@ -6213,24 +6225,25 @@ class qannagnps():
             
         
         #Primero se comprueba que existen las capas que estaban en el proyecto guardado. Si no lo están, se añaden. 
-        layers = {"dem":change_direction(project_df[project_df.iloc[:,0]=="dem"].iloc[0,1]),"soil":change_direction(project_df[project_df.iloc[:,0]=="soil_layer"].iloc[0,1]),
-            "use":change_direction(project_df[project_df.iloc[:,0]=="use_layer"].iloc[0,1]),"buffer":change_direction(project_df[project_df.iloc[:,0]=="buffer_layer"].iloc[0,1]),
+        layers = {"dem":change_direction(project_df[project_df.iloc[:,0]=="dem"].iloc[0,1]),"soil_layer":change_direction(project_df[project_df.iloc[:,0]=="soil_layer"].iloc[0,1]),
+            "use_layer":change_direction(project_df[project_df.iloc[:,0]=="use_layer"].iloc[0,1]),"buffer":change_direction(project_df[project_df.iloc[:,0]=="buffer_layer"].iloc[0,1]),
             "vegetation":change_direction(project_df[project_df.iloc[:,0]=="vegetation_layer"].iloc[0,1])}
         #Bucle para añadir capas
         names = {"dem":"dem_name","buffer":"buffer_name","vegetation":"vegetation_name"}
         for i in layers.keys():
-            layer_exists = False
-            for layer in QgsProject.instance().mapLayers().values():
-                if not layers[i]=="nan" and os.path.abspath(layer.source()) == os.path.abspath(layers[i]):
-                    layer_exists = True
-                    break
-            if not layer_exists:
-                if (i == "dem" or i == "buffer" or i == "vegetation" ) and not layers[i]=="nan":
-                    layer = QgsRasterLayer(layers[i],project_df[project_df.iloc[:,0]==names[i]].iloc[0,1])
-                    QgsProject.instance().addMapLayer(layer)
-                elif not layers[i]=="nan":
-                    layer = QgsVectorLayer(layers[i],i)
-                    QgsProject.instance().addMapLayer(layer)
+            if i in project_df.iloc[:,0].values:
+                layer_exists = False
+                for layer in QgsProject.instance().mapLayers().values():
+                    if not layers[i]=="nan" and os.path.abspath(layer.source()) == project_df[project_df.iloc[:,0]==i].iloc[0,1]:
+                        layer_exists = True
+                        break
+                if not layer_exists:
+                    if (i == "dem" or i == "buffer" or i == "vegetation" ) and not layers[i]=="nan":
+                        layer = QgsRasterLayer(layers[i],project_df[project_df.iloc[:,0]==names[i]].iloc[0,1])
+                        QgsProject.instance().addMapLayer(layer)
+                    elif not layers[i]=="nan":
+                        layer = QgsVectorLayer(layers[i],i)
+                        QgsProject.instance().addMapLayer(layer)
         
         #Se añaden al combobox la lista de las capas que hay en qgis. Sino, por ejemplo, cuando no tengo capas y cargo, no hay ninguna capa que elegir en el combobox. 
         #Hacer que el desplegable de las columnas se quede vacío después de las cargas anteriores
@@ -6323,12 +6336,11 @@ class qannagnps():
                     "simulation_directory":self.inputs.l_53}
         for i in load_dict.keys():
             try:
-                load_dict[i].setText(change_direction(str(project_df[project_df.iloc[:,0]==i].iloc[0,1])))
+                load_dict[i].setText(str(project_df[project_df.iloc[:,0]==i].iloc[0,1]))
             except:
                 self.warning_message("Error Loading Project\nThe file you have selected does not have the format or information necessary to upload a project")
                 return 
-        
-                    
+                   
                     
         load_dict = {"AnnAGNPS ID":self.inputs.l_54,
                     "Aquaculture Pond Data":self.inputs.l_2,"Aquaculture Schedule Data":self.inputs.l_24,"Cell Data":self.inputs.l_3,
@@ -9268,9 +9280,14 @@ class Sensitivity_Parallelization(QgsTask):
 
             #Pasar de shp a gpkg
             with qgis_processing_lock: #esto es para que no se use más de un hilo en la paralelización que puede dar problemas en la paralelización. 
+                crs = QgsVectorLayer(fichero_suelo, "temp", "ogr").crs()
+                if not crs.isValid():
+                    epsg_soil = self.epsg
+                else:
+                    epsg_soil = crs.authid()
                 e = processing.run("native:reprojectlayer", 
                     {'INPUT':fichero_suelo,
-                    'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg_sensitivity),
+                    'TARGET_CRS':QgsCoordinateReferenceSystem(epsg_soil),
                     'OPERATION':'+proj=noop','OUTPUT':fichero(f"reproyect_{self.n}")})
             #Reproyectar celdas al epsg del proyecto
             with qgis_processing_lock:
@@ -9968,9 +9985,14 @@ class Calibration_Parallelization(QgsTask):
 
             #Pasar de shp a gpkg
             with qgis_processing_lock: #esto es para que no se use más de un hilo en la paralelización que puede dar problemas en la paralelización. 
+                crs = QgsVectorLayer(fichero_suelo, "temp", "ogr").crs()
+                if not crs.isValid():
+                    epsg_soil = self.epsg
+                else:
+                    epsg_soil = crs.authid()
                 e = processing.run("native:reprojectlayer", 
                     {'INPUT':fichero_suelo,
-                    'TARGET_CRS':QgsCoordinateReferenceSystem(self.epsg_sensitivity),
+                    'TARGET_CRS':QgsCoordinateReferenceSystem(epsg_soil),
                     'OPERATION':'+proj=noop','OUTPUT':fichero(f"reproyect_{self.n}")})
             #Reproyectar celdas al epsg del proyecto
             with qgis_processing_lock:
