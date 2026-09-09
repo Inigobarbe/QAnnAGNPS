@@ -15,7 +15,7 @@
   </property>
   <property name="styleSheet">
    <string notr="true">/* Background color for main window*/
-background-color: #87CEEB
+background-color: #eef1f4
 
 
 </string>

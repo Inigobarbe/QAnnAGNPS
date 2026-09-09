@@ -14,7 +14,7 @@
    <string>Dialog</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">background-color: #87CEEB</string>
+   <string notr="true">background-color: #eef1f4</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">

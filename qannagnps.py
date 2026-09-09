@@ -35,7 +35,6 @@ from qgis.PyQt.QtWidgets import QApplication, QMainWindow, QProgressBar, QLabel,
 from qgis.core import QgsTask, QgsApplication
 from PyQt5.QtGui import QPixmap
 from pathlib import Path
-import seaborn as sns
 
 import subprocess
 import os
@@ -101,6 +100,7 @@ from .ui.calibration import CalibrationDialog
 from .ui.calibration_inputs import calibration_inputs
 from .ui.calibration_results import calibration_results
 from .ui.fiteval_calibration import fiteval_calibration
+from .ui.calibration_progress import CalibrationProgressDialog
 from .ui.scenario_analysis import scenario_analysis
 
 # Initialize Qt resources from file resources.py
@@ -114,6 +114,59 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import threading
 
 qgis_processing_lock = threading.Lock()
+
+#Folder where saved projects live. A module-level constant (instead of only a "self." attribute
+#set in the main class) so the Sensitivity_Parallelization/Calibration_Parallelization task
+#classes (which run in their own worker threads/objects, without access to the main class's
+#instance attributes) can also reach the untouched, original saved-project files when needed -
+#e.g. to compute a parameter shift relative to the true original value instead of whatever is
+#currently in a reused Core_N working copy.
+#Used to be a hardcoded "C:\Projects_QAnnAGNPS": that only existed on the machine that happened to
+#have saved a project there before, so it didn't exist yet - and writing to the root of C:\ often
+#needs admin rights anyway - on any other computer, making the plugin error out immediately on
+#startup (update_saved_projects() lists this folder before the user does anything). The user's
+#home directory always exists and is always writable on every Windows install, with no special
+#privileges needed.
+CARPETA_GUARDAR_PROYECTOS = os.path.join(os.path.expanduser("~"), "QAnnAGNPS_Projects")
+
+#Value told to the Bayesian optimizer (as the value to minimize) for a calibration execution that
+#failed (e.g. AnnAGNPS rejected the sampled parameter combination as out of range). It just needs
+#to be clearly worse than any real objective-function value, so the optimizer learns to steer away
+#from that region instead of the calibration crashing/stalling on one bad combination.
+CALIBRATION_FAILURE_PENALTY = 1e6
+
+#Outputs that can be calibrated. Each entry is (category, key, display label, source, column).
+#"source" says which AnnAGNPS output file/reader to use:
+#  "gaging_station"  -> AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv (watershed-outlet daily table;
+#                       streamflow, sediment, N, P, OC and pesticide loadings all live here)
+#  "ephemeral_gully"  -> AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv (summed across every gully per day)
+#"column" is the column read from that file (for ephemeral_gully, the column that gets summed).
+#Grouped and ordered by category so the calibration dialog lists them together, not interleaved.
+CALIBRATION_OUTPUTS = [
+    ("Streamflow", "streamflow", "Total Streamflow (Mg)", "gaging_station", "Total Streamflow [Mg]"),
+
+    ("Erosion", "erosion_all", "Total Erosion (Mg)", "gaging_station", "Sediment: All: Total [Mg]"),
+    ("Erosion", "erosion_sheet_rill", "Erosion: Sheet & Rill (Mg)", "gaging_station", "Sediment: Sheet & Rill: Total [Mg]"),
+    ("Erosion", "erosion_pond", "Erosion: Pond (Mg)", "gaging_station", "Sediment: Pond: Total [Mg]"),
+    ("Erosion", "erosion_ephemeral_gully", "Erosion: Ephemeral Gully (Mg)", "ephemeral_gully", "Total accumulated volume [Mg]"),
+
+    ("Nitrogen", "nitrogen_total", "Nitrogen: Total (kg)", "gaging_station", "Nitrogen: Total [kg]"),
+    ("Nitrogen", "nitrogen_attached", "Nitrogen: Attached (kg)", "gaging_station", "Nitrogen: Attached [kg]"),
+    ("Nitrogen", "nitrogen_dissolved", "Nitrogen: Dissolved (kg)", "gaging_station", "Nitrogen: Dissolved [kg]"),
+
+    ("Phosphorus", "phosphorus_total", "Phosphorus: Total (kg)", "gaging_station", "Phosphorus: Total [kg]"),
+    ("Phosphorus", "phosphorus_attached_inorganic", "Phosphorus: Attached Inorganic (kg)", "gaging_station", "Phosphorus: Attached Inorganic [kg]"),
+    ("Phosphorus", "phosphorus_attached_organic", "Phosphorus: Attached Organic (kg)", "gaging_station", "Phosphorus: Attached Organic [kg]"),
+    ("Phosphorus", "phosphorus_dissolved", "Phosphorus: Dissolved (kg)", "gaging_station", "Phosphorus: Dissolved [kg]"),
+
+    ("Organic Carbon", "organic_carbon_total", "Organic Carbon: Total (kg)", "gaging_station", "Organic Carbon: Total [kg]"),
+    ("Organic Carbon", "organic_carbon_attached", "Organic Carbon: Attached (kg)", "gaging_station", "Organic Carbon: Attached [kg]"),
+    ("Organic Carbon", "organic_carbon_dissolved", "Organic Carbon: Dissolved (kg)", "gaging_station", "Organic Carbon: Dissolved [kg]"),
+
+    ("Pesticide", "pesticide_total", "Pesticide: Total (kg)", "gaging_station", "Pesticide: Total [kg]"),
+    ("Pesticide", "pesticide_attached", "Pesticide: Attached (kg)", "gaging_station", "Pesticide: Attached [kg]"),
+    ("Pesticide", "pesticide_dissolved", "Pesticide: Dissolved (kg)", "gaging_station", "Pesticide: Dissolved [kg]"),
+]
 
 
 class qannagnps():
@@ -149,6 +202,17 @@ class qannagnps():
     def tr(self, message):
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('EphemeralGully', message)
+
+    def enable_raise_on_show(self,dialog):
+        """Method to patch a dialog's show() so it also raises the window and gives it focus.
+        Without this, calling .show() on a dialog that is already open but hidden behind other
+        windows does nothing visible, and the user has to find it manually in the taskbar/alt-tab."""
+        original_show = dialog.show
+        def show_and_raise():
+            original_show()
+            dialog.raise_()
+            dialog.activateWindow()
+        dialog.show = show_and_raise
 
     def add_action(
         self,
@@ -217,8 +281,20 @@ class qannagnps():
         self.dlg_calibration_results = calibration_results()
         self.dlg_fiteval_calibration= fiteval_calibration()
         self.dlg_scenario_analysis = scenario_analysis()
-        
-        
+
+        #Make every persistent dialog raise itself and grab focus when shown, so that clicking its
+        #button again brings it back to the front even if it was already open, hidden behind other
+        #windows (plain .show() alone doesn't reliably do that)
+        for dialog in [self.dlg,self.inputs,self.cgeneral,self.ctopagnps,self.cpeg,self.cagbuf,
+                       self.cagwet,self.cconcepts,self.cpothole,self.crasfor,self.craspro,self.dednm,
+                       self.agflow,self.overwrite,self.output,self.existing,self.documentation,
+                       self.sensitivity_dialog,self.dlg_warning_message,self.dlg_overwrite_project,
+                       self.dlg_results_sensitivity,self.dlg_figure_settings,self.dlg_calibration,
+                       self.dlg_calibration_inputs,self.dlg_calibration_results,
+                       self.dlg_fiteval_calibration,self.dlg_scenario_analysis]:
+            self.enable_raise_on_show(dialog)
+
+
         #Boton principal
         icon_path = ':/plugins/qannagnps/images/logo.svg'
         icon_size = QSize(100, 100)
@@ -296,12 +372,8 @@ class qannagnps():
         self.dlg.calibration.clicked.connect(self.dlg_calibration.show)
         self.dlg.calibration_results.clicked.connect(self.dlg_calibration_results.show)
         self.dlg_calibration_results.bootstraping.clicked.connect(self.calibration_bootstraping_show)
-        self.dlg_calibration.runoff_push.clicked.connect(self.dlg_calibration_inputs.show)
-        self.dlg_calibration.erosion_push.clicked.connect(self.dlg_calibration_inputs.show)
-        self.dlg_calibration.nitrogen_push.clicked.connect(self.dlg_calibration_inputs.show)
-        self.dlg_calibration.carbon_push.clicked.connect(self.dlg_calibration_inputs.show)
-        self.dlg_calibration.phosphorus_push.clicked.connect(self.dlg_calibration_inputs.show)
-        
+        #(the button that opens the observed-data dialog, "observed_push", is connected in setup_calibration_ui_enhancements)
+
         
         #Open scenario analysis
         self.dlg.scenario.clicked.connect(self.dlg_scenario_analysis_show)
@@ -330,7 +402,11 @@ class qannagnps():
         self.dlg_calibration_results.results.textChanged.connect(self.update_graph_calibration_results)
         self.dlg_calibration_results.graph_fit.toggled.connect(lambda checked: self.update_graph_calibration_results() if checked else None)
         self.dlg_calibration_results.one_one.toggled.connect(lambda checked: self.update_graph_calibration_results() if checked else None)
-        
+
+        #Modern "control panel" visual style for the calibration dialogs + objective metric selector
+        self.setup_calibration_ui_enhancements()
+
+
         
         #Cambiar el nombre en el control file de AGBUF.csv de las columnas Buffer y Vegetation al seleccionar una capa
         self.dlg.comboBox_2.currentIndexChanged.connect(self.buffer_nombre)
@@ -537,7 +613,11 @@ class qannagnps():
         self.inputs.change_s.clicked.connect(lambda _,b="simulation": self.change_directory_input(b))
         
         #Botón para guardar proyecto
-        self.carpeta_guardar_proyectos = "C:\\Projects_QAnnAGNPS"
+        self.carpeta_guardar_proyectos = CARPETA_GUARDAR_PROYECTOS
+        #Make sure this folder exists from the very start (before update_saved_projects() below,
+        #or anything else, ever tries to list it) - on a brand new computer this is the first
+        #time it's ever referenced, so nothing has created it yet
+        Path(self.carpeta_guardar_proyectos).mkdir(parents=True, exist_ok=True)
         self.dlg.pb_save.clicked.connect(lambda _,b=False: self.save_project(b))
         
         #Boton sobreescribir proyecto
@@ -692,11 +772,20 @@ class qannagnps():
         #Search inputs in sensitivity analysis and calibration
         self.sensitivity_dialog.search.textChanged.connect(self.search_sensitiviy_input)
         self.dlg_calibration.search.textChanged.connect(self.search_calibration_input)
-        
+
+        #When "Curve Number Shift" is the selected parameter, its row is picked by Curve_Number_ID
+        #from a dropdown instead of typed as a plain row index - preview the resulting parameter
+        #name (e.g. "Curve Number Shift__Arado") live as the user changes that dropdown's selection
+        self.sensitivity_dialog.row_curve_number.currentTextChanged.connect(
+            lambda text: self.sensitivity_dialog.parameter.setText(f"Curve Number Shift__{text}" if text else "Curve Number Shift"))
+        self.dlg_calibration.row_curve_number.currentTextChanged.connect(
+            lambda text: self.dlg_calibration.parameter.setText(f"Curve Number Shift__{text}" if text else "Curve Number Shift"))
+
+
         #Diccionario analisis de sensibilidad nombre en el dialogo - [nombre del archivo, nombre de la columna]
         dic_spatial = {'Pixel Size':['Spatial','TOPAGNPS.csv','FILENAME'],'Critical Source Area':['Spatial','TOPAGNPS.csv','CSA'],'Minimum Source Channel \nLength':['Spatial','TOPAGNPS.csv','MSCL'],'Absolute CTI':['Spatial','PEG.csv','CTI_value'],'Relative CTI':['Spatial','PEG.csv','Accum_pct'],'Cell Threshold':['Spatial','AGBUF.csv','C_THRESHOLD'],'Reach Threshold':['Spatial','AGBUF.csv','R_THRESHOLD'],'Drainage area \nto concentrated flow':['Spatial','AGFLOW.csv','Area'],'Maximum profile length \nuntil deposition':['Spatial','AGFLOW.csv','Length'],'Maximum Profile Slope':['Spatial','AGFLOW.csv','MxSlope'],'Wetness Index Threshold':['Spatial','AGWET.csv','WI_Threshold'],'Erosion Index Threshold':['Spatial','AGWET.csv','Erosion_Index_Threshold'],'Drainage Area Threshold':['Spatial','AGWET.csv','DA_Threshold'],'Maximum Wetland Ratio':['Spatial','AGWET.csv','Max_Wetland_Ratio'],'Minimum Wetland Ratio':['Spatial','AGWET.csv','Min_Wetland_Ratio'],'Barrier Height':['Spatial','AGWET.csv','Barrier_Height'],'Barrier Height Increment':['Spatial','AGWET.csv','Barrier_Height_Increment'],'Barrier Height Maximum':['Spatial','AGWET.csv','Barrier_Height_Max'],'Buffer width':['Spatial','AGWET.csv','Buffer_Width'],'Pothole Surface Area':['Spatial','POTHOLE.csv','POTHOLE_SURFACE_AREA']}
         dic_watershed = {'Pond area':[self.inputs.l_2,'Pond_Area'],'Pond Depth':[self.inputs.l_2,'Pond_Depth'],'Seepage Rate':[self.inputs.l_2,'Seepage_Rate'],'Sediment Delivery Ratio Pond':[self.inputs.l_2,'Sediment_Delivery_Ratio'],'Organic Carbon \nCalibration Factor Pond':[self.inputs.l_2,'OC_Calib_Fctr'],'Nitrogen Calibration Factor Pond':[self.inputs.l_2,'N_Calib_Fctr'],'Phosphorus Calibration Factor Pond':[self.inputs.l_2,'P_Calib_Fctr'],'Erosion Calibration Factor Pond':[self.inputs.l_2,'Erosion_Calib_Fctr'],'Sheet flow Manning’s n':[self.inputs.l_3,'Sheet_Flow_Mannings_n'],'Concentrated flow \nhydraulic depth':[self.inputs.l_3,'Conc_Flow_Hydraulic_Depth'],'Concentrated flow Manning’s n':[self.inputs.l_3,'Conc_Flow_Mannings_n'],'Delivery Ratio Pond':[self.inputs.l_3,'Delivery_Ratio'],'Constant USLE C factor':[self.inputs.l_3,'Constant_USLE_C_Fctr'],'Constant USLE P factor':[self.inputs.l_3,'Constant_USLE_P_Fctr'],'All Organic Carbon \nCalibration Factor':[self.inputs.l_3,'All_OC_Calib_Fctr'],'All Nitrogen Calibration Factor':[self.inputs.l_3,'All_N_Calib_Fctr'],'All Phosphorus Calibration Factor':[self.inputs.l_3,'All_P_Calib_Fctr'],'Sheet and Rill Erosion \nCalibration Factor':[self.inputs.l_3,'Sheet_and_Rill_Erosion_Calib_Fctr'],'Gullies Erosion Calibration Factor':[self.inputs.l_3,'Gullies_Erosion_Calib_Fctr'],'Head Cut Depth':[self.inputs.l_4,'Headcut_Depth'],'Erosion Coefficient':[self.inputs.l_4,'Erosion_Coef'],'Erosion Exponent':[self.inputs.l_4,'Erosion_exp'],'Delivery Ratio Gully':[self.inputs.l_4,'Delivery_Ratio'],'Organic Carbon \nCalibration Factor Gully':[self.inputs.l_4,'OC_Calib_Fctr'],'Nitrogen Calibration Factor Gully':[self.inputs.l_4,'N_Calib_Fctr'],'Phosphorus Calibration Factor Gully':[self.inputs.l_4,'P_Calib_Fctr'],'Erosion Calibration Factor Gully':[self.inputs.l_4,'Erosion_Calib_Fctr'],'Critical Shear Stress \nEphemeral Gully':[self.inputs.l_5,'Critical_Shear_Stress'],'Erosion Depth':[self.inputs.l_5,'Erosion_Depth'],'Delivery Ratio Ephemeral Gully':[self.inputs.l_5,'Delivery_Ratio'],'Manning’s n Ephemeral Gully':[self.inputs.l_5,'Mannings_n'],'Re Plant Period':[self.inputs.l_5,'Replant_Period'],'Organic Carbon':[self.inputs.l_5,'OC_Calib_Fctr'],'Nitrogen':[self.inputs.l_5,'N_Calib_Fctr'],'Phosphorus':[self.inputs.l_5,'P_Calib_Fctr'],'Erosion':[self.inputs.l_5,'Erosion_Calib_Fctr'],'Headcut detachment leading \ncoefficient a':[self.inputs.l_5,'Headcut_Dtach/Erod_Coef_a'],'Headcut erodibility \nleading coefficient a':[self.inputs.l_5,'Headcut_Dtach/Erod_Coef_a'],'Headcut detachment exponent \ncoefficient b':[self.inputs.l_5,'Headcut_Dtach/Erod_Exp_Coef_b'],'Headcut erodibility exponent \ncoefficient b':[self.inputs.l_5,'Headcut_Dtach/Erod_Exp_Coef_b'],'Maximum Buffer Trapping \nEfficiency TE m':[self.inputs.l_5,'Max_Trapping_Efficiency'],'Open Area':[self.inputs.l_6,'Open_Area'],'Paved Ratio':[self.inputs.l_6,'Paved_Ratio'],'Roof Area':[self.inputs.l_6,'Roof_Area'],'Upslope Area':[self.inputs.l_6,'Upslope_Area'],'Feedlot Initial N':[self.inputs.l_6,'Initial_N'],'Feedlot Initial P':[self.inputs.l_6,'Initial_P'],'Feedlot Initial OrgC':[self.inputs.l_6,'Initial_OC'],'Delta N':[self.inputs.l_6,'Delta_N'],'Delta P':[self.inputs.l_6,'Delta_P'],'Delta OrgC':[self.inputs.l_6,'Delta_OC'],'Feedlot Max N':[self.inputs.l_6,'Max_N'],'Feedlot Max P':[self.inputs.l_6,'Max_P'],'Feedlot Max OrgC':[self.inputs.l_6,'Max_OC'],'Feedlot Pack N':[self.inputs.l_6,'Pack_N'],'Feedlot Pack P':[self.inputs.l_6,'Pack_P'],'Feedlot Pack OrgC':[self.inputs.l_6,'Pack_OC'],'Organic Carbon Calibration \nFactor Feedlot':[self.inputs.l_6,'OC_Calib_Fctr'],'Nitrogen Calibration \nFactor Feedlot':[self.inputs.l_6,'N_Calib_Fctr'],'Phosphorus Calibration \nFactor Feedlot':[self.inputs.l_6,'P_Calib_Fct'],'Erosion Calibration \nFactor Feedlot':[self.inputs.l_6,'Erosion_Calib_Fctr'],'Cell Buffer Length':[self.inputs.l_6,'Cell_Buffer_Length'],'Field Pond area':[self.inputs.l_7,'Pond_Area'],'Number of rotation years':[self.inputs.l_7,'Number_of_Rotation_Years'],'Number gate operations':[self.inputs.l_7,'Number_of_Gate_Operations'],'Delivery Ratio Field Pond':[self.inputs.l_7,'Delivery_Ratio'],'Volume of release water':[self.inputs.l_7,'Volume_of_Release_Water'],'Drain Time':[self.inputs.l_7,'Drain_Time'],'Release rate':[self.inputs.l_7,'Release_Rate'],'Sediment Concentration':[self.inputs.l_7,'Sediment_Conc'],'Clay content Field Pond':[self.inputs.l_7,'Clay_Content'],'Silt content Field Pond':[self.inputs.l_7,'Silt_Content'],'Organic Carbon Calibration Factor Field Pond':[self.inputs.l_7,'OC_Calib_Fctr'],'Nitrogen Calibration Factor Field Pond':[self.inputs.l_7,'N_Calib_Fctr'],'Phosphorus Calibration Factor Field Pond':[self.inputs.l_7,'P_Calib_Fctr'],'Erosion Calibration Factor Field Pond':[self.inputs.l_7,'Erosion_Calib_Fctr'],'Impoundment Infiltration':[self.inputs.l_8,'Infiltration'],'Impoundment Seepage':[self.inputs.l_8,'Seepage'],'Permanent Pool Depth':[self.inputs.l_8,'Permanent_Pool_Depth'],'Impound Volume Coefficient':[self.inputs.l_8,'Volume_Coef'],'Impound Volume Exponent':[self.inputs.l_8,'Volume_Exp'],'Impound Discharge Coefficient':[self.inputs.l_8,'Discharge_Coef'],'Impound Discharge Exponent':[self.inputs.l_8,'Discharge_Exp'],'Sediment Clean Out Depth':[self.inputs.l_8,'Sed_Clean_Out_Depth'],'Sediment Clean Out Year':[self.inputs.l_8,'Sed_Clean_Out_Year'],'Point Flow':[self.inputs.l_9,'Point_Flow'],'Point Nitrogen':[self.inputs.l_9,'Point_N'],'Point Phosphorus':[self.inputs.l_9,'Point_P'],'Point Organic Carbon':[self.inputs.l_9,'Point_OC'],'Organic Carbon Calibration Factor':[self.inputs.l_9,'OC_Calib_Fctr'],'Nitrogen Calibration Factor':[self.inputs.l_9,'N_Calib_Fctr'],'Phosphorus Calibration Factor':[self.inputs.l_9,'P_Calib_Fctr'],'Erosion Calibration Factor':[self.inputs.l_9,'Erosion_Calib_Fctr'],'Reach Manning’s n':[self.inputs.l_10,'Mannings_n'],'Reach Flow Depth':[self.inputs.l_10,'Flow_Depth'],'Valley Width':[self.inputs.l_10,'Valley_Width'],'Valley n':[self.inputs.l_10,'Valley_Mannings_n'],'Delivery Ratio Reach':[self.inputs.l_10,'Delivery_Ratio'],'Latitude':[self.inputs.l_12,'Latitude'],'Longitude':[self.inputs.l_12,'Longitude'],'Wetland Area':[self.inputs.l_13,'Wetland_Area'],'Initial Water Depth':[self.inputs.l_13,'Initial_Water_Depth'],'Minimum Water Depth':[self.inputs.l_13,'Min_Water_Depth'],'Maximum Water Depth':[self.inputs.l_13,'Max_Water_Depth'],'Water Temperature':[self.inputs.l_13,'Water_Temperature'],'Potential Daily Infiltration':[self.inputs.l_13,'Potential_Daily_Infiltration'],'Weir Coefficient':[self.inputs.l_13,'Weir_Coef'],'Weir Width':[self.inputs.l_13,'Weir_Width'],'Weir Height':[self.inputs.l_13,'Weir_Height'],'Soluble N Concentration':[self.inputs.l_13,'Soluble_N_Conc'],'Nitrate Loss Rate':[self.inputs.l_13,'Nitrate-N_Loss_Rate'],'Nitrate Loss Rate Coefficient':[self.inputs.l_13,'Nitrate-N_Loss_Rate_Coef'],'Temperature Coefficient':[self.inputs.l_13,'Temperature_Coef'],'Weir Exponent':[self.inputs.l_13,'Weir_Exp']}
-        dic_general = {'Maximum Pool Depth':[self.inputs.l_24,'Max_Pool_Depth'],'Minimum Pool Depth':[self.inputs.l_24,'Min_Pool_Depth'],'Fill/Release Volume':[self.inputs.l_24,'Fill/Release_Vol'],'Fill/Drain Time':[self.inputs.l_24,'Fill/Drain_Time'],'Fill/Release Rate':[self.inputs.l_24,'Fill/Release_Rate'],'Fill/Drain All':[self.inputs.l_24,'Fill/Drain_All_Code'],'Total Sediment Concentration':[self.inputs.l_24,'Total_Sed_Conc'],'Clay Content Pond Schedule':[self.inputs.l_24,'Clay_Content'],'Silt Content Pond Schedule':[self.inputs.l_24,'Silt_Content'],'Total Nitrogen':[self.inputs.l_24,'Total_N'],'Dissolved Nitrogen':[self.inputs.l_24,'Dissolved_N'],'Total Phosphorus':[self.inputs.l_24,'Total_P'],'Dissolved Phosphorus':[self.inputs.l_24,'Dissolved_P'],'Sediment Concentration—Winter':[self.inputs.l_24,'Sed_Conc_Winter'],'Total Nitrogen—Winter':[self.inputs.l_24,'Total_N_Winter'],'Dissolved Nitrogen—Winter':[self.inputs.l_24,'Dissolved_N_Winter'],'Total Phosphorus—Winter':[self.inputs.l_24,'Total_P_Winter'],'Dissolved Phosphorus—Winter':[self.inputs.l_24,'Dissolved_P_Winter'],'Sediment Concentration—Spring':[self.inputs.l_24,'Sed_Conc_Spring'],'Total Nitrogen—Spring':[self.inputs.l_24,'Total_N_Spring'],'Dissolved Nitrogen—Spring':[self.inputs.l_24,'Dissolved_N_Spring'],'Total Phosphorus—Spring':[self.inputs.l_24,'Total_P_Spring'],'Dissolved Phosphorus—Spring':[self.inputs.l_24,'Dissolved_P_Spring'],'Sediment Concentration—Summer':[self.inputs.l_24,'Sed_Conc_Summer'],'Total Nitrogen—Summer':[self.inputs.l_24,'Total_N_Summer'],'Dissolved Nitrogen—Summer':[self.inputs.l_24,'Dissolved_N_Summer'],'Total Phosphorus—Summer':[self.inputs.l_24,'Total_P_Summer'],'Dissolved Phosphorus—Summer':[self.inputs.l_24,'Dissolved_P_Summer'],'Sediment Concentration—Autumn':[self.inputs.l_24,'Sed_Conc_Autumn'],'Total Nitrogen—Autumn':[self.inputs.l_24,'Total_N_Autumn'],'Dissolved Nitrogen—Autumn':[self.inputs.l_24,'Dissolved_N_Autumn'],'Total Phosphorus—Autumn':[self.inputs.l_24,'Total_P_Autumn'],'Dissolved Phosphorus—Autumn':[self.inputs.l_24,'Dissolved_P_Autumn'],'Furrow Slope':[self.inputs.l_25,'Furrow_Slope'],'Yield Units Harvested per Area':[self.inputs.l_26,'Yield_Units_Harvested'],'Residue Mass Ratio':[self.inputs.l_26,'Residue_Mass_Ratio'],'Surface decomposition Crop':[self.inputs.l_26,'Surface_Decomp'],'Sub-surface decomposition Crop':[self.inputs.l_26,'Subsurface_Decomp'],'USLE C-Factor Crop':[self.inputs.l_26,'USLE_C_Fctr'],'Moisture Depletion':[self.inputs.l_26,'Moisture_Depletion'],'Crop Residue_30%':[self.inputs.l_26,'Crop_Residue_30%'],'Crop Residue_60%':[self.inputs.l_26,'Crop_Residue_60%'],'Crop Residue_90%':[self.inputs.l_26,'Crop_Residue_90%'],'Yield Unit Mass':[self.inputs.l_26,'Yield_Unit_Mass'],'Harvest C-N Ratio':[self.inputs.l_26,'Harvest_CN_Ratio'],'N Uptake':[self.inputs.l_26,'N_Uptake'],'P Uptake':[self.inputs.l_26,'P_Uptake'],'Harvest C-P Ratio':[self.inputs.l_26,'Harvest_CP_Ratio'],'Growth Time Ini':[self.inputs.l_26,'Growth_Time_Ini'],'Growth Time Dev':[self.inputs.l_26,'Growth_Time_Dev'],'Growth Time Mat':[self.inputs.l_26,'Growth_Time_Mat'],'Basal Crop Coefficient (“Kcb-ini”) crop':[self.inputs.l_26,'Basal_Crop_Coef_Ini'],'Basal Crop Coefficient (“Kcb-mid”) crop':[self.inputs.l_26,'Basal_Crop_Coef_Mid'],'Basal Crop Coefficient (“Kcb-end”) crop':[self.inputs.l_26,'Basal_Crop_Coef_End'],'Root Mass':[self.inputs.l_27,'Root_Mass'],'Canopy Cover':[self.inputs.l_27,'Canopy_Cover'],'Rain Fall Height':[self.inputs.l_27,'Rain_Fall_Height'],'Pack Remove Ratio':[self.inputs.l_28,'Pack_Remove_Ratio'],'Pack Start N':[self.inputs.l_28,'Pack_Start_N'],'Pack Start P':[self.inputs.l_28,'Pack_Start_P'],'Pack Start OrgC':[self.inputs.l_28,'Pack_Start_OC'],'Pack Change N':[self.inputs.l_28,'Pack_Change_N'],'Pack Change P':[self.inputs.l_28,'Pack_Change_P'],'Pack Change OrgC':[self.inputs.l_28,'Pack_Change_OC'],'Fertilizer Rate':[self.inputs.l_29,'Application_Rate'],'Fertilizer Inorganic N':[self.inputs.l_30,'Inorganic_N'],'Fertilizer Organic N':[self.inputs.l_30,'Organic_N'],'Fertilizer Inorganic P':[self.inputs.l_30,'Inorganic_P'],'Fertilizer Organic P':[self.inputs.l_30,'Organic_P'],'Fertilizer Organic Matter':[self.inputs.l_30,'Organic_Matter'],'Delay Time':[self.inputs.l_31,'Delay_Time'],'Water Table':[self.inputs.l_31,'Water_Table'],'Aquifer Saturated \nHydraulic Conductivity':[self.inputs.l_31,'Aquifer_Sat_Hyd_Conduct'],'K-vadose Saturated \nHydraulic Conductivity':[self.inputs.l_31,'Vadose_Sat_Hyd_Conduct'],'Aquifer Porosity':[self.inputs.l_31,'Porosity'],'Aquifer Field Capacity':[self.inputs.l_31,'Field_Capacity'],'Aquifer Specific Yield':[self.inputs.l_31,'Specific_Yield'],'Aquifer Thickness':[self.inputs.l_31,'Thickness'],'Aquifer Soluble Nitrogen':[self.inputs.l_31,'Soluble_N'],'Aquifer Soluble Phosphorus':[self.inputs.l_31,'Soluble_P'],'Channel Length Coefficient':[self.inputs.l_32,'Channel_Length_Coef'],'Channel Length Exponent':[self.inputs.l_32,'Channel_Length_Exp'],'Channel Width Coefficient':[self.inputs.l_32,'Channel_Width_Coef'],'Channel Width Exponent':[self.inputs.l_32,'Channel_Width_Exp'],'Channel Depth Coefficient':[self.inputs.l_32,'Channel_Depth_Coef'],'Channel Depth Exponent':[self.inputs.l_32,'Channel_Depth_Exp'],'Valley Width Coefficient':[self.inputs.l_32,'Valley_Width_Coef'],'Valley Width Exponent':[self.inputs.l_32,'Valley_Width_Exp'],'Cycle Duration':[self.inputs.l_33,'Cycle_Duration'],'Amount Lost':[self.inputs.l_33,'Amount_Lost'],'Application Rate':[self.inputs.l_33,'Application_Rate'],'Tailwater Recovery':[self.inputs.l_33,'Tailwater_Recovery'],'Depletion Lower Limit':[self.inputs.l_33,'Depletion_Lower_Limit'],'Application Amount':[self.inputs.l_33,'Application_Amount'],'Area Fraction':[self.inputs.l_33,'Area_Fraction'],'Interval Number':[self.inputs.l_33,'Interval_Number'],'Interval Days':[self.inputs.l_33,'Interval_Days'],'Chemical Multiple':[self.inputs.l_33,'Chemical_Multiple'],'Sediment Rate':[self.inputs.l_33,'Sediment_Rate'],'Depletion Upper Limit':[self.inputs.l_33,'Depletion_Upper_Limit'],'Percent Rock Cover':[self.inputs.l_34,'Percent_Rock_Cover'],'Random Roughness':[self.inputs.l_34,'Random_Roughness'],'Terrace Horizontal Distance':[self.inputs.l_34,'Terrace_Horizontal_Distance'],'Terrace grade':[self.inputs.l_34,'Terrace_Grade'],'Residue Cover Remaining':[self.inputs.l_35,'Residue_Cover_Remaining'],'Residue Weight Remaining':[self.inputs.l_35,'Residue_Weight_Remaining'],'Area Disturbed':[self.inputs.l_35,'Area_Disturbed'],'Initial Random Roughness':[self.inputs.l_35,'Initial_Random_Roughness'],'Final Random Roughness':[self.inputs.l_35,'Final_Random_Roughness'],'Operation Tillage Depth':[self.inputs.l_35,'Operation_Tillage_Depth'],'Added Surface Residue':[self.inputs.l_35,'Added_Surface_Residue'],'Surface Decomposition \nmanagement':[self.inputs.l_35,'Surface_Decomp'],'Sub-surface Decomposition \nmanagement':[self.inputs.l_35,'Subsurface_Decomp'],'Surface Residue_30%':[self.inputs.l_35,'Surface_Residue_30%'],'Surface Residue_60%':[self.inputs.l_35,'Surface_Residue_60%'],'Surface Residue_90%':[self.inputs.l_35,'Surface_Residue_90%'],'Post Event Manning’s n':[self.inputs.l_36,'Post_Event_Mannings_n'],'Post Event Surface Constant':[self.inputs.l_36,'Post_Event_Surface_Constant'],'Operation Residue Change':[self.inputs.l_36,'Operation_Residue_Change'],'Tile Drain Controlled Depth':[self.inputs.l_36,'Tile_Drain_Controlled_Depth'],'Annual Root Mass':[self.inputs.l_37,'Annual_Root_Mass'],'Annual Cover Ratio':[self.inputs.l_37,'Annual_Cover_Ratio'],'Annual Rain Fall Height':[self.inputs.l_37,'Annual_Rain_Fall_Height'],'Surface Residue Cover':[self.inputs.l_37,'Surface_Cover_Residue'],'USLE C-Factor Non Crop':[self.inputs.l_37,'USLE_C-Fctr'],'Basal Crop Coefficient (“Kcb-mid”) Non Crop':[self.inputs.l_37,'Basal_Crop_Coef_Mid'],'Pesticide Rate':[self.inputs.l_38,'Application_Rate'],'Pesticide Depth':[self.inputs.l_38,'Depth'],'Pesticide Foliage Fraction':[self.inputs.l_38,'Foliage_Fraction'],'Pesticide Soil Fraction':[self.inputs.l_38,'Soil_Fraction'],'Pesticide Solubility':[self.inputs.l_39,'Solubility'],'Pesticide Partition':[self.inputs.l_39,'Partition'],'Pesticide Soil Half-life':[self.inputs.l_39,'Soil_Half-life'],'Pesticide Foliage Half-life':[self.inputs.l_39,'Foliage_Halflife'],'Pesticide Washoff':[self.inputs.l_39,'Washoff'],'Metabolite Transformation':[self.inputs.l_39,'Metabolite_Transformation'],'Pesticide Reach Half-life':[self.inputs.l_39,'Reach_Halflife'],'Reach Nitrogen Half-life':[self.inputs.l_40,'N_Half-life'],'Reach Phosphorus Half-life':[self.inputs.l_40,'P_Half-life'],'Reach Organic Carbon Half-life':[self.inputs.l_40,'OC_Half-life'],'Slope':[self.inputs.l_41,'Buffer_Slope'],'Maximum Trapping \nEfficiency “TE-m”':[self.inputs.l_41,'Max_Trap_Efficiency'],'Effective Buffer Width':[self.inputs.l_41,'Eff_Wdth_Thru_Buffer'],'Effective Concentrated \nFlow Width':[self.inputs.l_41,'Eff_Wdth_Along_Buffer'],'Drainage Area to Upstream \nPortion of Buffer':[self.inputs.l_41,'Drainage_Area_to_Buffer'],'Actual Trapping Efficiency \n“TE-a” Clay':[self.inputs.l_41,'Actual_Trap_Efficiency_Clay'],'Actual Trapping Efficiency \n“TE-a” Silt':[self.inputs.l_41,'Actual_Trap_Efficiency_Silt'],'Actual Trapping Efficiency \n“TE-a” Sand':[self.inputs.l_41,'Actual_Trap_Efficiency_Sand'],'Actual Trapping Efficiency \n“TE-a” Sm Agg':[self.inputs.l_41,'Actual_Trap_Efficiency_Sm_Agg'],'Actual Trapping Efficiency \n“TE-a” Lg Agg':[self.inputs.l_41,'Actual_Trap_Efficiency_Lg_Agg'],'Fraction Trapped “TE-ps” Clay':[self.inputs.l_41,'Fraction_Trapped_Clay'],'Fraction Trapped “TE-ps” Silt':[self.inputs.l_41,'Fraction_Trapped_Silt'],'Fraction Trapped “TE-ps” Sand':[self.inputs.l_41,'Fraction_Trapped_Sand'],'Fraction Trapped “TE-ps” Sm Agg':[self.inputs.l_41,'Fraction_Trapped_Sm_Agg'],'Fraction Trapped “TE-ps” Lg Agg':[self.inputs.l_41,'Fraction_Trapped_Lg_Agg'],'Curve Number “A”':[self.inputs.l_42,'CN_A'],'Curve Number “B”':[self.inputs.l_42,'CN_B'],'Curve Number “C”':[self.inputs.l_42,'CN_C'],'Curve Number “D”':[self.inputs.l_42,'CN_D'],'K-factor':[self.inputs.l_43,'K_Factor'],'Albedo':[self.inputs.l_43,'Albedo'],'Time to consolidation':[self.inputs.l_43,'Time_to_Consolidation'],'Impervious Depth':[self.inputs.l_43,'Impervious_Depth'],'Specific Gravity':[self.inputs.l_43,'Specific_Gravity'],'Layer Depth':[self.inputs.l_44,'Layer_Depth'],'Bulk Density':[self.inputs.l_44,'Bulk_Density'],'Clay Ratio':[self.inputs.l_44,'Clay_Ratio'],'Silt Ratio':[self.inputs.l_44,'Silt_Ratio'],'Sand Ratio':[self.inputs.l_44,'Sand_Ratio'],'Rock Ratio':[self.inputs.l_44,'Rock_Ratio'],'Very Fine Sand Ratio':[self.inputs.l_44,'Very_Fine_Sand_Ratio'],'CaCO3':[self.inputs.l_44,'CaCO3_Content'],'Saturated Conductivity':[self.inputs.l_44,'Saturated_Conductivity'],'Field Capacity':[self.inputs.l_44,'Field_Capacity'],'Wilting Point':[self.inputs.l_44,'Wilting_Point'],'Base Saturation':[self.inputs.l_44,'Base_Saturation'],'Unstable Aggregate Ratio':[self.inputs.l_44,'Unstable_Aggregate_Ratio'],'pH':[self.inputs.l_44,'pH'],'Organic Matter Ratio':[self.inputs.l_44,'Organic_Matter_Ratio'],'Organic N Ratio':[self.inputs.l_44,'Organic_N_Ratio'],'Inorganic N Ratio':[self.inputs.l_44,'Inorganic_N_Ratio'],'Organic P Ratio':[self.inputs.l_44,'Organic_P_Ratio'],'Inorganic P Ratio':[self.inputs.l_44,'Inorganic_P_Ratio'],'P Factor':[self.inputs.l_45,'P_Factor'],'Sediment Delivery Ratio Strip Crop':[self.inputs.l_45,'Delivery_Ratio'],'Drain Rate':[self.inputs.l_46,'Drain_Rate'],'Invert Depth':[self.inputs.l_46,'Invert_Depth']}
+        dic_general = {'Maximum Pool Depth':[self.inputs.l_24,'Max_Pool_Depth'],'Minimum Pool Depth':[self.inputs.l_24,'Min_Pool_Depth'],'Fill/Release Volume':[self.inputs.l_24,'Fill/Release_Vol'],'Fill/Drain Time':[self.inputs.l_24,'Fill/Drain_Time'],'Fill/Release Rate':[self.inputs.l_24,'Fill/Release_Rate'],'Fill/Drain All':[self.inputs.l_24,'Fill/Drain_All_Code'],'Total Sediment Concentration':[self.inputs.l_24,'Total_Sed_Conc'],'Clay Content Pond Schedule':[self.inputs.l_24,'Clay_Content'],'Silt Content Pond Schedule':[self.inputs.l_24,'Silt_Content'],'Total Nitrogen':[self.inputs.l_24,'Total_N'],'Dissolved Nitrogen':[self.inputs.l_24,'Dissolved_N'],'Total Phosphorus':[self.inputs.l_24,'Total_P'],'Dissolved Phosphorus':[self.inputs.l_24,'Dissolved_P'],'Sediment Concentration—Winter':[self.inputs.l_24,'Sed_Conc_Winter'],'Total Nitrogen—Winter':[self.inputs.l_24,'Total_N_Winter'],'Dissolved Nitrogen—Winter':[self.inputs.l_24,'Dissolved_N_Winter'],'Total Phosphorus—Winter':[self.inputs.l_24,'Total_P_Winter'],'Dissolved Phosphorus—Winter':[self.inputs.l_24,'Dissolved_P_Winter'],'Sediment Concentration—Spring':[self.inputs.l_24,'Sed_Conc_Spring'],'Total Nitrogen—Spring':[self.inputs.l_24,'Total_N_Spring'],'Dissolved Nitrogen—Spring':[self.inputs.l_24,'Dissolved_N_Spring'],'Total Phosphorus—Spring':[self.inputs.l_24,'Total_P_Spring'],'Dissolved Phosphorus—Spring':[self.inputs.l_24,'Dissolved_P_Spring'],'Sediment Concentration—Summer':[self.inputs.l_24,'Sed_Conc_Summer'],'Total Nitrogen—Summer':[self.inputs.l_24,'Total_N_Summer'],'Dissolved Nitrogen—Summer':[self.inputs.l_24,'Dissolved_N_Summer'],'Total Phosphorus—Summer':[self.inputs.l_24,'Total_P_Summer'],'Dissolved Phosphorus—Summer':[self.inputs.l_24,'Dissolved_P_Summer'],'Sediment Concentration—Autumn':[self.inputs.l_24,'Sed_Conc_Autumn'],'Total Nitrogen—Autumn':[self.inputs.l_24,'Total_N_Autumn'],'Dissolved Nitrogen—Autumn':[self.inputs.l_24,'Dissolved_N_Autumn'],'Total Phosphorus—Autumn':[self.inputs.l_24,'Total_P_Autumn'],'Dissolved Phosphorus—Autumn':[self.inputs.l_24,'Dissolved_P_Autumn'],'Furrow Slope':[self.inputs.l_25,'Furrow_Slope'],'Yield Units Harvested per Area':[self.inputs.l_26,'Yield_Units_Harvested'],'Residue Mass Ratio':[self.inputs.l_26,'Residue_Mass_Ratio'],'Surface decomposition Crop':[self.inputs.l_26,'Surface_Decomp'],'Sub-surface decomposition Crop':[self.inputs.l_26,'Subsurface_Decomp'],'USLE C-Factor Crop':[self.inputs.l_26,'USLE_C_Fctr'],'Moisture Depletion':[self.inputs.l_26,'Moisture_Depletion'],'Crop Residue_30%':[self.inputs.l_26,'Crop_Residue_30%'],'Crop Residue_60%':[self.inputs.l_26,'Crop_Residue_60%'],'Crop Residue_90%':[self.inputs.l_26,'Crop_Residue_90%'],'Yield Unit Mass':[self.inputs.l_26,'Yield_Unit_Mass'],'Harvest C-N Ratio':[self.inputs.l_26,'Harvest_CN_Ratio'],'N Uptake':[self.inputs.l_26,'N_Uptake'],'P Uptake':[self.inputs.l_26,'P_Uptake'],'Harvest C-P Ratio':[self.inputs.l_26,'Harvest_CP_Ratio'],'Growth Time Ini':[self.inputs.l_26,'Growth_Time_Ini'],'Growth Time Dev':[self.inputs.l_26,'Growth_Time_Dev'],'Growth Time Mat':[self.inputs.l_26,'Growth_Time_Mat'],'Basal Crop Coefficient (“Kcb-ini”) crop':[self.inputs.l_26,'Basal_Crop_Coef_Ini'],'Basal Crop Coefficient (“Kcb-mid”) crop':[self.inputs.l_26,'Basal_Crop_Coef_Mid'],'Basal Crop Coefficient (“Kcb-end”) crop':[self.inputs.l_26,'Basal_Crop_Coef_End'],'Root Mass':[self.inputs.l_27,'Root_Mass'],'Canopy Cover':[self.inputs.l_27,'Canopy_Cover'],'Rain Fall Height':[self.inputs.l_27,'Rain_Fall_Height'],'Pack Remove Ratio':[self.inputs.l_28,'Pack_Remove_Ratio'],'Pack Start N':[self.inputs.l_28,'Pack_Start_N'],'Pack Start P':[self.inputs.l_28,'Pack_Start_P'],'Pack Start OrgC':[self.inputs.l_28,'Pack_Start_OC'],'Pack Change N':[self.inputs.l_28,'Pack_Change_N'],'Pack Change P':[self.inputs.l_28,'Pack_Change_P'],'Pack Change OrgC':[self.inputs.l_28,'Pack_Change_OC'],'Fertilizer Rate':[self.inputs.l_29,'Application_Rate'],'Fertilizer Inorganic N':[self.inputs.l_30,'Inorganic_N'],'Fertilizer Organic N':[self.inputs.l_30,'Organic_N'],'Fertilizer Inorganic P':[self.inputs.l_30,'Inorganic_P'],'Fertilizer Organic P':[self.inputs.l_30,'Organic_P'],'Fertilizer Organic Matter':[self.inputs.l_30,'Organic_Matter'],'Delay Time':[self.inputs.l_31,'Delay_Time'],'Water Table':[self.inputs.l_31,'Water_Table'],'Aquifer Saturated \nHydraulic Conductivity':[self.inputs.l_31,'Aquifer_Sat_Hyd_Conduct'],'K-vadose Saturated \nHydraulic Conductivity':[self.inputs.l_31,'Vadose_Sat_Hyd_Conduct'],'Aquifer Porosity':[self.inputs.l_31,'Porosity'],'Aquifer Field Capacity':[self.inputs.l_31,'Field_Capacity'],'Aquifer Specific Yield':[self.inputs.l_31,'Specific_Yield'],'Aquifer Thickness':[self.inputs.l_31,'Thickness'],'Aquifer Soluble Nitrogen':[self.inputs.l_31,'Soluble_N'],'Aquifer Soluble Phosphorus':[self.inputs.l_31,'Soluble_P'],'Channel Length Coefficient':[self.inputs.l_32,'Channel_Length_Coef'],'Channel Length Exponent':[self.inputs.l_32,'Channel_Length_Exp'],'Channel Width Coefficient':[self.inputs.l_32,'Channel_Width_Coef'],'Channel Width Exponent':[self.inputs.l_32,'Channel_Width_Exp'],'Channel Depth Coefficient':[self.inputs.l_32,'Channel_Depth_Coef'],'Channel Depth Exponent':[self.inputs.l_32,'Channel_Depth_Exp'],'Valley Width Coefficient':[self.inputs.l_32,'Valley_Width_Coef'],'Valley Width Exponent':[self.inputs.l_32,'Valley_Width_Exp'],'Cycle Duration':[self.inputs.l_33,'Cycle_Duration'],'Amount Lost':[self.inputs.l_33,'Amount_Lost'],'Application Rate':[self.inputs.l_33,'Application_Rate'],'Tailwater Recovery':[self.inputs.l_33,'Tailwater_Recovery'],'Depletion Lower Limit':[self.inputs.l_33,'Depletion_Lower_Limit'],'Application Amount':[self.inputs.l_33,'Application_Amount'],'Area Fraction':[self.inputs.l_33,'Area_Fraction'],'Interval Number':[self.inputs.l_33,'Interval_Number'],'Interval Days':[self.inputs.l_33,'Interval_Days'],'Chemical Multiple':[self.inputs.l_33,'Chemical_Multiple'],'Sediment Rate':[self.inputs.l_33,'Sediment_Rate'],'Depletion Upper Limit':[self.inputs.l_33,'Depletion_Upper_Limit'],'Percent Rock Cover':[self.inputs.l_34,'Percent_Rock_Cover'],'Random Roughness':[self.inputs.l_34,'Random_Roughness'],'Terrace Horizontal Distance':[self.inputs.l_34,'Terrace_Horizontal_Distance'],'Terrace grade':[self.inputs.l_34,'Terrace_Grade'],'Residue Cover Remaining':[self.inputs.l_35,'Residue_Cover_Remaining'],'Residue Weight Remaining':[self.inputs.l_35,'Residue_Weight_Remaining'],'Area Disturbed':[self.inputs.l_35,'Area_Disturbed'],'Initial Random Roughness':[self.inputs.l_35,'Initial_Random_Roughness'],'Final Random Roughness':[self.inputs.l_35,'Final_Random_Roughness'],'Operation Tillage Depth':[self.inputs.l_35,'Operation_Tillage_Depth'],'Added Surface Residue':[self.inputs.l_35,'Added_Surface_Residue'],'Surface Decomposition \nmanagement':[self.inputs.l_35,'Surface_Decomp'],'Sub-surface Decomposition \nmanagement':[self.inputs.l_35,'Subsurface_Decomp'],'Surface Residue_30%':[self.inputs.l_35,'Surface_Residue_30%'],'Surface Residue_60%':[self.inputs.l_35,'Surface_Residue_60%'],'Surface Residue_90%':[self.inputs.l_35,'Surface_Residue_90%'],'Post Event Manning’s n':[self.inputs.l_36,'Post_Event_Mannings_n'],'Post Event Surface Constant':[self.inputs.l_36,'Post_Event_Surface_Constant'],'Operation Residue Change':[self.inputs.l_36,'Operation_Residue_Change'],'Tile Drain Controlled Depth':[self.inputs.l_36,'Tile_Drain_Controlled_Depth'],'Annual Root Mass':[self.inputs.l_37,'Annual_Root_Mass'],'Annual Cover Ratio':[self.inputs.l_37,'Annual_Cover_Ratio'],'Annual Rain Fall Height':[self.inputs.l_37,'Annual_Rain_Fall_Height'],'Surface Residue Cover':[self.inputs.l_37,'Surface_Cover_Residue'],'USLE C-Factor Non Crop':[self.inputs.l_37,'USLE_C-Fctr'],'Basal Crop Coefficient (“Kcb-mid”) Non Crop':[self.inputs.l_37,'Basal_Crop_Coef_Mid'],'Pesticide Rate':[self.inputs.l_38,'Application_Rate'],'Pesticide Depth':[self.inputs.l_38,'Depth'],'Pesticide Foliage Fraction':[self.inputs.l_38,'Foliage_Fraction'],'Pesticide Soil Fraction':[self.inputs.l_38,'Soil_Fraction'],'Pesticide Solubility':[self.inputs.l_39,'Solubility'],'Pesticide Partition':[self.inputs.l_39,'Partition'],'Pesticide Soil Half-life':[self.inputs.l_39,'Soil_Half-life'],'Pesticide Foliage Half-life':[self.inputs.l_39,'Foliage_Halflife'],'Pesticide Washoff':[self.inputs.l_39,'Washoff'],'Metabolite Transformation':[self.inputs.l_39,'Metabolite_Transformation'],'Pesticide Reach Half-life':[self.inputs.l_39,'Reach_Halflife'],'Reach Nitrogen Half-life':[self.inputs.l_40,'N_Half-life'],'Reach Phosphorus Half-life':[self.inputs.l_40,'P_Half-life'],'Reach Organic Carbon Half-life':[self.inputs.l_40,'OC_Half-life'],'Slope':[self.inputs.l_41,'Buffer_Slope'],'Maximum Trapping \nEfficiency “TE-m”':[self.inputs.l_41,'Max_Trap_Efficiency'],'Effective Buffer Width':[self.inputs.l_41,'Eff_Wdth_Thru_Buffer'],'Effective Concentrated \nFlow Width':[self.inputs.l_41,'Eff_Wdth_Along_Buffer'],'Drainage Area to Upstream \nPortion of Buffer':[self.inputs.l_41,'Drainage_Area_to_Buffer'],'Actual Trapping Efficiency \n“TE-a” Clay':[self.inputs.l_41,'Actual_Trap_Efficiency_Clay'],'Actual Trapping Efficiency \n“TE-a” Silt':[self.inputs.l_41,'Actual_Trap_Efficiency_Silt'],'Actual Trapping Efficiency \n“TE-a” Sand':[self.inputs.l_41,'Actual_Trap_Efficiency_Sand'],'Actual Trapping Efficiency \n“TE-a” Sm Agg':[self.inputs.l_41,'Actual_Trap_Efficiency_Sm_Agg'],'Actual Trapping Efficiency \n“TE-a” Lg Agg':[self.inputs.l_41,'Actual_Trap_Efficiency_Lg_Agg'],'Fraction Trapped “TE-ps” Clay':[self.inputs.l_41,'Fraction_Trapped_Clay'],'Fraction Trapped “TE-ps” Silt':[self.inputs.l_41,'Fraction_Trapped_Silt'],'Fraction Trapped “TE-ps” Sand':[self.inputs.l_41,'Fraction_Trapped_Sand'],'Fraction Trapped “TE-ps” Sm Agg':[self.inputs.l_41,'Fraction_Trapped_Sm_Agg'],'Fraction Trapped “TE-ps” Lg Agg':[self.inputs.l_41,'Fraction_Trapped_Lg_Agg'],'Curve Number “A”':[self.inputs.l_42,'CN_A'],'Curve Number “B”':[self.inputs.l_42,'CN_B'],'Curve Number “C”':[self.inputs.l_42,'CN_C'],'Curve Number “D”':[self.inputs.l_42,'CN_D'],'Curve Number Shift':[self.inputs.l_42,['CN_A','CN_B','CN_C','CN_D']],'K-factor':[self.inputs.l_43,'K_Factor'],'Albedo':[self.inputs.l_43,'Albedo'],'Time to consolidation':[self.inputs.l_43,'Time_to_Consolidation'],'Impervious Depth':[self.inputs.l_43,'Impervious_Depth'],'Specific Gravity':[self.inputs.l_43,'Specific_Gravity'],'Layer Depth':[self.inputs.l_44,'Layer_Depth'],'Bulk Density':[self.inputs.l_44,'Bulk_Density'],'Clay Ratio':[self.inputs.l_44,'Clay_Ratio'],'Silt Ratio':[self.inputs.l_44,'Silt_Ratio'],'Sand Ratio':[self.inputs.l_44,'Sand_Ratio'],'Rock Ratio':[self.inputs.l_44,'Rock_Ratio'],'Very Fine Sand Ratio':[self.inputs.l_44,'Very_Fine_Sand_Ratio'],'CaCO3':[self.inputs.l_44,'CaCO3_Content'],'Saturated Conductivity':[self.inputs.l_44,'Saturated_Conductivity'],'Field Capacity':[self.inputs.l_44,'Field_Capacity'],'Wilting Point':[self.inputs.l_44,'Wilting_Point'],'Base Saturation':[self.inputs.l_44,'Base_Saturation'],'Unstable Aggregate Ratio':[self.inputs.l_44,'Unstable_Aggregate_Ratio'],'pH':[self.inputs.l_44,'pH'],'Organic Matter Ratio':[self.inputs.l_44,'Organic_Matter_Ratio'],'Organic N Ratio':[self.inputs.l_44,'Organic_N_Ratio'],'Inorganic N Ratio':[self.inputs.l_44,'Inorganic_N_Ratio'],'Organic P Ratio':[self.inputs.l_44,'Organic_P_Ratio'],'Inorganic P Ratio':[self.inputs.l_44,'Inorganic_P_Ratio'],'P Factor':[self.inputs.l_45,'P_Factor'],'Sediment Delivery Ratio Strip Crop':[self.inputs.l_45,'Delivery_Ratio'],'Drain Rate':[self.inputs.l_46,'Drain_Rate'],'Invert Depth':[self.inputs.l_46,'Invert_Depth']}
         dic_climate = {'Station Latitude':[self.inputs.l_48,'Latitude'],'Station Longitude':[self.inputs.l_48,'Longitude'],'Station Elevation':[self.inputs.l_48,'Elevation'],'Adiabatic Air Temperature \nLapse Rate':[self.inputs.l_48,'Temperature_Lapse_Rate'],'Precipitation Nitrogen':[self.inputs.l_48,'Precipitation_N'],'Elevation Difference (1)':[self.inputs.l_48,'1st_Elevation_Difference'],'Elevation Rain Factor (1)':[self.inputs.l_48,'1st_Elevation_Rain_Factor'],'Elevation Difference (2)':[self.inputs.l_48,'2nd_Elevation_Difference'],'Elevation Rain Factor (2)':[self.inputs.l_48,'2nd_Elevation_Rain_Factor'],'2 Yr 24 Hr Precipitation':[self.inputs.l_48,'2_Yr_24_hr_Precipitation'],'Rainfall Calibration or Areal \nCorrection Coefficient':[self.inputs.l_48,'Calibration_or_Areal_Correction_Coefficient'],'Areal Rainfall \nCorrection Exponent':[self.inputs.l_48,'Calibration_or_Areal_Correction_Exponent'],'Minimum interception \nevaporation station':[self.inputs.l_48,'Minimum_Interception_Evaporation'],'Maximum interception \nevaporation station':[self.inputs.l_48,'Maximum_Interception_Evaporation'],'EI_Pct_01':[self.inputs.l_50,'EI_Pct_01'],'EI_Pct_02':[self.inputs.l_50,'EI_Pct_02'],'EI_Pct_03':[self.inputs.l_50,'EI_Pct_03'],'EI_Pct_04':[self.inputs.l_50,'EI_Pct_04'],'EI_Pct_05':[self.inputs.l_50,'EI_Pct_05'],'EI_Pct_06':[self.inputs.l_50,'EI_Pct_06'],'EI_Pct_07':[self.inputs.l_50,'EI_Pct_07'],'EI_Pct_08':[self.inputs.l_50,'EI_Pct_08'],'EI_Pct_09':[self.inputs.l_50,'EI_Pct_09'],'EI_Pct_10':[self.inputs.l_50,'EI_Pct_10'],'EI_Pct_11':[self.inputs.l_50,'EI_Pct_11'],'EI_Pct_12':[self.inputs.l_50,'EI_Pct_12'],'EI_Pct_13':[self.inputs.l_50,'EI_Pct_13'],'EI_Pct_14':[self.inputs.l_50,'EI_Pct_14'],'EI_Pct_15':[self.inputs.l_50,'EI_Pct_15'],'EI_Pct_16':[self.inputs.l_50,'EI_Pct_16'],'EI_Pct_17':[self.inputs.l_50,'EI_Pct_17'],'EI_Pct_18':[self.inputs.l_50,'EI_Pct_18'],'EI_Pct_19':[self.inputs.l_50,'EI_Pct_19'],'EI_Pct_20':[self.inputs.l_50,'EI_Pct_20'],'EI_Pct_21':[self.inputs.l_50,'EI_Pct_21'],'EI_Pct_22':[self.inputs.l_50,'EI_Pct_22'],'EI_Pct_23':[self.inputs.l_50,'EI_Pct_23'],'EI_Pct_24':[self.inputs.l_50,'EI_Pct_24']}
         dic_simulation = {'Headcut detachment leading coefficient (a)':[self.inputs.l_56,'Hdct_Detachment_Coef_a'],'Headcut detachment exponent coefficient (b)':[self.inputs.l_56,'Hdct_Detachment_Exp_Coef_b'],'Headcut erodibility leading coefficient (a)':[self.inputs.l_56,'Hdct_Erodibility_Coef_a'],'Headcut erodibility exponent coefficient (b)':[self.inputs.l_56,'Hdct_Erodibility_Exp_Coef_b'],'Minimum Interception Evaporation Global':[self.inputs.l_56,'Min_Interception_Evaporation'],'Maximum Interception Evaporation Global':[self.inputs.l_56,'Max_Interception_Evaporation'],'Detention Coefficient “a”':[self.inputs.l_56,'Detention_Coef_a'],'Detention Coefficient “b”':[self.inputs.l_56,'Detention_Coef_b'],'RCN Convergence Tolerance':[self.inputs.l_56,'RCN_Convergence_Tolerance'],'RCN Maximum Number of Iterations':[self.inputs.l_56,'RCN_Max_Iterations'],'Available Soil Moisture Ratio for AMC II':[self.inputs.l_56,'Avbl_Soil_Moist_Ratio_AMC_II'],'Maximum Available Sediment Concentration for Sheet Flow':[self.inputs.l_56,'Max_Avbl_Sed_Conc_for_Sht_Flw'],'Maximum Available Sediment Concentration for Concentrated Flow':[self.inputs.l_56,'Max_Avbl_Sed_Conc_for_Conc_Flw'],'Critical Shear Stress':[self.inputs.l_56,'Critical_Shear_Stress'],'Crop Initial Pesticide Amount 1':[self.inputs.l_57,'Crop_Initial_Amount_1'],'Crop Initial Pesticide Amount 2':[self.inputs.l_57,'Crop_Initial_Amount_2'],'Non-crop Initial Pesticide Amount 1':[self.inputs.l_57,'Non-Crop_Initial_Amount_1'],'Non-crop Initial Pesticide Amount 2':[self.inputs.l_57,'Non-Crop_Initial_Amount_2'],'Organic carbon from all sources':[self.inputs.l_58,'OC_All_Sources'],'Organic carbon from sheet & rill':[self.inputs.l_58,'OC_Sheet_and_Rill'],'Organic carbon from feedlot':[self.inputs.l_58,'OC_Feedlot'],'Organic carbon from point source':[self.inputs.l_58,'OC_Point_Source'],'Organic carbon from gully':[self.inputs.l_58,'OC_Gully'],'Organic carbon from pond':[self.inputs.l_58,'OC_Pond'],'Organic carbon from irrigation':[self.inputs.l_58,'OC_Irrigation'],'Nitrogen from all sources':[self.inputs.l_58,'N_All_Sources'],'Nitrogen from sheet & rill':[self.inputs.l_58,'N_Sheet_and_Rill'],'Nitrogen from feedlot':[self.inputs.l_58,'N_Feedlot'],'Nitrogen from point source':[self.inputs.l_58,'N_Point_Source'],'Nitrogen from gully':[self.inputs.l_58,'N_Gully'],'Nitrogen from pond':[self.inputs.l_58,'N_Pond'],'Nitrogen from irrigation':[self.inputs.l_58,'N_Irrigation'],'Phosphorus from all sources':[self.inputs.l_58,'P_All_Sources'],'Phosphorus from sheet & rill':[self.inputs.l_58,'P_Sheet_and_Rill'],'Phosphorus from feedlot':[self.inputs.l_58,'P_Feedlot'],'Phosphorus from point source':[self.inputs.l_58,'P_Point_Source'],'Phosphorus from gully':[self.inputs.l_58,'P_Gully'],'Phosphorus from pond':[self.inputs.l_58,'P_Pond'],'Phosphorus from irrigation':[self.inputs.l_58,'P_Irrigation'],'Sediment from all sources':[self.inputs.l_58,'Sediment_All_Sources'],'Sediment from sheet & rill':[self.inputs.l_58,'Sediment_Sheet_and_Rill'],'Sediment from feedlot':[self.inputs.l_58,'Sediment_Feedlot'],'Sediment from point source':[self.inputs.l_58,'Sediment_Point_Source'],'Sediment from gully':[self.inputs.l_58,'Sediment_Gully'],'Sediment from pond':[self.inputs.l_58,'Sediment_Pond'],'Sediment from irrigation':[self.inputs.l_58,'Sediment_Irrigation'],'Target Average Annual Direct Runoff Load':[self.inputs.l_59,'Target_AA_Direct_Runoff_Load'],'RCN Retention factor':[self.inputs.l_59,'RCN_Retention_Fctr'],'Reach Ratio':[self.inputs.l_59,'Reach_Ratio'],'Available Soil Moisture, AMC-II':[self.inputs.l_59,'Avbl_Soil_Moist_AMC_II'],'Rainfall factor':[self.inputs.l_60,'Rainfall_Fctr'],'10-yr EI':[self.inputs.l_60,'10-Year_EI'],'EI Number':[self.inputs.l_60,'EI_Number'],'Initialization Method Code':[self.inputs.l_60,'Init_Method_Code'],'Inorganic_N_1':[self.inputs.l_61,'Inorganic_N_1'],'Inorganic_N_2':[self.inputs.l_61,'Inorganic_N_2'],'Inorganic_P_1':[self.inputs.l_61,'Inorganic_P_1'],'Inorganic_P_2':[self.inputs.l_61,'Inorganic_P_2'],'Soil_Moisture_1':[self.inputs.l_61,'Soil_Moisture_1'],'Soil_Moisture_2':[self.inputs.l_61,'Soil_Moisture_2'],'Organic_Matter_1':[self.inputs.l_61,'Organic_Matter_1'],'Organic_Matter_2':[self.inputs.l_61,'Organic_Matter_2'],'Organic_N_1':[self.inputs.l_61,'Organic_N_1'],'Organic_N_2':[self.inputs.l_61,'Organic_N_2'],'Organic_P_1':[self.inputs.l_61,'Organic_P_1'],'Organic_P_2':[self.inputs.l_61,'Organic_P_2'],'Surface Residue':[self.inputs.l_61,'Surface_Residue'],'Manning’s n':[self.inputs.l_61,'Mannings_n'],'Snow Depth':[self.inputs.l_61,'Snow_Depth'],'Snow Density':[self.inputs.l_61,'Snow_Density'],'Surface Constant':[self.inputs.l_61,'Surface_Constant']}
         self.dic_name_column = {**dic_spatial,**dic_watershed, **dic_general, **dic_climate, **dic_simulation}
@@ -1138,14 +1227,14 @@ class qannagnps():
             simulated = []
             
             obtain_contenido = True
-            
+
             for k,i in enumerate(lineas):
+                if "Best combination results:" in i:
+                    obtain_contenido = False
+
                 if obtain_contenido:
                     contenido += i
-                
-                if "Nash-Sutcliffe efficiency" in i:
-                    obtain_contenido = False
-                    
+
                 if i[:5]=="date,":
                     for m in range(k+1,len(lineas)):
                         if "Results of each iteration" in lineas[m]:
@@ -1162,23 +1251,28 @@ class qannagnps():
                             simulated.append(float(lineas[m].split(",")[2]))
                         except:
                             simulated.append(0)
-                        
+
             self.dlg_calibration_results.textEdit.setPlainText(contenido)
             #Add the graph
-            if not hasattr(self, 'canvas_calibration_graph'):
+            #IMPORTANT: this attribute name must be distinct from the one used in
+            #update_graph_calibration_inputs (the "Observed data" preview dialog). Both used to
+            #share "canvas_calibration_graph"; once either dialog had been shown, the other one's
+            #`hasattr` check found the canvas already existing (created for the OTHER dialog's
+            #frame) and never created/attached its own, leaving this dialog's graph area empty.
+            if not hasattr(self, 'canvas_calibration_results_graph'):
                 #Create the canvas of the graph
                 # Si no existe, crear el canvas y añadirlo al layout
-                self.canvas_calibration_graph = FigureCanvas(plt.Figure(figsize=(15, 6)))
+                self.canvas_calibration_results_graph = FigureCanvas(plt.Figure(figsize=(15, 6)))
                 # Asignar un layout al QFrame si no tiene uno
                 layout = QVBoxLayout(self.dlg_calibration_results.frame)
                 self.dlg_calibration_results.frame.setLayout(layout)
                 #Add canvas to layout
-                layout.addWidget(self.canvas_calibration_graph)
-            
+                layout.addWidget(self.canvas_calibration_results_graph)
+
             #Add graph
-            self.canvas_calibration_graph.figure.clear()
-            self.ax_calibration_graph = self.canvas_calibration_graph.figure.subplots()
-            
+            self.canvas_calibration_results_graph.figure.clear()
+            self.ax_calibration_graph = self.canvas_calibration_results_graph.figure.subplots()
+
             if self.dlg_calibration_results.one_one.isChecked():
                 self.ax_calibration_graph.scatter(simulated, observed,color = "blue")
                 #1:1 line
@@ -1188,55 +1282,63 @@ class qannagnps():
                 self.ax_calibration_graph.set_ylabel("Observed",size = 12,family="arial",weight = "bold",color = "black")
                 self.ax_calibration_graph.tick_params(axis = "both",colors = "black",labelsize = 9)
 
-                
+
             elif self.dlg_calibration_results.graph_fit.isChecked():
                 self.ax_calibration_graph.plot(times,simulated,label = "Simulated",linewidth=2,zorder = 1)
                 self.ax_calibration_graph.scatter(times,observed,label = "Observed",color = "orange",zorder = 2)
-                
-                
+
+
                 self.ax_calibration_graph.legend()
                 self.ax_calibration_graph.set_xlabel("Time (s)",size = 12,family="arial",weight = "bold",color = "black")
                 self.ax_calibration_graph.set_ylabel("Total streamflow",size = 12,family="arial",weight = "bold",color = "black")
                 self.ax_calibration_graph.tick_params(axis = "both",colors = "black",labelsize = 9)
-            
+
             #Change background color
-            self.canvas_calibration_graph.figure.set_facecolor('#f0f0f0')
+            self.canvas_calibration_results_graph.figure.set_facecolor('#f0f0f0')
             self.ax_calibration_graph.set_facecolor('#f0f0f0')
-            
+
             # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
-            self.canvas_calibration_graph.figure.subplots_adjust(wspace=0.7) #spacing beteween two graphs
-            self.canvas_calibration_graph.figure.subplots_adjust(left=0.2, bottom=0.2)
+            self.canvas_calibration_results_graph.figure.subplots_adjust(wspace=0.7) #spacing beteween two graphs
+            self.canvas_calibration_results_graph.figure.subplots_adjust(left=0.2, bottom=0.2)
             #Draw canvas
-            self.canvas_calibration_graph.draw()
-            
+            self.canvas_calibration_results_graph.draw()
+
             #Save figure
-            self.dlg_calibration_results.print_graph.clicked.connect(lambda _, b= [self.dlg_calibration_results,self.canvas_calibration_graph]:self.figure_settings(b))
+            self.dlg_calibration_results.print_graph.clicked.connect(lambda _, b= [self.dlg_calibration_results,self.canvas_calibration_results_graph]:self.figure_settings(b))
             
     
     
     def update_graph_calibration_inputs(self):
         """Method to update the graph of the inputs of calibration"""
         #Create and clear axis before drawing
-        if not hasattr(self, 'canvas_calibration_graph'):
+        if not hasattr(self, 'canvas_calibration_inputs_graph'):
             # Si no existe, crear el canvas y añadirlo al layout
-            self.canvas_calibration_graph = FigureCanvas(plt.Figure(figsize=(15, 6)))
+            self.canvas_calibration_inputs_graph = FigureCanvas(plt.Figure(figsize=(15, 6)))
             
             # Asignar un layout al QFrame si no tiene uno
             layout = QVBoxLayout(self.dlg_calibration_inputs.frame)
             self.dlg_calibration_inputs.frame.setLayout(layout)
             
             # Añadir el canvas al layout
-            layout.addWidget(self.canvas_calibration_graph)
+            layout.addWidget(self.canvas_calibration_inputs_graph)
         else:
             # Si ya existe, simplemente limpiar el canvas
-            self.canvas_calibration_graph.figure.clear()
+            self.canvas_calibration_inputs_graph.figure.clear()
             
         try:
-                
-            self.ax_calibration_inputs = self.canvas_calibration_graph.figure.subplots()
-            self.canvas_calibration_graph.figure.set_facecolor('#87CEEB') # Fondo exterior
-            self.ax_calibration_inputs.set_facecolor('#87CEEB')
-            
+
+            self.ax_calibration_inputs = self.canvas_calibration_inputs_graph.figure.subplots()
+
+            #Colors matching the modern "control panel" style of the calibration dialogs
+            card_color = '#ffffff'
+            accent_color = '#3f6ea5'
+            accent_fill = '#aecbe3'
+            text_color = '#2c3e50'
+            grid_color = '#d8dee4'
+
+            self.canvas_calibration_inputs_graph.figure.set_facecolor(card_color)
+            self.ax_calibration_inputs.set_facecolor(card_color)
+
             file_path = self.dlg_calibration_inputs.lineEdit.text()
             df = pd.read_csv(file_path, sep=',', header=None)
             if len(df.columns)!=2:
@@ -1249,56 +1351,101 @@ class qannagnps():
             df['value'] = pd.to_numeric(df['value'], errors='coerce')
             df = df.dropna().sort_values('date')
 
-            # 3. Configuración del Gráfico
-            # IMPORTANTE: Usamos .values para evitar el ValueError
-            line_color = '#2C3E50'
-            self.ax_calibration_inputs.plot(
-                df['date'].values, 
-                df['value'].values, 
-                color=line_color, 
-                marker='o', 
-                markersize=4, 
-                linewidth=1.5, 
-                label='Data'
-            )
+            # 3. Agregación temporal (diaria/mensual/anual), según lo elegido en el diálogo
+            time_step = self.calibration_observed_time_step()
+            if time_step == "Monthly":
+                df = df.set_index('date').resample('MS').sum().reset_index()
+            elif time_step == "Annual":
+                df = df.set_index('date').resample('YS').sum().reset_index()
 
-            # 4. Personalización de Ejes (Sin título)
-            self.ax_calibration_inputs.set_ylabel('Observed value', fontsize=12, color='#333333')
-            self.ax_calibration_inputs.set_xlabel('Time', fontsize=12, color='#333333')
+            dates = df['date'].values
+            values = df['value'].values
 
-            # --- ESTILO "AXIS" (MARCO CERRADO) ---
+            # 4. Configuración del Gráfico
+            if time_step == "Daily":
+                #Área rellena bajo la curva
+                self.ax_calibration_inputs.fill_between(dates, values, color=accent_fill, alpha=0.35, zorder=1)
+
+                #Línea principal, con marcadores solo si hay pocos puntos (si no, satura el gráfico)
+                show_markers = len(df) <= 90
+                self.ax_calibration_inputs.plot(
+                    dates,
+                    values,
+                    color=accent_color,
+                    marker='o' if show_markers else None,
+                    markersize=4,
+                    markerfacecolor=card_color,
+                    markeredgecolor=accent_color,
+                    markeredgewidth=1.2,
+                    linewidth=2,
+                    solid_capstyle='round',
+                    zorder=2
+                )
+            else:
+                #Barras para los totales mensuales/anuales, más habituales de leer que una línea
+                if len(dates) > 1:
+                    bar_width = np.median(np.diff(mdates.date2num(dates)))*0.7
+                else:
+                    bar_width = 20 if time_step=="Monthly" else 300
+                self.ax_calibration_inputs.bar(dates, values, width=bar_width, color=accent_color, edgecolor=accent_color, zorder=2)
+
+            # 5. Personalización de Ejes
+            file_name = os.path.basename(file_path)
+            output_label = self.calibration_output_display_label()
+            self.ax_calibration_inputs.set_title(f"Observed data ({time_step}) — {file_name}", fontsize=12, color=text_color, weight='bold', pad=12)
+            self.ax_calibration_inputs.set_ylabel(f"Observed {output_label}", fontsize=11, color=text_color)
+            self.ax_calibration_inputs.set_xlabel('Date', fontsize=11, color=text_color)
+
+            # --- Marco suave, a juego con las tarjetas del diálogo ---
             for spine in self.ax_calibration_inputs.spines.values():
                 spine.set_visible(True)
-                spine.set_color('#333333')
+                spine.set_color(grid_color)
                 spine.set_linewidth(1)
 
-            # Separador de miles
-            self.ax_calibration_inputs.yaxis.set_major_formatter(
-                ticker.FuncFormatter(lambda x, p: format(int(x), ','))
-            )
+            # Separador de miles (solo para valores grandes; si no, se muestran con precisión)
+            def format_y(x,pos):
+                if abs(x)>=1000:
+                    return format(int(x),',')
+                return f"{x:g}"
+            self.ax_calibration_inputs.yaxis.set_major_formatter(ticker.FuncFormatter(format_y))
 
-            # --- CONFIGURACIÓN DEL EJE X ---
-            self.ax_calibration_inputs.xaxis.set_major_locator(mdates.YearLocator())
-            self.ax_calibration_inputs.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
-            self.ax_calibration_inputs.xaxis.set_minor_locator(mdates.MonthLocator())
+            # --- CONFIGURACIÓN DEL EJE X, adaptada al paso temporal y a la duración del periodo observado ---
+            span_days = (df['date'].max() - df['date'].min()).days if len(df)>1 else 0
+            if time_step == "Annual":
+                self.ax_calibration_inputs.xaxis.set_major_locator(mdates.YearLocator())
+                self.ax_calibration_inputs.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+            elif time_step == "Monthly":
+                self.ax_calibration_inputs.xaxis.set_major_locator(mdates.MonthLocator(interval=max(1,round(span_days/365*2))))
+                self.ax_calibration_inputs.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+            elif span_days > 365:
+                self.ax_calibration_inputs.xaxis.set_major_locator(mdates.YearLocator())
+                self.ax_calibration_inputs.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+                self.ax_calibration_inputs.xaxis.set_minor_locator(mdates.MonthLocator())
+            elif span_days > 60:
+                self.ax_calibration_inputs.xaxis.set_major_locator(mdates.MonthLocator())
+                self.ax_calibration_inputs.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+                self.ax_calibration_inputs.xaxis.set_minor_locator(mdates.WeekdayLocator())
+            else:
+                self.ax_calibration_inputs.xaxis.set_major_locator(mdates.AutoDateLocator())
+                self.ax_calibration_inputs.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
 
-            # Estética de Ticks (direction='in' para estilo técnico)
-            self.ax_calibration_inputs.tick_params(axis='x', which='major', length=10, width=1.2, labelsize=11, bottom=True, top=True, direction='in')
-            self.ax_calibration_inputs.tick_params(axis='x', which='minor', length=5, width=0.8, bottom=True, top=True, direction='in')
-            self.ax_calibration_inputs.tick_params(axis='y', which='major', length=6, left=True, right=True, direction='in')
+            # Estética de Ticks
+            self.ax_calibration_inputs.tick_params(axis='x', which='major', length=6, width=1, labelsize=10, colors=text_color, direction='out')
+            self.ax_calibration_inputs.tick_params(axis='y', which='major', length=6, width=1, labelsize=10, colors=text_color, direction='out')
 
             # Rejilla muy sutil
-            self.ax_calibration_inputs.grid(axis='y', linestyle='--', alpha=0.15)
+            self.ax_calibration_inputs.grid(axis='y', linestyle='--', linewidth=0.7, color=grid_color, alpha=0.8, zorder=0)
+            self.ax_calibration_inputs.set_axisbelow(True)
 
             # Ajustar márgenes y dibujar
-            self.canvas_calibration_graph.figure.subplots_adjust(left=0.15, bottom=0.2, right=0.95, top=0.9)
-            self.canvas_calibration_graph.draw()
-            
+            self.canvas_calibration_inputs_graph.figure.subplots_adjust(left=0.1, bottom=0.18, right=0.97, top=0.88)
+            self.canvas_calibration_inputs_graph.draw()
+
         except:
             #If output doesnt exist, then stop with the code
-            self.canvas_calibration_graph.figure.clear()
+            self.canvas_calibration_inputs_graph.figure.clear()
             #If I clear but not .draw() then is changed but only when dialog is maximized or minimized
-            self.canvas_calibration_graph.draw()
+            self.canvas_calibration_inputs_graph.draw()
             return
     
     
@@ -3910,7 +4057,7 @@ class qannagnps():
             #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo PEG.csv
             if path.exists(fichero("PEG.csv")):
                 eg_path = fichero(self.ephemeral_gully_file()) #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
                     layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
@@ -3982,7 +4129,7 @@ class qannagnps():
             #Se aplica el uso al fichero de cárcavas efímeras
             if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
                 eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
                     layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
@@ -4181,7 +4328,7 @@ class qannagnps():
             #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo PEG.csv
             if path.exists(fichero("PEG.csv")):
                 eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
                     layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
@@ -4249,7 +4396,7 @@ class qannagnps():
             #Se aplica el uso al fichero de cárcavas efímeras
             if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
                 eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
                     layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
@@ -4609,38 +4756,47 @@ class qannagnps():
                     return self.inputs.l_47.text()+"/"+input_path
                 elif section == "simulation":
                     return self.inputs.l_53.text()+"/"+input_path
+
+        #Compares two paths ignoring case (Windows filesystems are case-insensitive) so that e.g.
+        #"C:\Proj\climate" and "c:\proj\climate" are correctly treated as the same folder, instead
+        #of os.path.normpath alone (which does NOT fold case) wrongly telling them apart and trying
+        #to copy a file onto itself
+        def misma_ruta(a,b):
+            return os.path.normcase(os.path.normpath(a))==os.path.normcase(os.path.normpath(b))
+
+        #Copies the input file from where it's currently referenced to its Processing_inputs
+        #subfolder, if it isn't already there. Any failure shows both the source and destination
+        #paths plus the actual underlying error, instead of a generic "file not found" that can be
+        #misleading (e.g. a copy-onto-itself raises shutil.SameFileError, not a missing-file error)
+        def copiar_input(f,section):
+            origen = origin_direction(f,section)
+            destino = fichero_input(f,section)
+            if misma_ruta(origen,destino):
+                return
+            try:
+                shutil.copyfile(origen,destino)
+            except shutil.SameFileError:
+                #Same file on disk despite the paths looking different as strings (e.g. differing
+                #case, or one of them using a symlink/junction) - nothing to do
+                pass
+            except Exception as e:
+                self.warning_message(f"Error AnnAGNPS\nCould not copy input file.\nFrom: {origen}\nTo: {destino}\nReason: {e}")
+                self.end_execution = 1
+                return False
+            return True
+
         #Bucle para mover los archivos inputs de AnnAGNPS
         for t in tipes_of_files:
             for f in t:
-                try:
-                    if t == climate_files and os.path.normpath(origin_direction(f,"climate"))!=os.path.normpath(fichero_input(f,"climate")):#esta última condición es porque si no hay que mover el archivo, da error
-                        shutil.copyfile(origin_direction(f,"climate"),fichero_input(f,"climate"))
-                except:
-                    self.warning_message("Error AnnAGNPS\n{} file not found".format(origin_direction(f,"climate")))
-                    self.end_execution = 1
+                if t == climate_files and copiar_input(f,"climate") is False:
                     return
-                try:
-                    if t == general_files and os.path.normpath(origin_direction(f,"general"))!= os.path.normpath(fichero_input(f,"general")):
-                       shutil.copyfile(origin_direction(f,"general"),fichero_input(f,"general"))
-                except:
-                    self.warning_message("Error AnnAGNPS\n{} file not found".format(origin_direction(f,"general")))
-                    self.end_execution = 1
+                if t == general_files and copiar_input(f,"general") is False:
                     return
-                try:
-                    if t == simulation_files and os.path.normpath(origin_direction(f,"simulation"))!=os.path.normpath(fichero_input(f,"simulation")):
-                       shutil.copyfile(origin_direction(f,"simulation"),fichero_input(f,"simulation"))
-                except:
-                    self.warning_message("Error AnnAGNPS\n{} file not found".format(origin_direction(f,"simulation")))
-                    self.end_execution = 1
+                if t == simulation_files and copiar_input(f,"simulation") is False:
                     return
-                try:
-                    if t == watershed_files and os.path.normpath(origin_direction(f,"watershed"))!=os.path.normpath(fichero_input(f,"watershed")):
-                        shutil.copyfile(origin_direction(f,"watershed"),fichero_input(f,"watershed"))
-                except:
-                    self.warning_message("Error AnnAGNPS\n{} file not found".format(origin_direction(f,"watershed")))
-                    self.end_execution = 1
+                if t == watershed_files and copiar_input(f,"watershed") is False:
                     return
-                    
+
         #CREACIÓN DEL ARCHIVO annagnps_master.csv
         def fichero_master(nombre):
             try:
@@ -5915,8 +6071,31 @@ class qannagnps():
             self.dlg_overwrite_project.show()
             self.dlg_overwrite_project.raise_()
             self.dlg_overwrite_project.activateWindow()
-            return 
-        
+            return
+
+        #Progress dialog so the user can see what save_project is doing at each moment (saving can
+        #take a long time when Processing_outputs/Sensitivity_analysis contain a lot of data, and
+        #without this it looks like QGIS has frozen)
+        save_progress_stages = ["Clearing previous saved project data","Writing project settings file",
+            "Copying Preprocessing inputs","Copying Preprocessing outputs","Copying Processing inputs",
+            "Copying Processing outputs","Copying Sensitivity analysis","Updating saved projects list"]
+        save_progress_dlg = QProgressDialog("Preparing to save project...", None, 0, len(save_progress_stages), self.dlg)
+        save_progress_dlg.setWindowModality(Qt.WindowModal)
+        save_progress_dlg.setWindowTitle("Saving project")
+        save_progress_dlg.setMinimumDuration(0)
+        save_progress_dlg.show()
+        QCoreApplication.processEvents()
+
+        def report_save_stage(stage_index, text=None):
+            save_progress_dlg.setValue(stage_index)
+            save_progress_dlg.setLabelText(text if text is not None else save_progress_stages[stage_index])
+            QCoreApplication.processEvents()
+
+        def report_save_item(stage_index, item_index, item_total, item_name):
+            save_progress_dlg.setValue(stage_index)
+            save_progress_dlg.setLabelText(f"{save_progress_stages[stage_index]} ({item_index}/{item_total}):\n{item_name}")
+            QCoreApplication.processEvents()
+
         #Create the folder of the project if it doesn't exist
         Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}").mkdir(parents=True, exist_ok=True)
         
@@ -6039,9 +6218,11 @@ class qannagnps():
                     
         
         #Se elimina todo lo que había dentro de la carpeta
+        report_save_stage(0)
         delete_files_and_folders(name_of_project)
-        
+
         # Se guarda el archivo CSV utilizando la API de QGIS
+        report_save_stage(1)
         file_path = self.carpeta_guardar_proyectos+f"\\{name_of_project}\\{name_of_project}.csv"
         try:
             with open(file_path, 'w') as file:
@@ -6053,22 +6234,25 @@ class qannagnps():
                         file.write(f"{key},{value}\n")
         except:
             iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
+            save_progress_dlg.close()
             return
         
         
         #First we move the inputs of preprocessing
         if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_inputs"):
+            report_save_stage(2)
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_inputs").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
             delete_files_and_folders(f"{name_of_project}\\"+"Preprocessing_inputs")
-            
+
             #First move the files selected in the interface to self.direccion+"\\Preprocessing_inputs"
             self.create_folder_preprocessing_and_move_files()
-            
+
             #Move all files
-            
-            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_inputs"):
+            elementos_preprocessing_inputs = os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_inputs")
+            for idx, elemento in enumerate(elementos_preprocessing_inputs):
+                report_save_item(2, idx+1, len(elementos_preprocessing_inputs), elemento)
                 try:
                     ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_inputs", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_inputs", elemento)
@@ -6081,15 +6265,18 @@ class qannagnps():
                         shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
                 except:
                     pass
-            
+
         #Now the preprocessing outputs
         if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_outputs"):
+            report_save_stage(3)
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_outputs").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
             delete_files_and_folders(f"{name_of_project}\\"+"Preprocessing_outputs")
             #Move all files
-            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_outputs"):
+            elementos_preprocessing_outputs = os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_outputs")
+            for idx, elemento in enumerate(elementos_preprocessing_outputs):
+                report_save_item(3, idx+1, len(elementos_preprocessing_outputs), elemento)
                 try:
                     ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Preprocessing_outputs", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Preprocessing_outputs", elemento)
@@ -6102,21 +6289,24 @@ class qannagnps():
                         shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
                 except:
                     pass
-        
+
         #Now Processing inputs
         if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_inputs"):
+            report_save_stage(4)
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Processing_inputs").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
             delete_files_and_folders(f"{name_of_project}\\"+"Processing_inputs")
-            
+
             #First move the files selected in the interface to self.direccion+"\\Processing_inputs"
             self.direccion = self.dlg.project.text()+f"\\{name_of_folder}"
             self.create_folder_processing_and_move_files()
             self.direccion = self.dlg.project.text()+f"\\{name_of_project}"
-            
+
             #Move all files
-            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_inputs"):
+            elementos_processing_inputs = os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_inputs")
+            for idx, elemento in enumerate(elementos_processing_inputs):
+                report_save_item(4, idx+1, len(elementos_processing_inputs), elemento)
                 try:
                     ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_inputs", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Processing_inputs", elemento)
@@ -6129,15 +6319,18 @@ class qannagnps():
                         shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
                 except:
                     pass
-        
+
         #Processing outputs
         if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_outputs"):
+            report_save_stage(5)
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Processing_outputs").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
             delete_files_and_folders(f"{name_of_project}\\"+"Processing_outputs")
             #Move all files
-            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_outputs"):
+            elementos_processing_outputs = os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_outputs")
+            for idx, elemento in enumerate(elementos_processing_outputs):
+                report_save_item(5, idx+1, len(elementos_processing_outputs), elemento)
                 try:
                     ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Processing_outputs", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Processing_outputs", elemento)
@@ -6148,19 +6341,22 @@ class qannagnps():
                     elif os.path.isdir(ruta_origen):
                         # Copiar carpetas completas
                         shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
-                        
+
                 except:
                     pass
-        
-        
+
+
         #Sensitivity analysis
         if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis"):
+            report_save_stage(6)
             #Create folder
             Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Sensitivity_analysis").mkdir(parents=True, exist_ok=True)
             #We eliminate what is inside
             delete_files_and_folders(f"{name_of_project}\\"+"Sensitivity_analysis")
             #Move all files
-            for elemento in os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis"):
+            elementos_sensitivity_analysis = os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis")
+            for idx, elemento in enumerate(elementos_sensitivity_analysis):
+                report_save_item(6, idx+1, len(elementos_sensitivity_analysis), elemento)
                 try:
                     ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Sensitivity_analysis", elemento)
@@ -6171,12 +6367,15 @@ class qannagnps():
                     elif os.path.isdir(ruta_origen):
                         # Copiar carpetas completas
                         shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
-                        
+
                 except:
                     pass
-        
+
         #Update the available projects in the computer
+        report_save_stage(7)
         self.update_saved_projects()
+        save_progress_dlg.setValue(len(save_progress_stages))
+        save_progress_dlg.close()
         
         
     def load_project(self):
@@ -6186,34 +6385,61 @@ class qannagnps():
         if self.dlg.project.text()=="":
             self.warning_message("Please select a working directory where the files are going to be loaded")
             return
-        
+
+        #Progress dialog so the user can see what load_project is doing at each moment (loading can
+        #take a long time when the saved project has a lot of data, e.g. a Sensitivity_analysis
+        #folder with many Core_N subfolders, and without this it looks like QGIS has frozen)
+        load_progress_stages = ["Reading project settings","Copying project folders","Adding map layers","Loading control file settings"]
+        load_progress_dlg = QProgressDialog("Reading project settings...", None, 0, len(load_progress_stages), self.dlg)
+        load_progress_dlg.setWindowModality(Qt.WindowModal)
+        load_progress_dlg.setWindowTitle("Loading project")
+        load_progress_dlg.setMinimumDuration(0)
+        load_progress_dlg.show()
+        QCoreApplication.processEvents()
+
+        def report_load_stage(stage_index, text=None):
+            load_progress_dlg.setValue(stage_index)
+            load_progress_dlg.setLabelText(text if text is not None else load_progress_stages[stage_index])
+            QCoreApplication.processEvents()
+
+        def report_load_item(stage_index, item_index, item_total, item_name):
+            load_progress_dlg.setValue(stage_index)
+            load_progress_dlg.setLabelText(f"{load_progress_stages[stage_index]} ({item_index}/{item_total}):\n{item_name}")
+            QCoreApplication.processEvents()
+
         #Se abre el archivo
         name_of_project = self.dlg.combo_created_projects.currentText()
         csv_file = self.carpeta_guardar_proyectos +"\\"+name_of_project+"\\"+name_of_project+".csv"
-        
+
         project_df = pd.read_csv(csv_file,encoding = "ISO-8859-1",delimiter=",")
 
         #Se añade el epsg
         QgsProject.instance().setCrs(QgsCoordinateReferenceSystem(str(project_df[project_df.iloc[:,0]=="epsg"].iloc[0,1])))
-        
+
         #Put the name to the project
         self.dlg.name_of_project.setText(name_of_project)
-        
+
         #Move all the folders to the new folder
+        report_load_stage(1)
         origen = Path(self.carpeta_guardar_proyectos +"\\"+name_of_project)
         destino = Path(self.direccion)
-        
-        
+
+
         destino.mkdir(parents=True, exist_ok=True)
-        for carpeta in origen.iterdir():
-            if carpeta.is_dir():
-                shutil.copytree(
-                    carpeta,
-                    destino / carpeta.name,
-                    dirs_exist_ok=True
-                )
-        
-        
+        carpetas_a_copiar = [carpeta for carpeta in origen.iterdir() if carpeta.is_dir()]
+        for idx_carpeta, carpeta in enumerate(carpetas_a_copiar):
+            destino_carpeta = destino / carpeta.name
+            destino_carpeta.mkdir(parents=True, exist_ok=True)
+            elementos = list(carpeta.iterdir())
+            for idx_elemento, elemento in enumerate(elementos):
+                report_load_item(1, idx_carpeta+1, len(carpetas_a_copiar), f"{carpeta.name}\\{elemento.name} ({idx_elemento+1}/{len(elementos)})")
+                if elemento.is_file():
+                    shutil.copy2(elemento, destino_carpeta / elemento.name)
+                elif elemento.is_dir():
+                    shutil.copytree(elemento, destino_carpeta / elemento.name, dirs_exist_ok=True)
+
+        report_load_stage(2)
+
         #Función para pasar de la ruta de la carpeta donde se guarda el proyecto a la carpeta de trabajo cargada
         def change_direction(ruta):
             try:
@@ -6327,19 +6553,29 @@ class qannagnps():
             self.inputs.checkBox_4.setChecked(retrieve_data("riparian_topagpns_provided"))
             self.inputs.checkBox_5.setChecked(retrieve_data("wetland_topagpns_provided"))
         except:
+            load_progress_dlg.close()
             self.warning_message("Error Loading Project\nThe file you have selected does not have the format or information necessary to upload a project")
-            return 
-            
-        
+            return
+
+
         #Inputs de AnnAGNPS
+        report_load_stage(3)
         load_dict = {"watershed_directory":self.inputs.l_1,"general_directory":self.inputs.l_23,"climate_directory":self.inputs.l_47,
                     "simulation_directory":self.inputs.l_53}
         for i in load_dict.keys():
             try:
-                load_dict[i].setText(str(project_df[project_df.iloc[:,0]==i].iloc[0,1]))
+                #The saved value points into the permanent storage folder
+                #(self.carpeta_guardar_proyectos\<project>\Processing_inputs\<section>), not the
+                #live working directory that was just populated above with the actual working copy
+                #of the files. Rebase it the same way change_direction() already does for map
+                #layers ("Processing_inputs\<section>" kept, storage root swapped for self.direccion)
+                #-- otherwise editing an input after loading a project would silently edit the
+                #permanent backup instead of the working copy.
+                load_dict[i].setText(change_direction(str(project_df[project_df.iloc[:,0]==i].iloc[0,1])))
             except:
+                load_progress_dlg.close()
                 self.warning_message("Error Loading Project\nThe file you have selected does not have the format or information necessary to upload a project")
-                return 
+                return
                    
                     
         load_dict = {"AnnAGNPS ID":self.inputs.l_54,
@@ -6382,11 +6618,14 @@ class qannagnps():
             try:
                 load_dict[i].setText(str(retrieve_data(i)))
             except:
+                load_progress_dlg.close()
                 self.warning_message("Error Loading Project\nThe file you have selected does not have the format or information necessary to upload a project")
-                return 
-            
-        
-        
+                return
+
+        load_progress_dlg.setValue(len(load_progress_stages))
+        load_progress_dlg.close()
+
+
     def update_saved_projects(self,update_scenario = True):
         """Method to update the projects that are available in the computer"""
         #In the main windo. 
@@ -6642,7 +6881,7 @@ class qannagnps():
                     boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
         if section == "General":
             inputs_general = ["Management Aquaculture \n Pond Schedule", "Contour", "Crop", "Crop Growth", "Feedlot Management","Fertilizer application", "Fertilizer reference", "Geology", "Hydraulic Geometry", "Irrigation Application", "Management Field", "Management Operation", "Management Schedule", "Non-crop","Pesticide Application", "Pesticide Reference","Reach Nutrient Half-life", "Riparian Buffer", "Runoff Curve", "Soil", "Soil Layers", "Strip Crop", "Tile Drain"]
-            dic = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
+            dic = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”","Curve Number Shift"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
             for nombre in inputs_general:
                 if self.check_if_input_present_in_master(nombre,project_df):
                     boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
@@ -6776,7 +7015,7 @@ class qannagnps():
                     boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
         if section == "General":
             inputs_general = ["Management Aquaculture \n Pond Schedule", "Contour", "Crop", "Crop Growth", "Feedlot Management","Fertilizer application", "Fertilizer reference", "Geology", "Hydraulic Geometry", "Irrigation Application", "Management Field", "Management Operation", "Management Schedule", "Non-crop","Pesticide Application", "Pesticide Reference","Reach Nutrient Half-life", "Riparian Buffer", "Runoff Curve", "Soil", "Soil Layers", "Strip Crop", "Tile Drain"]
-            dic = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
+            dic = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”","Curve Number Shift"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
             for nombre in inputs_general:
                 if self.check_if_input_present_in_master(nombre,project_df):
                     boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
@@ -6875,8 +7114,13 @@ class qannagnps():
             add_element(2,f"mean:{self.sensitivity_dialog.first.text()},stdv:{self.sensitivity_dialog.second.text()}")
         elif distribution == "Normal truncated":
             add_element(2,f"min:{self.sensitivity_dialog.first.text()},max:{self.sensitivity_dialog.second.text()},mean:{self.sensitivity_dialog.third.text()},stdv:{self.sensitivity_dialog.fourth.text()}")
-        #Add row
-        add_element(3,self.sensitivity_dialog.row.text())
+        #Add row (for "Curve Number Shift", translate the chosen Curve_Number_ID name back to its
+        #row index; every other parameter keeps using the plain row field as before)
+        if self.sensitivity_dialog.row_curve_number.isVisible():
+            fila = getattr(self,'sensitivity_curve_number_rows',{}).get(self.sensitivity_dialog.row_curve_number.currentText(),"0")
+            add_element(3,str(fila))
+        else:
+            add_element(3,self.sensitivity_dialog.row.text())
         
         #Update number of samples
         self.change_sensitivity_metod
@@ -6907,8 +7151,13 @@ class qannagnps():
         add_element(1,self.dlg_calibration.first.text())
         #Add maximum
         add_element(2,self.dlg_calibration.second.text())
-        #Add row
-        add_element(3,self.dlg_calibration.row.text())
+        #Add row (for "Curve Number Shift", translate the chosen Curve_Number_ID name back to its
+        #row index; every other parameter keeps using the plain row field as before)
+        if self.dlg_calibration.row_curve_number.isVisible():
+            fila = getattr(self,'calibration_curve_number_rows',{}).get(self.dlg_calibration.row_curve_number.currentText(),"0")
+            add_element(3,str(fila))
+        else:
+            add_element(3,self.dlg_calibration.row.text())
 
     
     
@@ -6934,13 +7183,57 @@ class qannagnps():
         #Update number of samples
         self.change_sensitivity_metod()
     
+    def obtain_curve_number_rows(self,project):
+        """Method to read the Curve_Number_ID -> row index mapping from a saved project's Runoff
+        Curve Number Data file. Used so the "Curve Number Shift" parameter can be picked by its
+        name (e.g. "Arado") instead of by a numeric row index that's hard to identify from the
+        dialog alone. Returns {} if the project or the file can't be read."""
+        try:
+            master_file = self.carpeta_guardar_proyectos+f"\\{project}\\Processing_inputs\\annagnps_master.csv"
+            project_df = pd.read_csv(master_file,encoding="ISO-8859-1",delimiter=",")
+            file_name = project_df[project_df.iloc[:,0]=="Runoff Curve Number Data"].iloc[0,1]
+            file_path = self.carpeta_guardar_proyectos+f"\\{project}\\Processing_inputs\\"+file_name
+            data = pd.read_csv(file_path,encoding="ISO-8859-1",delimiter=",")
+            data.columns = data.columns.str.strip()
+            ids = data["Curve_Number_ID"].astype(str).str.strip().tolist()
+            return {nombre: idx for idx,nombre in enumerate(ids)}
+        except Exception:
+            return {}
+
+    def update_curve_number_shift_widget(self,dlg,project,nombre,curve_number_rows_attr):
+        """Method shared by the sensitivity and calibration dialogs: shows the Curve_Number_ID
+        dropdown (and hides the plain row field) when "Curve Number Shift" is the selected
+        parameter, or the other way around for every other parameter."""
+        if nombre == "Curve Number Shift":
+            rows = self.obtain_curve_number_rows(project)
+            setattr(self,curve_number_rows_attr,rows)
+            dlg.row_curve_number.blockSignals(True)
+            dlg.row_curve_number.clear()
+            dlg.row_curve_number.addItems(list(rows.keys()))
+            dlg.row_curve_number.blockSignals(False)
+            dlg.row.setVisible(False)
+            if hasattr(dlg,'label_row_hint'):
+                dlg.label_row_hint.setVisible(False)
+            dlg.row_curve_number.setVisible(True)
+            #Preview the final parameter name (used as-is when "Add" is clicked) right away
+            primero = dlg.row_curve_number.currentText()
+            dlg.parameter.setText(f"Curve Number Shift__{primero}" if primero else "Curve Number Shift")
+        else:
+            dlg.row.setVisible(True)
+            if hasattr(dlg,'label_row_hint'):
+                dlg.label_row_hint.setVisible(True)
+            dlg.row_curve_number.setVisible(False)
+            dlg.parameter.setText(str(nombre))
+
     def add_parameter_label(self,nombre):
         #Metod to add the parameter to the lineEdit
-        self.sensitivity_dialog.parameter.setText(str(nombre))
-    
+        project = self.sensitivity_dialog.project_sensitivity.currentText()
+        self.update_curve_number_shift_widget(self.sensitivity_dialog,project,nombre,'sensitivity_curve_number_rows')
+
     def add_parameter_label_calibration(self,nombre):
         #Metod to add the parameter to the lineEdit
-        self.dlg_calibration.parameter.setText(str(nombre))
+        project = self.dlg_calibration.project_calibration.currentText()
+        self.update_curve_number_shift_widget(self.dlg_calibration,project,nombre,'calibration_curve_number_rows')
     
     def create_dictionary_sensitivity_analysis(self):
         """Method to create the dictionary of the sensitivity analysis"""
@@ -7026,11 +7319,26 @@ class qannagnps():
             for carpeta in origen.iterdir() :
                 if carpeta.is_dir() and carpeta.name != "Sensitivity_analysis" and carpeta.name != "Calibration":
                     try:
-                        shutil.copytree(
-                            carpeta,
-                            destino / carpeta.name,
-                            dirs_exist_ok=True
-                        )
+                        if carpeta.name in ("Preprocessing_outputs","Processing_outputs"):
+                            #Solo hace falta la carpeta vacía: su contenido se genera durante la
+                            #propia ejecución, copiar lo que hubiera en el proyecto guardado es
+                            #innecesario (y puede haber quedado desactualizado de una ejecución anterior)
+                            (destino / carpeta.name).mkdir(parents=True, exist_ok=True)
+                        elif carpeta.name == "Processing_inputs":
+                            #CSV_Output_Files es una carpeta de salida dentro de Processing_inputs,
+                            #no hace falta copiarla (se regenera en la propia ejecución)
+                            shutil.copytree(
+                                carpeta,
+                                destino / carpeta.name,
+                                dirs_exist_ok=True,
+                                ignore=shutil.ignore_patterns("CSV_Output_Files")
+                            )
+                        else:
+                            shutil.copytree(
+                                carpeta,
+                                destino / carpeta.name,
+                                dirs_exist_ok=True
+                            )
                     except Exception as e:
                         self.end_execution = 1
                         self.warning_message(str(e))
@@ -7136,39 +7444,193 @@ class qannagnps():
                     modify_input("Output Options - EV","EV_P_Yld_Mass",columns,"out_ev")
         
         elif information == "Calibration":
+            #Todos los outputs calibrables (streamflow, sedimento, N, P, OC, pesticidas) viven en un
+            #único fichero (AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv), así que basta con activar
+            #este output, sea cual sea el que se vaya a usar como objetivo de la calibración.
             for core in range(1,self.number_cores+1):
-            
-                if self.dlg_calibration.runoff.isChecked(): 
-                    columns = ["CCHE1D", "CONCEPTS_XML", "Gaging_Station_Hyd", "REMM", "Gaging_Station_Evt"]
-                    modify_input("Output Options - TBL","Gaging_Station_Hyd",columns,"out_tbl")
-                
-                elif self.dlg_calibration.total_erosion.isChecked(): 
-                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-                    modify_input("Output Options - EV","EV_Sed_Yld_Mass",columns,"out_ev")
-                    
-                    
-                elif self.dlg_calibration.nitrogen.isChecked(): 
-                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-                    modify_input("Output Options - EV","EV_N_Yld_Mass",columns,"out_ev")
-                
-                
-                elif self.dlg_calibration.organic.isChecked(): 
-                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-                    modify_input("Output Options - EV","EV_OC_Yld_Mass",columns,"out_ev")
-                
-                elif self.dlg_calibration.phosphorus.isChecked(): 
-                    columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
-                    modify_input("Output Options - EV","EV_P_Yld_Mass",columns,"out_ev")
+                columns = ["CCHE1D", "CONCEPTS_XML", "Gaging_Station_Hyd", "REMM", "Gaging_Station_Evt"]
+                modify_input("Output Options - TBL","Gaging_Station_Hyd",columns,"out_tbl")
         
     
-    def run_calibration(self): 
+    def setup_calibration_ui_enhancements(self):
+        """Method to apply the modern control-panel style to the calibration dialogs and add the objective metric selector"""
+        plugin_directory = os.path.dirname(os.path.realpath(__file__))
+
+        #Objective metric selector, added next to "Tolerance for convergence"
+        self.dlg_calibration.combo_metric = QtWidgets.QComboBox(self.dlg_calibration.frame_8)
+        self.dlg_calibration.combo_metric.addItems(["NSE","RMSE","PBIAS","KGE"])
+        label_metric = QtWidgets.QLabel("Objective metric",self.dlg_calibration.frame_8)
+        label_metric.setFont(self.dlg_calibration.label_6.font())
+        self.dlg_calibration.formLayout.insertRow(5,label_metric,self.dlg_calibration.combo_metric)
+
+        #Build the list of outputs that can be calibrated (CALIBRATION_OUTPUTS), grouped by category
+        self.build_calibration_output_radios(plugin_directory)
+
+        #Icon for the single button that opens the observed-data dialog, and for its browse button
+        icon_document = QIcon(os.path.join(plugin_directory,"images","document.svg"))
+        icon_search = QIcon(os.path.join(plugin_directory,"images","search.svg"))
+        self.dlg_calibration.observed_push.setIcon(icon_document)
+        self.dlg_calibration_inputs.browse.setIcon(icon_search)
+        self.dlg_calibration.observed_push.clicked.connect(lambda: (self.dlg_calibration_inputs.show(), self.dlg_calibration_inputs.raise_()))
+
+        #Refresh the observed-data graph (title/y-axis label) when the output to calibrate changes
+        for output_radio in self.dlg_calibration.output_radios.values():
+            output_radio.toggled.connect(lambda checked: self.update_graph_calibration_inputs() if checked else None)
+
+        #Switch the observed-data graph between daily/monthly/annual aggregation
+        for time_step_radio in [self.dlg_calibration_inputs.daily,self.dlg_calibration_inputs.monthly,
+                                 self.dlg_calibration_inputs.annual]:
+            time_step_radio.toggled.connect(lambda checked: self.update_graph_calibration_inputs() if checked else None)
+
+        #Modern "control panel" style, applied to the 4 calibration dialogs
+        dialogs_card_frames = {
+            self.dlg_calibration: ["frame","frame_4","frame_5","frame_6","frame_7"],
+            self.dlg_calibration_inputs: ["frame"],
+            self.dlg_calibration_results: ["frame_2","frame","frame_4"],
+            self.dlg_fiteval_calibration: ["frame_2","frame_3","frame_4"],
+        }
+        for dialog,card_frames in dialogs_card_frames.items():
+            dialog.setStyleSheet(self.modern_panel_stylesheet(card_frames))
+            for name in card_frames:
+                frame = getattr(dialog,name,None)
+                if frame is not None:
+                    self.apply_card_shadow(frame)
+
+
+    def build_calibration_output_radios(self,plugin_directory):
+        """Method to populate the "Studied Output" list of calibration.ui with one radio button per
+        calibratable output (CALIBRATION_OUTPUTS), grouped under a bold category label, in order"""
+        icons_by_category = {
+            "Streamflow": QIcon(os.path.join(plugin_directory,"images","water.svg")),
+            "Erosion": QIcon(os.path.join(plugin_directory,"images","erosion.svg")),
+            "Nitrogen": QIcon(os.path.join(plugin_directory,"images","nutrient.svg")),
+            "Phosphorus": QIcon(os.path.join(plugin_directory,"images","nutrient.svg")),
+            "Organic Carbon": QIcon(os.path.join(plugin_directory,"images","nutrient.svg")),
+            "Pesticide": QIcon(os.path.join(plugin_directory,"images","nutrient.svg")),
+        }
+
+        layout = self.dlg_calibration.verticalLayout_5
+        container = self.dlg_calibration.scrollAreaWidgetContents_2
+
+        self.dlg_calibration.output_radios = {}
+        current_category = None
+        for category,key,label,source,column in CALIBRATION_OUTPUTS:
+            if category != current_category:
+                current_category = category
+                category_label = QtWidgets.QLabel(category,container)
+                bold_font = QFont()
+                bold_font.setBold(True)
+                category_label.setFont(bold_font)
+                category_label.setStyleSheet("color: #3f6ea5; margin-top: 6px;")
+                layout.addWidget(category_label)
+
+            radio = QtWidgets.QRadioButton(label,container)
+            radio.setIcon(icons_by_category[category])
+            radio.setChecked(key=="streamflow")
+            layout.addWidget(radio)
+            self.dlg_calibration.output_radios[key] = radio
+
+        layout.addStretch()
+
+
+    def modern_panel_stylesheet(self,card_frames):
+        """Method that returns the QSS for the modern 'control panel' style, carding the given QFrame object names"""
+        frame_selector = ", ".join(f"QFrame#{name}" for name in card_frames)
+        return f"""
+            QDialog {{
+                background-color: #eef1f4;
+            }}
+            QLabel {{
+                color: #2c3e50;
+            }}
+            {frame_selector} {{
+                background-color: #ffffff;
+                border: 1px solid #d8dee4;
+                border-radius: 10px;
+            }}
+            QPushButton {{
+                background-color: #3f6ea5;
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 14px;
+            }}
+            QPushButton:hover {{
+                background-color: #335a89;
+            }}
+            QPushButton:pressed {{
+                background-color: #274566;
+            }}
+            QLineEdit, QComboBox {{
+                background-color: #ffffff;
+                border: 1px solid #c3ccd4;
+                border-radius: 5px;
+                padding: 3px 6px;
+            }}
+            QComboBox::drop-down {{
+                border: none;
+            }}
+            QTableWidget {{
+                background-color: #ffffff;
+                border: 1px solid #d8dee4;
+                border-radius: 6px;
+                gridline-color: #e3e7eb;
+            }}
+            QHeaderView::section {{
+                background-color: #eef1f4;
+                padding: 4px;
+                border: none;
+                font-weight: bold;
+                color: #2c3e50;
+            }}
+            QRadioButton, QCheckBox {{
+                spacing: 6px;
+                color: #2c3e50;
+                background-color: transparent;
+            }}
+            QScrollArea {{
+                border: none;
+                background-color: transparent;
+            }}
+        """
+
+
+    def apply_card_shadow(self,frame):
+        """Method to apply a subtle drop shadow to a card-style QFrame"""
+        shadow = QtWidgets.QGraphicsDropShadowEffect(frame)
+        shadow.setBlurRadius(16)
+        shadow.setXOffset(0)
+        shadow.setYOffset(2)
+        shadow.setColor(QColor(0,0,0,40))
+        frame.setGraphicsEffect(shadow)
+
+
+    def run_calibration(self):
         #Metod to run sensitiviy analysis
         self.end_execution = 0
+        self.calibration_stopped_by_user = False
+        self.calibration_error_count = 0
         #If there is not working directory selected then error
         if self.dlg.project.text()=="":
             self.warning_message("Please select a working directory where the files are going to be loaded")
             return
-        
+
+        #Check that an observed data file has been selected before running the calibration
+        #(otherwise pandas fails deep inside check_period_match_observed_simulated_calibration
+        #trying to open an empty path, with a confusing FileNotFoundError instead of a clear message)
+        observed_file_path = self.dlg_calibration_inputs.lineEdit.text()
+        if observed_file_path == "" or not os.path.isfile(observed_file_path):
+            self.warning_message("Please select an observed data file before running the calibration.")
+            return
+
+        #Check that the saved project already has the AnnAGNPS output enabled that the selected
+        #calibration objective needs, so we fail fast with a clear message instead of erroring
+        #mid-run
+        prerequisite_error = self.check_calibration_output_prerequisites()
+        if prerequisite_error:
+            self.warning_message(prerequisite_error)
+            return
+
         #Check if the period of the observed is the same as the simulation
         if self.check_period_match_observed_simulated_calibration():
             self.warning_message("The observed data cover a period that is not simulated. \nPlease make sure that the observed period falls within the simulation period (Simulation period data).")
@@ -7178,39 +7640,59 @@ class qannagnps():
         self.dlg_calibration.close()
         self.dlg.close()
 
-        #Start with the progress bar
-        self.progress_metod("Calibration",start = True)
-        
+        #Start with the calibration progress dialog (shows live progress + a working Stop button)
+        self.dlg_calibration_progress = CalibrationProgressDialog()
+        self.enable_raise_on_show(self.dlg_calibration_progress)
+        self.dlg_calibration_progress.stop_requested.connect(self.stop_calibration_by_user)
+        self.dlg_calibration_progress.set_status("Starting calibration...")
+        self.dlg_calibration_progress.show()
+        QCoreApplication.processEvents()
+
         #Create the dictionary with the input data and the parameter values
-        self.create_dictionary_calibration()        
-        
+        self.create_dictionary_calibration()
+
         #Obtain the number of cores to work with
         self.number_cores = QThreadPool.globalInstance().maxThreadCount() - 1
-        
+
         #Obtener la direccoin de los raster ahora que están en la carpeta de "Sensitivity_analysis"
         self.declare_rasters_sensitivity_analysis("Calibration")
-        
+
         #Move the files from the save project to working directory + name of the project + "Sensitivity_analysis"
-        self.progress_dialog.setLabelText("Moving files to the working directory...")
+        self.dlg_calibration_progress.set_status("Moving files to the working directory...")
+        QCoreApplication.processEvents()
         self.move_files_to_working_directory_sensitivity_analysis("Calibration")
         if self.end_execution:
+            self.dlg_calibration_progress.close()
             return
-        
+
         
         #Modifiy the inputs so that the required output are displayed
         self.modify_input_sensitivity_match_output("Calibration")
-        
-        
+
+
         #Results are obtained
         self.resultados = []
         self.numero_ejecucion = 0
         self.end_execution = False
+
+        #Fresh error log for this calibration run: any execution that fails gets appended here
+        #instead of stopping the whole calibration (see finalizar_tarea_calibration), so a failed
+        #parameter combination doesn't waste a long calibration run. Reset here (not appended
+        #across runs) so errors from a previous calibration don't pile up/confuse a new one.
+        save_name_stem = Path(self.dlg_calibration.file_save.text()).stem
+        self.calibration_error_log_path = self.direccion_sensitivity+f"\\{save_name_stem}_errors.log"
+        try:
+            open(self.calibration_error_log_path,'w',encoding='utf-8-sig').close()
+        except Exception:
+            pass
         
         
         #Check if preprocessing is going to be executed
+        #(i.split("__")[0]: repeated parameters are stored as "Name__1", "Name__2"... in dic_data,
+        #but dic_name_column is only keyed by the original parameter name)
         self.execute_preprocessing_calibration = False
         for i in self.dic_data.keys():
-            if self.dic_name_column[i][0]=="Spatial":
+            if self.dic_name_column[i.split("__")[0]][0]=="Spatial":
                 self.execute_preprocessing_calibration = True
         
         
@@ -7221,10 +7703,16 @@ class qannagnps():
             self.calibration_maximum_executions = int(self.dlg_calibration.trajectories.text())
             self.tareas_pendientes = list(range(self.calibration_maximum_executions))
         except:
+            self.dlg_calibration_progress.close()
             self.warning_message("Please select a number for the maximum iterations")
             return
         self.terminadas = 0
         self.tareas_activas = []
+
+        #Show the total right away, instead of waiting for the first execution to finish
+        self.dlg_calibration_progress.update_progress(0,self.calibration_maximum_executions,0,
+            self.dlg_calibration.combo_metric.currentText(),None,None)
+        QCoreApplication.processEvents()
         
         #Obtener la cantidad de tareas que se ve a hacer en cada ronda
         self.tareas_por_ronda = self.number_cores-1
@@ -7235,12 +7723,24 @@ class qannagnps():
         self.opt = Optimizer(dimensions=espacio, base_estimator="GP")
         self.counter_calibration = 0
         self.counter_calibration_round = 0
+        #How many tasks have been launched in the current round so far - used to give each
+        #parallel task its own distinct point out of self.proximos_inputs (counter_calibration_round
+        #only tracks completions and must not double as "which point", or every task launched in the
+        #same round would end up evaluating the exact same point)
+        self.tareas_lanzadas_ronda = 0
         self.resultados_outputs_calibration = []
+        self.calibration_best_metric_previous_round = None
+        self.calibration_rounds_without_improvement = 0
         self.proximos_inputs = self.opt.ask(n_points=self.tareas_por_ronda)
         self.lanzar_siguiente_calibration()
-    
-            
-    def run_sensitivity_analysis(self): 
+
+        #Reflect the executions launched in the first round
+        self.dlg_calibration_progress.update_progress(0,self.calibration_maximum_executions,
+            len(self.tareas_activas),self.dlg_calibration.combo_metric.currentText(),None,None)
+        QCoreApplication.processEvents()
+
+
+    def run_sensitivity_analysis(self):
         #Metod to run sensitiviy analysis
         self.end_execution = 0
         #If there is not working directory selected then error
@@ -7294,9 +7794,11 @@ class qannagnps():
         
         
         #Check if preprocessing is going to be executed
+        #(i.split("__")[0]: repeated parameters are stored as "Name__1", "Name__2"... in dic_data,
+        #but dic_name_column is only keyed by the original parameter name)
         self.execute_preprocessing_sensitivity = False
         for i in self.dic_data.keys():
-            if self.dic_name_column[i][0]=="Spatial":
+            if self.dic_name_column[i.split("__")[0]][0]=="Spatial":
                 self.execute_preprocessing_sensitivity = True
         
         
@@ -7373,47 +7875,130 @@ class qannagnps():
     
     def finalizar_tarea_calibration(self,task, id_carpeta,n,proximos_inputs,counter_round):
         """Method that will be executed after each execution in AnnAGNPS in the parallelization of the calibration"""
-    
+
         # IMPORTANT: Remove from active list immediately
         if task in self.tareas_activas:
             self.tareas_activas.remove(task)
-            
+
+        # If the user already stopped the calibration, ignore any task that still completes/fails
+        # afterwards (e.g. one whose process was killed but hadn't unblocked yet) instead of
+        # reopening the results file or popping up another warning
+        if getattr(self,"calibration_stopped_by_user",False):
+            return
+
         # Check if the task failed or was canceled
         if task.status() != QgsTask.Complete:
-            # Check if we already cleared the queue (to avoid multiple popups)
-            if len(self.tareas_pendientes) > 0:
-                self.stop_calibration_execution(task)
-            return # Stop this specific execution branch here
-        
+            # A single execution failing (e.g. AnnAGNPS rejects a sampled parameter combination as
+            # out of range) shouldn't stop a whole calibration that might have hours of runs left:
+            # log it to this run's error file and keep going, telling the optimizer a heavy penalty
+            # for that point so it steers away from that region.
+            try:
+                reason = task.error_msg
+            except (RuntimeError, ReferenceError, AttributeError):
+                reason = "Unexpected error (no further details available)."
+            self.log_calibration_error(f"Task {n} (Core_{id_carpeta}): {reason}")
+            self.resultados_outputs_calibration.append(CALIBRATION_FAILURE_PENALTY)
+            self.advance_calibration_after_execution(id_carpeta, None)
+            return
+
         # --- Normal Success Logic ---
         # We save the result
-        resultado = self.obtain_nash_calibration(id_carpeta,proximos_inputs,counter_round)
+        resultado = self.obtain_calibration_metric(id_carpeta,proximos_inputs,counter_round)
+
+        # If reading the required AnnAGNPS output failed (self.end_execution set inside
+        # obtain_calibration_metric, which already showed the specific warning), stop the whole
+        # calibration cleanly here. Unlike an individual execution failing, this means every
+        # remaining execution would fail identically (a required control-file setting isn't
+        # enabled), so continuing would just burn through the whole run for nothing.
+        if self.end_execution:
+            self.tareas_pendientes = []
+            for t in self.tareas_activas[:]:
+                try:
+                    if t:
+                        t.cancel()
+                except (RuntimeError, ReferenceError):
+                    pass
+            self.tareas_activas = []
+            self.dlg_calibration_progress.close()
+            return
+
         self.resultados.append(resultado)
-        
+
+        #Save everything obtained so far to disk, so nothing is lost if the calibration is
+        #stopped/interrupted before reaching the final report
+        self.save_calibration_progress()
+
+        metric = self.dlg_calibration.combo_metric.currentText()
+        last_value = resultado.get(metric)
+        self.advance_calibration_after_execution(id_carpeta, last_value)
+
+
+    def log_calibration_error(self,message):
+        """Append one error to this calibration run's error log (reset fresh at the start of every
+        calibration in run_calibration, so errors from a previous run never mix in). Best-effort:
+        a failure to write here must never itself interrupt the calibration."""
+        self.calibration_error_count = getattr(self,'calibration_error_count',0) + 1
+        try:
+            with open(self.calibration_error_log_path,'a',encoding='utf-8') as f:
+                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
+        except Exception:
+            pass
+
+
+    def advance_calibration_after_execution(self,id_carpeta,last_value):
+        """Shared bookkeeping once one calibration execution (successful or failed) has used up
+        its slot: free its folder, move the round/overall counters forward, launch the next
+        execution(s), and refresh the progress dialog. last_value is the display metric value for
+        a successful execution, or None for a failed one (self.resultados_outputs_calibration has
+        already been given a value to minimize for the optimizer's tell() either way)."""
         self.counter_calibration +=1
         self.counter_calibration_round +=1
-        
+
         # Return folder to pool
         self.carpetas_libres.append(id_carpeta)
-        
-        
+
+        #Metric/best values for the progress dialog (updated further below, once the next
+        #executions have actually been launched)
+        metric = self.dlg_calibration.combo_metric.currentText()
+        best_value = self.best_result_calibration[1].get(metric) if hasattr(self,'best_result_calibration') else None
+
         if self.counter_calibration >= self.calibration_maximum_executions:
             #Se ponen los resultados en un dataframe, se guarda y se calculan los índices de sensibilidad
             self.run_calibration_two()
-        
+            return
+
         elif self.counter_calibration_round >= self.tareas_por_ronda:
             self.counter_calibration_round = 0
-            self.lanzar_siguiente_calibration()
+            self.tareas_lanzadas_ronda = 0
+
+            #Check if the calibration has converged (early stop based on the tolerance for
+            #convergence). Skipped if every execution so far has failed (no best result yet).
+            if hasattr(self,'best_result_calibration') and self.check_calibration_convergence():
+                self.run_calibration_two()
+                return
+
+            #IMPORTANT: tell/ask BEFORE launching the next round, so the tasks about to be created
+            #get self.proximos_inputs already updated to the new points. Launching first (as this
+            #used to do) would start the next round still using the round that was just evaluated,
+            #wasting a full round re-evaluating the same points before the new ones ever get used.
             self.opt.tell(self.proximos_inputs, self.resultados_outputs_calibration)
             self.proximos_inputs = self.opt.ask(n_points=self.tareas_por_ronda)
             self.resultados_outputs_calibration = []
-            
-        
+            self.lanzar_siguiente_calibration()
+
         else:
             # Only launch next if the queue hasn't been emptied by an error
             if self.tareas_pendientes:
                 self.lanzar_siguiente_calibration()
-    
+
+        #Update the progress dialog AFTER launching the next execution(s) above, so "Running now"
+        #reflects what is actually running at this moment instead of a stale count taken right
+        #before the replacement task(s) were launched (which, e.g. in a near-serial run with few
+        #cores, would show 0 for the entire duration of each execution and only jump once it finished)
+        self.dlg_calibration_progress.update_progress(self.counter_calibration,self.calibration_maximum_executions,
+            len(self.tareas_activas),metric,last_value,best_value)
+        QCoreApplication.processEvents()
+
     def check_period_match_observed_simulated_calibration(self):
         """Method to check if observed and simulated periods are the same in the calibration"""
         #Obtain observed date
@@ -7455,16 +8040,205 @@ class qannagnps():
         
     
     
-    def obtain_nash_calibration(self,id_carpeta,proximos_inputs,counter_round):
-        """Method to obtain the objective funciotn value in the calibration"""
+    def calibration_selected_output(self):
+        """Method to obtain the (category, key, label, source, column) tuple for the output currently selected to calibrate"""
+        for category,key,label,source,column in CALIBRATION_OUTPUTS:
+            radio = self.dlg_calibration.output_radios.get(key)
+            if radio is not None and radio.isChecked():
+                return category,key,label,source,column
+        #Fallback (should not normally happen): first option
+        return CALIBRATION_OUTPUTS[0]
+
+
+    def calibration_output_source(self):
+        """Method to obtain the AnnAGNPS output file group ("gaging_station"/"ephemeral_gully") for the output selected to calibrate"""
+        return self.calibration_selected_output()[3]
+
+
+    def calibration_output_column(self):
+        """Method to obtain the column name read (and, for ephemeral gully, summed) for the output selected to calibrate"""
+        return self.calibration_selected_output()[4]
+
+
+    def calibration_output_display_label(self):
+        """Method to obtain a human-readable label for the output currently selected to calibrate"""
+        return self.calibration_selected_output()[2]
+
+
+    def calibration_output_required_message(self):
+        """Method to obtain the message explaining which control-file setting is required for the output selected to calibrate"""
+        if self.calibration_output_source() == "gaging_station":
+            return ("AnnAGNPS_TBL_Gaging_Station_Data_Hyd output not found. \n"
+                    "The column 'Gaging_Station_Hyd' in the project's 'Output Options - TBL' control file must be set to T.")
+        return ("AnnAGNPS_SIM_Ephemeral_Gully_Summary output not found. \n"
+                "Every column in the project's 'Output Options - SIM' control file must be set to T.")
+
+
+    def check_calibration_output_prerequisites(self):
+        """Method to check, before starting the calibration, that the saved project's control files
+        already enable the AnnAGNPS output required for the output currently selected to calibrate.
+        Returns an error message string if a prerequisite is missing, or None if everything is fine."""
+        source = self.calibration_output_source()
+        project = self.dlg_calibration.project_calibration.currentText()
+        processing_inputs = self.carpeta_guardar_proyectos+f"\\{project}\\Processing_inputs"
+        master_file = processing_inputs+r"\annagnps_master.csv"
+
+        try:
+            project_df = pd.read_csv(master_file,encoding="ISO-8859-1",delimiter=",")
+        except Exception:
+            return f"Could not read the project's master file ({master_file}) to check the required outputs."
+
+        name_master = "Output Options - TBL" if source=="gaging_station" else "Output Options - SIM"
+        required_message = self.calibration_output_required_message()
+
+        if name_master not in project_df.iloc[:,0].values:
+            return required_message
+
+        file_path = processing_inputs+"\\"+project_df[project_df.iloc[:,0]==name_master].iloc[0,1]
+        try:
+            data = pd.read_csv(file_path,encoding="ISO-8859-1",delimiter=",")
+            data.columns = data.columns.str.strip()
+        except Exception:
+            return required_message
+
+        if source == "gaging_station":
+            try:
+                value = str(data["Gaging_Station_Hyd"].iloc[0]).strip().upper()
+            except Exception:
+                return required_message
+            if value != "T":
+                return required_message
+        else:
+            values = data.iloc[0].astype(str).str.strip().str.upper()
+            if not (values=="T").all():
+                return required_message
+
+        return None
+
+
+    def parse_annagnps_daily_table(self,fichero):
+        """Generic reader for AnnAGNPS Processing_outputs CSV files: skips any number of metadata rows
+        at the top (this can vary) and starts reading from the row whose first column is
+        "Gregorian Day". Data rows are trimmed/kept to match the header length, so it works whether or
+        not a file's data rows end in an extra trailing comma.
+        Returns the full table as a DataFrame, with a 'date' column added from Year/Month/Day."""
+        with open(fichero) as file:
+            rows = list(csv.reader(file))
+
+        header = None
+        data_rows = []
+        for row in rows:
+            if not row:
+                continue
+            if header is None:
+                if row[0].strip()=="Gregorian Day":
+                    header = [c.strip() for c in row]
+                continue
+            data_rows.append(row[:len(header)])
+
+        if header is None:
+            raise ValueError(f"'Gregorian Day' header row not found in {fichero}")
+
+        df = pd.DataFrame(columns=header,data=data_rows)
+
+        #After the last daily row, AnnAGNPS appends a summary footer ("[mass units]...",
+        #"Average Annual at W/S Outlet,...", "Drainage Area = ,..." etc.) whose Year/Month/Day
+        #columns are blank or non-numeric labels. Drop any row that isn't a real numeric daily row
+        #before converting to int, otherwise the whole read fails with e.g.
+        #"invalid literal for int() with base 10: ''" even though the actual daily data is fine.
+        for col in ['Gregorian Day','Year','Month','Day']:
+            df[col] = pd.to_numeric(df[col].astype(str).str.strip(), errors='coerce')
+        df = df.dropna(subset=['Gregorian Day','Year','Month','Day']).reset_index(drop=True)
+
+        df['date'] = pd.to_datetime({
+            'year': df['Year'].astype(int),
+            'month': df['Month'].astype(int),
+            'day': df['Day'].astype(int),
+        })
+        return df
+
+
+    def read_gaging_station_table(self,core):
+        """Method to read AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv for one Core folder.
+        This single file contains streamflow, sediment, nitrogen, phosphorus, organic carbon and
+        pesticide loadings together, so every "gaging_station"-sourced calibratable output is read from it.
+        Returns the daily rows for the watershed outlet ("OUTLET")."""
+        fichero = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs\\AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"
+        df = self.parse_annagnps_daily_table(fichero)
+        return df[df["Reach ID"].str.strip()=="OUTLET"]
+
+
+    def read_ephemeral_gully_summary(self,core,column):
+        """Method to read AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv for one Core folder, summing the
+        given column (e.g. "Total accumulated volume [Mg]") across every ephemeral gully for each day.
+        Returns a two-column DataFrame ('date','value')."""
+        fichero = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs\\AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv"
+        df = self.parse_annagnps_daily_table(fichero)
+        df[column] = pd.to_numeric(df[column],errors='coerce')
+        return df.groupby('date',as_index=False)[column].sum().rename(columns={column:'value'})
+
+
+    def calibration_observed_time_step(self):
+        """Method to obtain the time step selected for the observed data graph (Daily/Monthly/Annual)"""
+        if self.dlg_calibration_inputs.monthly.isChecked():
+            return "Monthly"
+        if self.dlg_calibration_inputs.annual.isChecked():
+            return "Annual"
+        return "Daily"
+
+
+    def compute_calibration_metric(self,obs,sim,metric):
+        """Method to compute the calibration objective metric. Returns (value shown to the user, value to minimize by the optimizer)"""
+        obs = np.asarray(obs,dtype=float)
+        sim = np.asarray(sim,dtype=float)
+
+        if metric == "NSE":
+            nse = 1 - np.sum((obs - sim)**2) / np.sum((obs - np.mean(obs))**2)
+            return nse, -nse
+
+        if metric == "RMSE":
+            rmse = np.sqrt(np.mean((obs - sim)**2))
+            return rmse, rmse
+
+        if metric == "PBIAS":
+            pbias = 100*np.sum(obs - sim)/np.sum(obs)
+            return pbias, abs(pbias)
+
+        #KGE
+        r = np.corrcoef(obs,sim)[0,1]
+        alpha = np.std(sim)/np.std(obs)
+        beta = np.mean(sim)/np.mean(obs)
+        kge = 1 - math.sqrt((r-1)**2 + (alpha-1)**2 + (beta-1)**2)
+        return kge, -kge
+
+
+    def metric_is_better(self,new_value,best_value,metric):
+        """Method to check if new_value is a better calibration result than best_value for the given metric"""
+        if metric in ("NSE","KGE"):
+            return new_value>=best_value
+        if metric == "PBIAS":
+            return abs(new_value)<=abs(best_value)
+        #RMSE
+        return new_value<=best_value
+
+
+    def obtain_calibration_metric(self,id_carpeta,proximos_inputs,counter_round):
+        """Method to obtain the objective function value in the calibration, for the output selected to calibrate"""
         #Put the values of the inputs
         data_to_save = {}
-        
+
         #We add input files
-        for k,i in enumerate(self.dic_data.keys()):  
-            data_to_save[i.replace("\n", " ")] = proximos_inputs[counter_round][k]
-        
-        
+        for k,i in enumerate(self.dic_data.keys()):
+            valor = proximos_inputs[counter_round][k]
+            #"Curve Number Shift" is always rounded to an integer before being applied (see
+            #change_inputs_sensitivity/Calibration_Parallelization); report that same rounded
+            #value here instead of the raw sampled one (e.g. 1 instead of 1.1), so what's shown
+            #as the calibrated value actually matches what was used in the execution
+            if i.split("__")[0] == "Curve Number Shift":
+                valor = int(round(valor))
+            data_to_save[i.replace("\n", " ")] = valor
+
+
         #Obtain df of observed
         file_path = self.dlg_calibration_inputs.lineEdit.text()
         df_observed = pd.read_csv(file_path, sep=',', header=None)
@@ -7474,64 +8248,81 @@ class qannagnps():
         df_observed['date'] = pd.to_datetime(df_observed['date'], format='%d/%m/%Y', errors='coerce')
         df_observed['value'] = pd.to_numeric(df_observed['value'], errors='coerce')
         df_observed = df_observed.dropna().sort_values('date')
-        
-        
-        #Obtain df of simulated
-        fichero= self.direccion_sensitivity+f"\\Core_{id_carpeta}"+"\\Processing_outputs\AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"
-        first_column = "Gregorian Day"
 
 
+        #Obtain df of simulated, from the AnnAGNPS output file required by the output selected to calibrate
+        source = self.calibration_output_source()
+        column = self.calibration_output_column()
+        try:
+            if source == "gaging_station":
+                df = self.read_gaging_station_table(id_carpeta)
+                df_simulated = df[['date',column]].rename(columns={column:'value'})
+            else: #"ephemeral_gully"
+                df_simulated = self.read_ephemeral_gully_summary(id_carpeta,column)
+            df_simulated['value'] = pd.to_numeric(df_simulated['value'],errors='coerce')
+        except Exception as e:
+            self.end_execution = True
+            #Show the actual underlying error together with the usual "check the control file
+            #setting" guidance: that setting is the most common cause, but not the only possible
+            #one (e.g. a parsing bug), and showing only the fixed guidance text regardless of what
+            #really failed makes unrelated problems very hard to diagnose
+            self.warning_message(f"{self.calibration_output_required_message()}\n\nDetails: {e}")
+            return data_to_save
 
-        file = open(fichero)
-        csvreader = csv.reader(file)
-        rows = []
-        for row in csvreader:
-               rows.append(row)
-        lista = []
-        a = 0
-        for i in rows:
-           try:
-               if i[0]==first_column:
-                   a = 1
-                   lista.append(i)
-               elif a ==1:
-                   lista.append(i[:-1])
-           except:
-               continue
-           
-        df_simulated = pd.DataFrame(columns = lista[0],data = lista[1:])
-        df_simulated = df_simulated[df_simulated["Reach ID"]=="OUTLET"]
-        df_simulated['date'] = pd.to_datetime(df_simulated[['Year', 'Month', 'Day']])
-        # Encontrar la columna que contiene "Total Streamflow"
-        total_col = [col for col in df_simulated.columns if "Total Streamflow" in col][0]
-        # Seleccionar solo la columna 'Date' y la columna de Total Streamflow
-        df_simulated = df_simulated[['date', total_col]]
-        df_simulated[total_col] = df_simulated[total_col].astype(float)
-        df_simulated = df_simulated.rename(columns={total_col: 'value'})
-
-
-
-        #Calculate nash
-        df_merged = pd.merge(df_observed, df_simulated, on='date', suffixes=('_observed', '_simulated'))
+        #Calculate objective metric
+        if source == "ephemeral_gully":
+            #AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv only has a row on days with erosion; any
+            #observed day missing from it means no ephemeral gully erosion that day, i.e. 0
+            df_merged = pd.merge(df_observed, df_simulated, on='date', how='left', suffixes=('_observed', '_simulated'))
+            df_merged['value_simulated'] = df_merged['value_simulated'].fillna(0)
+        else:
+            df_merged = pd.merge(df_observed, df_simulated, on='date', suffixes=('_observed', '_simulated'))
         obs = df_merged['value_observed'].values
         sim = df_merged['value_simulated'].values
 
-        # Calcular NSE
-        nse = 1 - np.sum((obs - sim)**2) / np.sum((obs - np.mean(obs))**2)
-        
-        self.resultados_outputs_calibration.append(-nse)
-        
-        
-        data_to_save["Nash_Sutcliffe"]=nse
-        
+        metric = self.dlg_calibration.combo_metric.currentText()
+        metric_value, value_to_minimize = self.compute_calibration_metric(obs,sim,metric)
+
+        self.resultados_outputs_calibration.append(value_to_minimize)
+
+        data_to_save[metric] = metric_value
+
         #Save best result
         if len(self.resultados)==0:
             self.best_result_calibration = [df_merged,data_to_save]
-        
-        elif nse>=max(d["Nash_Sutcliffe"] for d in self.resultados):
+
+        elif self.metric_is_better(metric_value,self.best_result_calibration[1][metric],metric):
             self.best_result_calibration = [df_merged,data_to_save]
-        
+
         return data_to_save
+
+
+    def check_calibration_convergence(self):
+        """Method to check if the calibration has converged, according to the tolerance for convergence set by the user. Returns True if the calibration should stop early"""
+        tolerance_text = self.dlg_calibration.lineEdit_6.text()
+        if tolerance_text == "":
+            return False
+        try:
+            tolerance = float(tolerance_text)
+        except ValueError:
+            return False
+
+        metric = self.dlg_calibration.combo_metric.currentText()
+        current_best = self.best_result_calibration[1][metric]
+
+        if self.calibration_best_metric_previous_round is None:
+            improved = True
+        else:
+            improved = abs(current_best - self.calibration_best_metric_previous_round) >= tolerance
+
+        self.calibration_best_metric_previous_round = current_best
+
+        if improved:
+            self.calibration_rounds_without_improvement = 0
+            return False
+
+        self.calibration_rounds_without_improvement += 1
+        return self.calibration_rounds_without_improvement >= 3
         
     
     def stop_sensitivity_execution(self,task):
@@ -7562,32 +8353,33 @@ class qannagnps():
         self.progress_dialog.close()
     
     
-    def stop_calibration_execution(self,task):
-        """Método para detener el análisis de sensibilidad de forma segura"""
-        self.tareas_pendientes = []  # Clear the queue
-        
-        # Use a copy [:] to iterate safely
+    def stop_calibration_by_user(self):
+        """Method called when the user clicks 'Stop calibration' on the progress dialog"""
+        #Once this is set, finalizar_tarea_calibration ignores any task that still completes/fails
+        #afterwards (e.g. one that was mid-execution and only reacts to the kill below a bit later)
+        self.calibration_stopped_by_user = True
+
+        self.tareas_pendientes = []
         for t in self.tareas_activas[:]:
             try:
-                # We only cancel tasks that are still alive and are NOT the failed one
-                if t and t != task:
+                if t:
+                    #cancel() only stops QGIS from waiting on/relaunching from this task; it does
+                    #NOT stop the AnnAGNPS/TopAGNPS executable it launched (subprocess.call blocks
+                    #the task's thread and doesn't check for cancellation), so the running process
+                    #has to be killed directly as well
                     t.cancel()
+                    if hasattr(t,"kill_running_processes"):
+                        t.kill_running_processes()
             except (RuntimeError, ReferenceError):
                 pass
-                
-        self.tareas_activas = [] 
-        
-        # Try to build the error message safely
-        try:
-            msg = f"Analysis stopped in task {task.n}. Reason: {task.error_msg}"
-        except (RuntimeError, ReferenceError, AttributeError):
-            msg = "Calibration analysis stopped due to an unexpected error."
+        self.tareas_activas = []
 
-        # Show the warning in English
-        self.warning_message(msg)
-        
-        #Close progress bar
-        self.progress_dialog.close()
+        if self.resultados:
+            #Save whatever was obtained so far as the calibration result
+            self.run_calibration_two(stopped_by_user=True)
+        else:
+            self.dlg_calibration_progress.close()
+            self.warning_message("Calibration stopped by the user before any execution finished. Nothing to save.")
     
     
     def lanzar_siguiente_calibration(self):
@@ -7596,23 +8388,35 @@ class qannagnps():
         if not self.tareas_pendientes:
             return
         
-        # Mientras haya tareas por hacer y carpetas vacías...
-        while self.tareas_pendientes and self.carpetas_libres:
-            
+        # Mientras haya tareas por hacer, carpetas libres, y no se haya lanzado ya un número de
+        # tareas igual al de puntos pedidos al optimizador para esta ronda (self.proximos_inputs
+        # tiene exactamente self.tareas_por_ronda puntos: lanzar más tareas que eso dejaría alguna
+        # sin punto asignado, y self.carpetas_libres puede tener una carpeta más que tareas_por_ronda)...
+        while self.tareas_pendientes and self.carpetas_libres and self.tareas_lanzadas_ronda<self.tareas_por_ronda:
+
             n_tarea = self.tareas_pendientes.pop(0)
             id_carpeta = self.carpetas_libres.pop(0) # Reservamos la carpeta
+            #Cada tarea lanzada en esta ronda recibe su propio punto distinto de self.proximos_inputs
+            slot_ronda = self.tareas_lanzadas_ronda
+            self.tareas_lanzadas_ronda += 1
             task = Calibration_Parallelization(n_tarea, id_carpeta,self.execute_preprocessing_calibration,self.direccion_sensitivity,
                 self.dic_data,self.proximos_inputs,self.executable_directory,self.plugin_dir,self.dic_name_column,
                 self.inputs,self.epsg_sensitivity,
                 self.unique_soil_sensitivity, self.fichero_soil_sensitivity,self.column_soil_sensitivity,self.unique_use_sensitivity,self.fichero_manag_sensitivity,
-                self.column_use_sensitivity,self.project_df,self.counter_calibration_round)
-            
+                self.column_use_sensitivity,self.project_df,slot_ronda)
+
             self.tareas_activas.append(task)
-            
-            # Al finalizar, liberamos la carpeta y lanzamos la siguiente
-            task.taskCompleted.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n,self.proximos_inputs,self.counter_calibration_round))
+
+            # Al finalizar, liberamos la carpeta y lanzamos la siguiente.
+            # IMPORTANTE: se lee t.proximos_inputs/t.counter_calibration_round (los valores fijados
+            # en esta tarea al crearla), no self.proximos_inputs/self.counter_calibration_round: esos
+            # últimos son compartidos y van cambiando de valor conforme otras tareas van terminando y
+            # empieza la siguiente ronda, así que si se leyeran en el momento en que ESTA tarea
+            # termina (que puede ser más tarde, por ser ejecuciones en paralelo) ya no corresponderían
+            # a los inputs con los que se lanzó, provocando resultados incorrectos o un IndexError.
+            task.taskCompleted.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n,t.proximos_inputs,t.counter_calibration_round))
             # Esto es por si hay error
-            task.taskTerminated.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n,self.proximos_inputs,self.counter_calibration_round))
+            task.taskTerminated.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_calibration(t, f, n,t.proximos_inputs,t.counter_calibration_round))
             self.manager.addTask(task)
     
     
@@ -7829,39 +8633,77 @@ class qannagnps():
         self.warning_message("Succes in the sensitiviy analysis ")
     
     
-    def run_calibration_two(self):
-        """Method to save the results of the calibration"""
-        #Organize the dataframe
-        self.results_calibration = pd.DataFrame(self.resultados)
-        
-        #Calculate sensitivity indexes
-        path = self.direccion_sensitivity + "\\"+self.dlg_calibration.file_save.text()
-        
-        #Add best input combination and nash sutcliffe efficiency
-        with open(path, 'w') as f:
+    def write_calibration_report(self,path):
+        """Method to write the calibration report (optimized inputs, best metric, best combination
+        results and the full iteration history so far) to the given path. Shared by the final saved
+        file and by the live progress file, so both always have exactly the same format."""
+        results_calibration = pd.DataFrame(self.resultados)
+        metric = self.dlg_calibration.combo_metric.currentText()
+
+        #Parameter names can contain non-ASCII characters (curly quotes, etc.). Writing without an
+        #explicit encoding falls back to the system's default codepage, which is what was turning
+        #them into mojibake ("Curve Number a^", stray euro signs...). utf-8-sig is used only for
+        #this first write, since that codec adds a BOM every time it's opened - appending more
+        #with it later would sprinkle extra BOM markers through the middle of the file.
+        with open(path, 'w', encoding='utf-8-sig') as f:
             #Add first row
             f.write("Calibration results" + '\n')
             f.write("Optimized input values:" + '\n')
             for i in self.dic_data:
                 f.write(f"{i}: "+str(self.best_result_calibration[1][i.replace('\n', ' ')]) + '\n')
-            
-            f.write(f"Nash-Sutcliffe efficiency: {self.best_result_calibration[1]['Nash_Sutcliffe']}" + '\n')
+
+            f.write(f"{metric}: {self.best_result_calibration[1][metric]}" + '\n')
             f.write("Best combination results:\n")
         #Add best result
-        self.best_result_calibration[0].to_csv(path, mode='a', index=False, float_format='%.10f')
-        
-        with open(path, 'a') as f:
+        self.best_result_calibration[0].to_csv(path, mode='a', index=False, float_format='%.10f', encoding='utf-8')
+
+        with open(path, 'a', encoding='utf-8') as f:
             #Add first row
             f.write("Results of each iteration" + '\n')
-            
+
         #Append results
-        self.results_calibration.to_csv(path, mode='a', index=False, float_format='%.10f')
-        
+        results_calibration.to_csv(path, mode='a', index=False, float_format='%.10f', encoding='utf-8')
+
+
+    def save_calibration_progress(self):
+        """Method to save every calibration result obtained so far to a 'live' file, rewritten in
+        full after each execution finishes. This way nothing is lost if the calibration is stopped,
+        crashes, or QGIS is closed before it reaches the final report. This always runs on the main
+        thread (called once per finished execution from finalizar_tarea_calibration), so there is
+        never more than one writer at a time and the file can't get corrupted by the parallel
+        AnnAGNPS/TopAGNPS executions."""
+        if not self.resultados:
+            return
+        path = self.direccion_sensitivity + "\\calibration_progress_" + self.dlg_calibration.file_save.text()
+        try:
+            self.write_calibration_report(path)
+        except Exception:
+            pass
+
+
+    def run_calibration_two(self,stopped_by_user=False):
+        """Method to save the results of the calibration"""
+        path = self.direccion_sensitivity + "\\"+self.dlg_calibration.file_save.text()
+        self.write_calibration_report(path)
+
+        #Pre-fill the "Calibration results" dialog with the file that was just written, so the
+        #user doesn't have to browse for it manually - just opening that dialog shows this run's
+        #results right away
+        self.dlg_calibration_results.results.setText(path)
+
         #Se cierra la barra de progreso
-        self.progress_dialog.close()
-        
-        #MENSAJE DE ÉXITO
-        self.warning_message("Succes in the calibration")
+        self.dlg_calibration_progress.close()
+
+        #If any execution failed along the way (logged to self.calibration_error_log_path instead
+        #of stopping the whole calibration), mention it here so it isn't missed
+        errores = getattr(self,'calibration_error_count',0)
+        aviso_errores = f" {errores} execution(s) failed and were skipped along the way (see {Path(self.calibration_error_log_path).name})." if errores else ""
+
+        #Mensaje final
+        if stopped_by_user:
+            self.warning_message(f"Calibration stopped by the user. Results obtained so far were saved.{aviso_errores}")
+        else:
+            self.warning_message(f"Succes in the calibration{aviso_errores}")
     
     
     def calibration_bootstraping_show(self):
@@ -7878,14 +8720,14 @@ class qannagnps():
             simulated = []
             
             obtain_contenido = True
-            
+
             for k,i in enumerate(lineas):
+                if "Best combination results:" in i:
+                    obtain_contenido = False
+
                 if obtain_contenido:
                     contenido += i
-                
-                if "Nash-Sutcliffe efficiency" in i:
-                    obtain_contenido = False
-                    
+
                 if i[:5]=="date,":
                     for m in range(k+1,len(lineas)):
                         if "Results of each iteration" in lineas[m]:
@@ -8016,23 +8858,39 @@ class qannagnps():
 
             
             #Put p value
-            p_value = sum(1 for nash in values if nash < float(dialog.nash.text())) / len(values)
-            dialog.p_value.setText(f"p-value: {str(round(p_value,2))}")
+            #H0: NSE <= threshold. H1: NSE > threshold. p-value = fraction of the bootstrap NSE
+            #distribution that falls below the threshold, i.e. P(NSE as low as or lower than the
+            #threshold). A small p-value means that's unlikely, so it's evidence NSE > threshold.
+            threshold = float(dialog.nash.text())
+            p_value = sum(1 for nash in values if nash < threshold) / len(values)
+            dialog.p_value.setText(f"p-value: {round(p_value,3)}")
+
+            #Plain-language conclusion of the hypothesis test, using the usual 0.05 significance level
+            if p_value < 0.05:
+                dialog.label.setText(f"✓ p = {p_value:.3f} < 0.05: at the 95% confidence level, "
+                    f"there is enough evidence to accept that NSE is greater than the threshold ({threshold:g}).")
+                dialog.label.setStyleSheet("color: #1e7d34; font-weight: bold; font-size: 9pt;")
+            else:
+                dialog.label.setText(f"✗ p = {p_value:.3f} ≥ 0.05: at the 95% confidence level, "
+                    f"there isn't enough evidence to conclude that NSE is greater than the threshold ({threshold:g}).")
+                dialog.label.setStyleSheet("color: #a83232; font-weight: bold; font-size: 9pt;")
+            dialog.label.setWordWrap(True)
+
             #Put confidence interval for nash
             median = str(round(stats.scoreatpercentile(values,50),2))
             percentile_25 = str(round(stats.scoreatpercentile(values,2.5),2))
             percentile_975 = str(round(stats.scoreatpercentile(values,97.5),2))
-            
+
             dialog.label_3.setText(f"NSE [95%CI]: {median}[{percentile_25} - {percentile_975}]")
 
             #Same for RMSE
             median = f"{stats.scoreatpercentile(values_rmse,50):.2e}"
             percentile_25 = f"{stats.scoreatpercentile(values_rmse,2.5):.2e}"
             percentile_975 = f"{stats.scoreatpercentile(values_rmse,97.5):.2e}"
-            
+
             dialog.label_7.setText(f"RMSE [95%CI]: {median}[{percentile_25} - {percentile_975}]")
-            
-            
+
+
         except:
             pass
     
@@ -8060,52 +8918,73 @@ class qannagnps():
         getattr(self,canvas).figure.clear()
         ax1 = getattr(self,canvas).figure.subplots()
 
+        #Colors matching the modern "control panel" style of the calibration dialogs
+        card_color = '#ffffff'
+        hist_fill = '#aecbe3'
+        hist_edge = '#3f6ea5'
+        cumulative_color = '#2c8f6b'
+        threshold_color = '#c0392b'
+        text_color = '#2c3e50'
+        grid_color = '#d8dee4'
+
         # Histograma
         finite_nse = [nse for nse in self.nashes_bootstraping if nse != -np.inf]
         inf_count = len([nse for nse in self.nashes_bootstraping if nse == -np.inf])
-        
+
         counts, bins, patches = ax1.hist(
-            finite_nse, bins=20, density=True, alpha=0.7, color="lightcoral", edgecolor="black", label="Histogram"
+            finite_nse, bins=20, density=True, alpha=0.85, color=hist_fill, edgecolor=hist_edge, linewidth=1.1, label="Bootstrap distribution"
         )
 
         # Función acumulada
         nashes = np.sort([x for x in self.nashes_bootstraping if not np.isnan(x)])
-        
+
         cumulative = [np.searchsorted(nashes, b, side='right') / len(nashes) for b in bins]
         ax2 = ax1.twinx()
-        ax2.plot(bins, cumulative, color="teal", lw=2, label="Cumulative")
-        
-        
-        if inf_count>0:
-            ax2.set_title(f"-Inf cases: {inf_count}")
-        
-        #Vertical line
+        ax2.plot(bins, cumulative, color=cumulative_color, lw=2.5, label="Cumulative probability")
+
+        #Vertical/horizontal threshold markers, with a small label next to the threshold line
+        #instead of a bare dashed line
         try:
-            ax1.axvline(x=float(dialog.nash.text()), color='red', linestyle='--', linewidth=1.5)
-            ax2.hlines(y=float(dialog.p_value.text().split(":")[-1]), xmin=float(dialog.nash.text()), xmax=ax2.get_xlim()[1],transform=ax2.get_yaxis_transform(),color='red', linestyle='--', linewidth=1.5)
+            threshold = float(dialog.nash.text())
+            p_value = float(dialog.p_value.text().split(":")[-1])
+            ax1.axvline(x=threshold, color=threshold_color, linestyle='--', linewidth=1.75, zorder=3)
+            ax1.text(threshold, ax1.get_ylim()[1]*0.97, f" Threshold = {threshold:g}", color=threshold_color,
+                size=9, weight="bold", va="top", ha="left" if threshold < np.median(nashes) else "right")
+            ax2.hlines(y=p_value, xmin=threshold, xmax=ax2.get_xlim()[1],transform=ax2.get_yaxis_transform(),color=threshold_color, linestyle='--', linewidth=1.75)
         except:
             pass
 
-        # Etiquetas de los ejes
-        ax1.set_xlabel("Nash–Sutcliffe Efficiency")
-        ax1.set_ylabel("Density")
-        ax2.set_ylabel("Cumulative Probability")
+        # Título (incluye el aviso de casos -Inf, si los hay, en vez de sobreescribir el título con él)
+        titulo = f"Bootstrap distribution of NSE (n={len(self.nashes_bootstraping)} resamples)"
+        if inf_count>0:
+            titulo += f"  •  {inf_count} -Inf case(s) excluded"
+        ax1.set_title(titulo, size=11, weight="bold", color=text_color, pad=12)
 
+        # Etiquetas de los ejes
+        ax1.set_xlabel("Nash–Sutcliffe Efficiency",size=10,weight="bold",color=text_color)
+        ax1.set_ylabel("Density",size=10,weight="bold",color=text_color)
+        ax2.set_ylabel("Cumulative Probability",size=10,weight="bold",color=text_color)
+        ax1.tick_params(axis="both",colors=text_color,labelsize=9)
+        ax2.tick_params(axis="both",colors=text_color,labelsize=9)
 
         # Personalización de los grids
-        ax1.grid(visible=True, linestyle="--", linewidth=0.6, alpha=0.5)
+        ax1.grid(visible=True, linestyle="--", linewidth=0.7, alpha=0.6, color=grid_color)
+        ax1.set_axisbelow(True)
         ax2.grid(visible=False)
+        for spine in list(ax1.spines.values())+list(ax2.spines.values()):
+            spine.set_color(grid_color)
 
         # Leyendas
         lines1, labels1 = ax1.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
-        legend = ax1.legend(lines1 + lines2, labels1 + labels2, loc="best")
-        
+        legend = ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper center", bbox_to_anchor=(0.5,-0.15),
+            ncol=2, frameon=False, fontsize=9)
+
         #Change background color
-        getattr(self,canvas).figure.set_facecolor('#f0f0f0')
-        ax1.set_facecolor('#f0f0f0')
+        getattr(self,canvas).figure.set_facecolor(card_color)
+        ax1.set_facecolor(card_color)
         # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
-        getattr(self,canvas).figure.subplots_adjust(left=0.2, bottom=0.2,right = 0.8)
+        getattr(self,canvas).figure.subplots_adjust(left=0.15, bottom=0.28,right = 0.85, top=0.88)
         #Draw canvas
         getattr(self,canvas).draw()
         
@@ -9087,7 +9966,7 @@ class Sensitivity_Parallelization(QgsTask):
         #Si el input es tamaño de pixel entonces la variable será un texto que seleccione al DEM con el tamaño de pixel determinado
         if nombre_parametro =="Pixel Size" and spatial:
             self.change_control_files_pixel(param_values,numero_parametro)
-        elif self.dic_name_column[nombre_parametro][1]=="AGFLOW.csv" and spatial:#in the case of agflow the input change is different
+        elif self.dic_name_column[nombre_parametro.split("__")[0]][1]=="AGFLOW.csv" and spatial:#in the case of agflow the input change is different
             #First we add the data of control files to the dialog. This is important because the rest of the values that are not changed need to be taken from the control file.
             self.asignar_valores_control_dialogo()
             #Then we change the inputs of agflow control file
@@ -9142,7 +10021,50 @@ class Sensitivity_Parallelization(QgsTask):
                 direccion#Check if "direccion" and "columna" exist. If they don't, then do anything
                 
                 df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
-                if self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
+                if nombre_parametro.split("__")[0] == "Curve Number Shift":
+                    #Caso especial: en vez de sobreescribir CN_A/B/C/D por separado (lo que puede romper
+                    #la condición CN_A<=CN_B<=CN_C<=CN_D que exige AnnAGNPS/TopAGNPS y hacer que la
+                    #ejecución falle), se suma el mismo desplazamiento entero a los cuatro grupos de
+                    #curve number en la(s) fila(s) seleccionada(s), lo que mantiene siempre el orden.
+                    #Los curve number tienen que ser enteros, así que se redondea el valor (posiblemente
+                    #decimal) propuesto por el muestreo antes de aplicarlo.
+                    shift = int(round(param_values[numero_parametro]))
+                    #IMPORTANT: the shift has to be applied relative to the ORIGINAL saved-project
+                    #values, not to whatever is currently sitting in this Core_N file. Core_N
+                    #folders get reused across many executions without their input files being
+                    #reset in between, so basing the shift on the current (possibly
+                    #already-shifted, by an earlier execution that reused this same folder) value
+                    #would let shifts silently accumulate across executions - e.g. two executions
+                    #each individually within [-5,5] could compound into an observed change of up
+                    #to 10, even though every sampled shift value really was within bounds.
+                    try:
+                        project_name = Path(self.direccion_sensitivity).parent.name
+                        #NOTE: can't just reuse os.path.basename(direccion) - "Runoff Curve Number
+                        #Data" lives in a "general" subfolder of Processing_inputs, and the
+                        #relative path stored for it in annagnps_master.csv already includes that
+                        #subfolder (e.g. ".\general\run_curve.csv"), so the storage project's own
+                        #master file has to be consulted the same way every other file lookup in
+                        #this codebase does it, instead of guessing the pristine path from the
+                        #Core_N working copy's bare filename (which silently failed to find the
+                        #file, making this fallback to the buggy accumulating behavior every time).
+                        storage_master_file = CARPETA_GUARDAR_PROYECTOS+f"\\{project_name}\\Processing_inputs\\annagnps_master.csv"
+                        storage_master_df = pd.read_csv(storage_master_file,encoding = "ISO-8859-1",delimiter=",")
+                        storage_file_name = storage_master_df[storage_master_df.iloc[:,0]=="Runoff Curve Number Data"].iloc[0,1]
+                        pristine_path = CARPETA_GUARDAR_PROYECTOS+f"\\{project_name}\\Processing_inputs\\"+storage_file_name
+                        df_pristine = pd.read_csv(pristine_path,encoding = "ISO-8859-1",delimiter=",")
+                        df_pristine.columns = df_pristine.columns.str.strip()
+                    except Exception:
+                        df_pristine = df #No se pudo leer el original: mejor no bloquear la ejecución
+                    for columna_cn in columna:
+                        base = pd.to_numeric(df_pristine[columna_cn],errors='coerce').astype(int) if columna_cn in df_pristine.columns else df[columna_cn].astype(int)
+                        if self.dic_data[nombre_parametro][2]=="All":
+                            valores = base + shift
+                        else:
+                            fila = int(self.dic_data[nombre_parametro][2])
+                            valores = df[columna_cn].astype(int)
+                            valores.iloc[fila] = base.iloc[fila] + shift
+                        df[columna_cn] = valores
+                elif self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
                     df[columna] = [param_values[numero_parametro] for x in range(len(df))]
                 else:#si solo se ha elegido una fila entonces se cambia una única fila
                     df[columna].iloc[int(self.dic_data[nombre_parametro][2])] = param_values[numero_parametro]
@@ -9398,7 +10320,7 @@ class Sensitivity_Parallelization(QgsTask):
             #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo PEG.csv
             if path.exists(fichero("PEG.csv")):
                 eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
                     layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
@@ -9469,7 +10391,7 @@ class Sensitivity_Parallelization(QgsTask):
             #Se aplica el uso al fichero de cárcavas efímeras
             if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
                 eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
                     layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
@@ -9575,11 +10497,15 @@ class Calibration_Parallelization(QgsTask):
         self.column_use_sensitivity = column_use_sensitivity
         self.project_df = project_df
         self.counter_calibration_round = counter_calibration_round
-        
-        
+        #Track every AnnAGNPS/TopAGNPS/STEAD process this task launches, so that the calibration
+        #can actually kill the running executable if the user stops the calibration, instead of
+        #just letting it keep running to completion in the background
+        self.procesos_lanzados = []
+
+
     def run(self):
         # Ajusta la ruta para que use la carpeta correspondiente al folder_id
-        
+
         self.end_execution = 0
         try:
             self.ejecucion_completa_sensitivity()
@@ -9588,8 +10514,21 @@ class Calibration_Parallelization(QgsTask):
             return False
         if self.end_execution ==1:
             return False
-        
+
         return True
+
+
+    def kill_running_processes(self):
+        """Method to forcibly stop whichever AnnAGNPS/TopAGNPS/STEAD process this task currently
+        has running. Killing only the top-level process (cmd.exe, since the .bat wrappers are
+        launched as a shell) would leave the actual .exe orphaned and still running, so the whole
+        process tree is killed via taskkill /T."""
+        for proceso in self.procesos_lanzados:
+            if proceso.poll() is None:
+                try:
+                    subprocess.run(["taskkill","/F","/T","/PID",str(proceso.pid)],capture_output=True)
+                except Exception:
+                    pass
     
     
     def ejecucion_completa_sensitivity(self):
@@ -9618,7 +10557,7 @@ class Calibration_Parallelization(QgsTask):
                 self.change_inputs_sensitivity(self.proximos_inputs[self.counter_calibration_round],j,k,spatial =True) #cambio de los inputs espaciales
             #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
             self.time_start_preprocessing = datetime.now()
-            #EJECUCIÓN DE TOPAGNPS            
+            #EJECUCIÓN DE TOPAGNPS
             def main():
                 f = open(self.executable_directory+"\\"+f"EjecutarTopagnps_{self.core}.bat","w+")
                 linea_uno = "CD /d {}".format(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs")
@@ -9627,9 +10566,9 @@ class Calibration_Parallelization(QgsTask):
                 f.write("{} \n".format(linea_dos))
                 f.close()
             main()
-            subprocess.call(self.executable_directory+"\\"+f"EjecutarTopagnps_{self.core}.bat")
-            #proc = subprocess.Popen(self.executable_directory+"\\"+"EjecutarTopagnps.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-            #stdout, stderr = proc.communicate()
+            proceso_topagnps = subprocess.Popen(self.executable_directory+"\\"+f"EjecutarTopagnps_{self.core}.bat")
+            self.procesos_lanzados.append(proceso_topagnps)
+            proceso_topagnps.wait()
             #If error file of TopAGNPS is opened, then return a error message
             try:
                 open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.csv", "r+") 
@@ -9685,12 +10624,11 @@ class Calibration_Parallelization(QgsTask):
         #Se cambian los inputs
         for j,k in enumerate(self.dic_data.keys()):
             self.change_inputs_sensitivity(self.proximos_inputs[self.counter_calibration_round],j,k,spatial =False) #cambio de los inptus no espaciales
-        
-        
-        
+
+
         #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
         self.time_start_processing = datetime.now()
-        
+
         #EJECUCIÓN DE ANNAGNPS
         #os.chdir(self.direccion+"\\"+directory)
         def execute_bat():
@@ -9703,12 +10641,10 @@ class Calibration_Parallelization(QgsTask):
                f.close()
            main()
         execute_bat()
-        r'''env = os.environ.copy()
-        env['PATH'] = f'{self.executable_directory};' + env['PATH']
-        command = self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat"
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='latin-1', env=env)'''
 
-        subprocess.call(self.executable_directory+"\\"+f"EjecutarAnnAGNPS_{self.core}.bat")
+        proceso_annagnps = subprocess.Popen(self.executable_directory+"\\"+f"EjecutarAnnAGNPS_{self.core}.bat")
+        self.procesos_lanzados.append(proceso_annagnps)
+        proceso_annagnps.wait()
 
         
                   
@@ -9741,6 +10677,7 @@ class Calibration_Parallelization(QgsTask):
         shutil.copyfile(self.executable_directory + "\\" +"STEAD.fil" ,self.direccion_sensitivity+f"\\Core_{self.core}" + "\\Processing_inputs\\" +"STEAD.fil")
         os.chdir(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_inputs")
         proc = subprocess.Popen(self.executable_directory + "\\" +"STEAD.exe", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+        self.procesos_lanzados.append(proc)
         stdout, stderr = proc.communicate()
         
         #Los outputs de AnnAGNPS se guardan en Processing_outputs
@@ -9810,14 +10747,14 @@ class Calibration_Parallelization(QgsTask):
                 columna = self.dic_name_column[nombre_parametro.split("__")[0]][1]
             
 
-        if self.dic_name_column[nombre_parametro][1]=="AGFLOW.csv" and spatial:#in the case of agflow the input change is different
+        if self.dic_name_column[nombre_parametro.split("__")[0]][1]=="AGFLOW.csv" and spatial:#in the case of agflow the input change is different
             #First we add the data of control files to the dialog. This is important because the rest of the values that are not changed need to be taken from the control file.
             self.asignar_valores_control_dialogo()
             #Then we change the inputs of agflow control file
             fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
             texto = fichero.read()
             fichero.close()
-            
+
             #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
             try:
                 if self.agflow.lineEdit_4.text() =="":slope="1"
@@ -9865,7 +10802,50 @@ class Calibration_Parallelization(QgsTask):
                 direccion#Check if "direccion" and "columna" exist. If they don't, then do anything
                 
                 df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
-                if self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
+                if nombre_parametro.split("__")[0] == "Curve Number Shift":
+                    #Caso especial: en vez de sobreescribir CN_A/B/C/D por separado (lo que puede romper
+                    #la condición CN_A<=CN_B<=CN_C<=CN_D que exige AnnAGNPS/TopAGNPS y hacer que la
+                    #ejecución falle), se suma el mismo desplazamiento entero a los cuatro grupos de
+                    #curve number en la(s) fila(s) seleccionada(s), lo que mantiene siempre el orden.
+                    #Los curve number tienen que ser enteros, así que se redondea el valor (posiblemente
+                    #decimal) propuesto por el optimizador antes de aplicarlo.
+                    shift = int(round(proximos_inputs[numero_parametro]))
+                    #IMPORTANT: the shift has to be applied relative to the ORIGINAL saved-project
+                    #values, not to whatever is currently sitting in this Core_N file. Core_N
+                    #folders get reused across many executions without their input files being
+                    #reset in between, so basing the shift on the current (possibly
+                    #already-shifted, by an earlier execution that reused this same folder) value
+                    #would let shifts silently accumulate across executions - e.g. two executions
+                    #each individually within [-5,5] could compound into an observed change of up
+                    #to 10, even though every sampled shift value really was within bounds.
+                    try:
+                        project_name = Path(self.direccion_sensitivity).parent.name
+                        #NOTE: can't just reuse os.path.basename(direccion) - "Runoff Curve Number
+                        #Data" lives in a "general" subfolder of Processing_inputs, and the
+                        #relative path stored for it in annagnps_master.csv already includes that
+                        #subfolder (e.g. ".\general\run_curve.csv"), so the storage project's own
+                        #master file has to be consulted the same way every other file lookup in
+                        #this codebase does it, instead of guessing the pristine path from the
+                        #Core_N working copy's bare filename (which silently failed to find the
+                        #file, making this fallback to the buggy accumulating behavior every time).
+                        storage_master_file = CARPETA_GUARDAR_PROYECTOS+f"\\{project_name}\\Processing_inputs\\annagnps_master.csv"
+                        storage_master_df = pd.read_csv(storage_master_file,encoding = "ISO-8859-1",delimiter=",")
+                        storage_file_name = storage_master_df[storage_master_df.iloc[:,0]=="Runoff Curve Number Data"].iloc[0,1]
+                        pristine_path = CARPETA_GUARDAR_PROYECTOS+f"\\{project_name}\\Processing_inputs\\"+storage_file_name
+                        df_pristine = pd.read_csv(pristine_path,encoding = "ISO-8859-1",delimiter=",")
+                        df_pristine.columns = df_pristine.columns.str.strip()
+                    except Exception:
+                        df_pristine = df #No se pudo leer el original: mejor no bloquear la ejecución
+                    for columna_cn in columna:
+                        base = pd.to_numeric(df_pristine[columna_cn],errors='coerce').astype(int) if columna_cn in df_pristine.columns else df[columna_cn].astype(int)
+                        if self.dic_data[nombre_parametro][2]=="All":
+                            valores = base + shift
+                        else:
+                            fila = int(self.dic_data[nombre_parametro][2])
+                            valores = df[columna_cn].astype(int)
+                            valores.iloc[fila] = base.iloc[fila] + shift
+                        df[columna_cn] = valores
+                elif self.dic_data[nombre_parametro][2]=="All": #si se han elegido todas las filas entonces se cambia en todas las filas
                     df[columna] = [proximos_inputs[numero_parametro] for x in range(len(df))]
                 else:#si solo se ha elegido una fila entonces se cambia una única fila
                     df[columna].iloc[int(self.dic_data[nombre_parametro][2])] = proximos_inputs[numero_parametro]
@@ -10103,7 +11083,7 @@ class Calibration_Parallelization(QgsTask):
             #Se aplica el suelo al fichero de cárcavas efímeras, si existe el archivo PEG.csv
             if path.exists(fichero("PEG.csv")):
                 eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
                     layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
@@ -10174,7 +11154,7 @@ class Calibration_Parallelization(QgsTask):
             #Se aplica el uso al fichero de cárcavas efímeras
             if path.exists(fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv")):
                 eg_path = fichero("AnnAGNPS_Ephemeral_Gully_Data_Section.csv") #se obtiene el nombre del archivo al que hay que poner el tipo y manejo de suelo
-                summary = pd.read_csv("PEG_Summary.txt",encoding = "ISO-8859-1",delimiter=",")
+                summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
                     layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
