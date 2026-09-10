@@ -6637,8 +6637,13 @@ class qannagnps():
         self.dlg.combo_created_projects.clear()
         self.dlg.combo_created_projects.addItems(project_names)
 
-            
-        if self.dlg.name_of_project.text() == "": #we put the last modified folder
+        #Nothing saved yet (e.g. a brand new install with an empty projects folder) - there's
+        #nothing to preselect, so leave the three combo boxes empty instead of trying to index
+        #into an empty list below (max()/.index() on an empty sequence would raise ValueError and
+        #crash initGui(), preventing the plugin from loading at all)
+        if not project_names:
+            latest_folder_name = None
+        elif self.dlg.name_of_project.text() == "": #we put the last modified folder
             folders = [
                 os.path.join(self.carpeta_guardar_proyectos, f)
                 for f in os.listdir(self.carpeta_guardar_proyectos)
@@ -6650,27 +6655,31 @@ class qannagnps():
             # Solo el nombre (sin ruta completa)
             latest_folder_name = os.path.basename(latest_folder)
             self.dlg.combo_created_projects.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
-            
+
         else:
-            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive. 
+            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive.
             self.dlg.combo_created_projects.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
-        
+
         #In sensitivity
         self.sensitivity_dialog.project_sensitivity.clear()
         self.sensitivity_dialog.project_sensitivity.addItems(project_names)
-        if self.dlg.name_of_project.text() == "": #we put the last modified folder
+        if not project_names:
+            pass
+        elif self.dlg.name_of_project.text() == "": #we put the last modified folder
             self.sensitivity_dialog.project_sensitivity.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
         else:
-            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive. 
+            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive.
             self.sensitivity_dialog.project_sensitivity.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
-        
+
         #In calibration
         self.dlg_calibration.project_calibration.clear()
         self.dlg_calibration.project_calibration.addItems(project_names)
-        if self.dlg.name_of_project.text() == "": #we put the last modified folder
+        if not project_names:
+            pass
+        elif self.dlg.name_of_project.text() == "": #we put the last modified folder
             self.dlg_calibration.project_calibration.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
         else:
-            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive. 
+            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive.
             self.dlg_calibration.project_calibration.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
         
         
@@ -7610,6 +7619,10 @@ class qannagnps():
         self.end_execution = 0
         self.calibration_stopped_by_user = False
         self.calibration_error_count = 0
+        #Forget any best-execution snapshot from a previous calibration run, so "save calibrated
+        #project" (if used again) never mistakes a stale snapshot for this run's actual best result
+        if hasattr(self,'best_calibration_core'):
+            del self.best_calibration_core
         #If there is not working directory selected then error
         if self.dlg.project.text()=="":
             self.warning_message("Please select a working directory where the files are going to be loaded")
@@ -7954,8 +7967,14 @@ class qannagnps():
         self.counter_calibration +=1
         self.counter_calibration_round +=1
 
-        # Return folder to pool
-        self.carpetas_libres.append(id_carpeta)
+        # Return folder to pool - unless it's the folder holding the current best result, which
+        # stays reserved (excluded from reuse) until the calibration ends, so its inputs/outputs
+        # are still exactly as they were for that best execution when "save calibrated project"
+        # copies them afterwards. This relies on the folder pool always having one more folder
+        # than a round needs (tareas_por_ronda = number_cores-1, carpetas pool size = number_cores)
+        # so reserving one doesn't reduce how many executions can run in parallel.
+        if id_carpeta != getattr(self,'best_calibration_core',None):
+            self.carpetas_libres.append(id_carpeta)
 
         #Metric/best values for the progress dialog (updated further below, once the next
         #executions have actually been launched)
@@ -8269,6 +8288,17 @@ class qannagnps():
             self.warning_message(f"{self.calibration_output_required_message()}\n\nDetails: {e}")
             return data_to_save
 
+        #Aggregate both series to the time step chosen in the "Observed data" dialog
+        #(Daily/Monthly/Annual) before comparing them - the same resample+sum used to build that
+        #dialog's preview graph, so what's shown there actually matches what the calibration uses.
+        time_step = self.calibration_observed_time_step()
+        if time_step == "Monthly":
+            df_observed = df_observed.set_index('date').resample('MS').sum().reset_index()
+            df_simulated = df_simulated.set_index('date').resample('MS').sum().reset_index()
+        elif time_step == "Annual":
+            df_observed = df_observed.set_index('date').resample('YS').sum().reset_index()
+            df_simulated = df_simulated.set_index('date').resample('YS').sum().reset_index()
+
         #Calculate objective metric
         if source == "ephemeral_gully":
             #AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv only has a row on days with erosion; any
@@ -8290,9 +8320,11 @@ class qannagnps():
         #Save best result
         if len(self.resultados)==0:
             self.best_result_calibration = [df_merged,data_to_save]
+            self.reserve_best_calibration_core(id_carpeta)
 
         elif self.metric_is_better(metric_value,self.best_result_calibration[1][metric],metric):
             self.best_result_calibration = [df_merged,data_to_save]
+            self.reserve_best_calibration_core(id_carpeta)
 
         return data_to_save
 
@@ -8681,15 +8713,109 @@ class qannagnps():
             pass
 
 
+    def reserve_best_calibration_core(self,id_carpeta):
+        """Method to mark the folder that produced the current best calibration result as
+        "reserved": excluded from the Core_N reuse pool (see advance_calibration_after_execution)
+        so its inputs/outputs are guaranteed to stay exactly as they were for that best execution
+        - no file copying happens here, only bookkeeping, since that's cheap. If a different
+        folder held the "best" title before, it's released back into the pool now that it's no
+        longer needed. The actual (single) copy of this folder happens later, once, in
+        save_calibrated_project - after the whole calibration has finished, per the user's
+        request, instead of after every improvement (which used to block the UI with a full
+        folder copy, sometimes several times in a row during the first round)."""
+        previous = getattr(self,'best_calibration_core',None)
+        if previous is not None and previous != id_carpeta and previous not in self.carpetas_libres:
+            self.carpetas_libres.append(previous)
+        self.best_calibration_core = id_carpeta
+
+
+    def save_calibrated_project(self):
+        """If the user checked "Save calibrated project" and gave it a name, create a new saved
+        project (selectable afterwards from load/sensitivity analysis/calibration like any other)
+        with the same project-level metadata as the original, but with the inputs and outputs of
+        the best-performing calibration execution. Its Core_N folder was reserved (excluded from
+        reuse) throughout the run by reserve_best_calibration_core, so it's still untouched here,
+        letting this do the one and only folder copy after everything has finished. Returns a
+        short message to append to the calibration's final result message, or None if the option
+        wasn't used."""
+        if not self.dlg_calibration.save_calibrated_project.isChecked():
+            return None
+
+        nombre = self.dlg_calibration.calibrated_project_name.text().strip()
+        if nombre == "":
+            return " Calibrated project NOT saved: no name was given."
+
+        if not hasattr(self,'best_calibration_core'):
+            return " Calibrated project NOT saved: no execution completed successfully."
+
+        snapshot = self.direccion_sensitivity+f"\\Core_{self.best_calibration_core}"
+        if not os.path.exists(snapshot):
+            return " Calibrated project NOT saved: the best execution's working folder is missing."
+
+        original_project = self.dlg_calibration.project_calibration.currentText()
+
+        #Avoid silently overwriting an unrelated existing project with the same name
+        nombre_final = nombre
+        existentes = [f for f in os.listdir(self.carpeta_guardar_proyectos) if os.path.isdir(os.path.join(self.carpeta_guardar_proyectos,f))]
+        contador = 1
+        while nombre_final.lower() in [x.lower() for x in existentes]:
+            contador += 1
+            nombre_final = f"{nombre} ({contador})"
+
+        destino_proyecto = self.carpeta_guardar_proyectos+f"\\{nombre_final}"
+        #This copies Preprocessing_outputs/Processing_outputs too, which can be large (TopAGNPS
+        #rasters, many AnnAGNPS output CSVs) - reuse the calibration progress dialog (still open
+        #at this point, closed by run_calibration_two right after this returns) to show what's
+        #happening instead of QGIS just looking frozen for however long the copy takes.
+        try:
+            self.dlg_calibration_progress.set_status(f"Saving calibrated project '{nombre_final}': preparing folder...")
+            QCoreApplication.processEvents()
+            Path(destino_proyecto).mkdir(parents=True,exist_ok=True)
+            #Project-level metadata (CRS, layer references, checkboxes...) is unrelated to
+            #calibration, so it's copied unchanged from the original project
+            self.dlg_calibration_progress.set_status(f"Saving calibrated project '{nombre_final}': copying project metadata...")
+            QCoreApplication.processEvents()
+            shutil.copy2(self.carpeta_guardar_proyectos+f"\\{original_project}\\{original_project}.csv",
+                destino_proyecto+f"\\{nombre_final}.csv")
+            #Calibrated inputs and their matching outputs, from the best execution's snapshot
+            for carpeta in ["Preprocessing_inputs","Preprocessing_outputs","Processing_inputs","Processing_outputs"]:
+                self.dlg_calibration_progress.set_status(f"Saving calibrated project '{nombre_final}': copying {carpeta}...")
+                QCoreApplication.processEvents()
+                origen_carpeta = snapshot+f"\\{carpeta}"
+                if os.path.exists(origen_carpeta):
+                    shutil.copytree(origen_carpeta,destino_proyecto+f"\\{carpeta}",dirs_exist_ok=True)
+            #So the new project shows up right away in every "select project" combo box
+            self.dlg_calibration_progress.set_status(f"Saving calibrated project '{nombre_final}': updating the list of saved projects...")
+            QCoreApplication.processEvents()
+            self.update_saved_projects()
+            return f" Calibrated project saved as '{nombre_final}'."
+        except Exception as e:
+            return f" Calibrated project NOT saved. Reason: {e}"
+
+
     def run_calibration_two(self,stopped_by_user=False):
         """Method to save the results of the calibration"""
         path = self.direccion_sensitivity + "\\"+self.dlg_calibration.file_save.text()
-        self.write_calibration_report(path)
+        #IMPORTANT: this write has to be protected. If the results file is open in another
+        #program (e.g. Excel has it locked for reading), open(path,'w',...) raises
+        #PermissionError - and since this whole method runs inside a Qt signal/slot callback
+        #(finalizar_tarea_calibration -> advance_calibration_after_execution), an uncaught
+        #exception here doesn't just print a traceback: it can cross into Qt/C++ in a way that
+        #hangs and then crashes QGIS entirely, instead of failing gracefully in Python.
+        save_error = None
+        try:
+            self.write_calibration_report(path)
+        except Exception as e:
+            save_error = e
 
         #Pre-fill the "Calibration results" dialog with the file that was just written, so the
         #user doesn't have to browse for it manually - just opening that dialog shows this run's
-        #results right away
-        self.dlg_calibration_results.results.setText(path)
+        #results right away (only if the write above actually succeeded)
+        if save_error is None:
+            self.dlg_calibration_results.results.setText(path)
+
+        #If requested, save a new project with the calibrated inputs/outputs
+        aviso_proyecto_calibrado = self.save_calibrated_project() or ""
 
         #Se cierra la barra de progreso
         self.dlg_calibration_progress.close()
@@ -8700,10 +8826,16 @@ class qannagnps():
         aviso_errores = f" {errores} execution(s) failed and were skipped along the way (see {Path(self.calibration_error_log_path).name})." if errores else ""
 
         #Mensaje final
-        if stopped_by_user:
-            self.warning_message(f"Calibration stopped by the user. Results obtained so far were saved.{aviso_errores}")
+        if save_error is not None:
+            self.warning_message(
+                f"The calibration finished, but the results file could not be saved.\n"
+                f"Please make sure '{path}' is not open in another program (e.g. Excel) and try running the calibration again.\n"
+                f"Reason: {save_error}{aviso_errores}{aviso_proyecto_calibrado}"
+            )
+        elif stopped_by_user:
+            self.warning_message(f"Calibration stopped by the user. Results obtained so far were saved.{aviso_errores}{aviso_proyecto_calibrado}")
         else:
-            self.warning_message(f"Succes in the calibration{aviso_errores}")
+            self.warning_message(f"Succes in the calibration{aviso_errores}{aviso_proyecto_calibrado}")
     
     
     def calibration_bootstraping_show(self):
