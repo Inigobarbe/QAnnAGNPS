@@ -66,8 +66,10 @@ from scipy import stats
 #Local libraries
 from .libraries.SALib.sample import saltelli
 from .libraries.SALib.analyze import sobol
-from .libraries.SALib.sample.morris import sample as sample_morris 
+from .libraries.SALib.sample.morris import sample as sample_morris
 from .libraries.SALib.analyze.morris import analyze as analyze_morris
+from .libraries.SALib.sample import fast_sampler
+from .libraries.SALib.analyze import fast as fast_analyze
 from .libraries.skopt.optimizer import Optimizer
 
 #Dialog files
@@ -102,6 +104,8 @@ from .ui.calibration_results import calibration_results
 from .ui.fiteval_calibration import fiteval_calibration
 from .ui.calibration_progress import CalibrationProgressDialog
 from .ui.scenario_analysis import scenario_analysis
+from .ui.identifiability import IdentifiabilityDialog
+from .ui.results_identifiability import ResultsIdentifiabilityDialog
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -281,6 +285,8 @@ class qannagnps():
         self.dlg_calibration_results = calibration_results()
         self.dlg_fiteval_calibration= fiteval_calibration()
         self.dlg_scenario_analysis = scenario_analysis()
+        self.dlg_identifiability = IdentifiabilityDialog()
+        self.dlg_results_identifiability = ResultsIdentifiabilityDialog()
 
         #Make every persistent dialog raise itself and grab focus when shown, so that clicking its
         #button again brings it back to the front even if it was already open, hidden behind other
@@ -291,7 +297,8 @@ class qannagnps():
                        self.sensitivity_dialog,self.dlg_warning_message,self.dlg_overwrite_project,
                        self.dlg_results_sensitivity,self.dlg_figure_settings,self.dlg_calibration,
                        self.dlg_calibration_inputs,self.dlg_calibration_results,
-                       self.dlg_fiteval_calibration,self.dlg_scenario_analysis]:
+                       self.dlg_fiteval_calibration,self.dlg_scenario_analysis,
+                       self.dlg_identifiability,self.dlg_results_identifiability]:
             self.enable_raise_on_show(dialog)
 
 
@@ -736,6 +743,10 @@ class qannagnps():
         #Open sensitivity analysis dialog and results
         self.dlg.sensitivity.clicked.connect(self.sensitivity_dialog.show)
         self.dlg.results_sensitivity.clicked.connect(self.dlg_results_sensitivity.show)
+
+        #Open identifiability analysis dialog (its parameter list is (re)built on every open,
+        #since self.dic_name_column can only be built further down in initGui)
+        self.dlg.identifiability.clicked.connect(lambda: (self.search_identifiability_input(), self.dlg_identifiability.show()))
         
         #Show inputs in sensitivity analysis dialog
         self.sensitivity_dialog.Spatial.clicked.connect(lambda _,b = "Spatial":self.annagnps_inputs(b))
@@ -789,7 +800,40 @@ class qannagnps():
         dic_climate = {'Station Latitude':[self.inputs.l_48,'Latitude'],'Station Longitude':[self.inputs.l_48,'Longitude'],'Station Elevation':[self.inputs.l_48,'Elevation'],'Adiabatic Air Temperature \nLapse Rate':[self.inputs.l_48,'Temperature_Lapse_Rate'],'Precipitation Nitrogen':[self.inputs.l_48,'Precipitation_N'],'Elevation Difference (1)':[self.inputs.l_48,'1st_Elevation_Difference'],'Elevation Rain Factor (1)':[self.inputs.l_48,'1st_Elevation_Rain_Factor'],'Elevation Difference (2)':[self.inputs.l_48,'2nd_Elevation_Difference'],'Elevation Rain Factor (2)':[self.inputs.l_48,'2nd_Elevation_Rain_Factor'],'2 Yr 24 Hr Precipitation':[self.inputs.l_48,'2_Yr_24_hr_Precipitation'],'Rainfall Calibration or Areal \nCorrection Coefficient':[self.inputs.l_48,'Calibration_or_Areal_Correction_Coefficient'],'Areal Rainfall \nCorrection Exponent':[self.inputs.l_48,'Calibration_or_Areal_Correction_Exponent'],'Minimum interception \nevaporation station':[self.inputs.l_48,'Minimum_Interception_Evaporation'],'Maximum interception \nevaporation station':[self.inputs.l_48,'Maximum_Interception_Evaporation'],'EI_Pct_01':[self.inputs.l_50,'EI_Pct_01'],'EI_Pct_02':[self.inputs.l_50,'EI_Pct_02'],'EI_Pct_03':[self.inputs.l_50,'EI_Pct_03'],'EI_Pct_04':[self.inputs.l_50,'EI_Pct_04'],'EI_Pct_05':[self.inputs.l_50,'EI_Pct_05'],'EI_Pct_06':[self.inputs.l_50,'EI_Pct_06'],'EI_Pct_07':[self.inputs.l_50,'EI_Pct_07'],'EI_Pct_08':[self.inputs.l_50,'EI_Pct_08'],'EI_Pct_09':[self.inputs.l_50,'EI_Pct_09'],'EI_Pct_10':[self.inputs.l_50,'EI_Pct_10'],'EI_Pct_11':[self.inputs.l_50,'EI_Pct_11'],'EI_Pct_12':[self.inputs.l_50,'EI_Pct_12'],'EI_Pct_13':[self.inputs.l_50,'EI_Pct_13'],'EI_Pct_14':[self.inputs.l_50,'EI_Pct_14'],'EI_Pct_15':[self.inputs.l_50,'EI_Pct_15'],'EI_Pct_16':[self.inputs.l_50,'EI_Pct_16'],'EI_Pct_17':[self.inputs.l_50,'EI_Pct_17'],'EI_Pct_18':[self.inputs.l_50,'EI_Pct_18'],'EI_Pct_19':[self.inputs.l_50,'EI_Pct_19'],'EI_Pct_20':[self.inputs.l_50,'EI_Pct_20'],'EI_Pct_21':[self.inputs.l_50,'EI_Pct_21'],'EI_Pct_22':[self.inputs.l_50,'EI_Pct_22'],'EI_Pct_23':[self.inputs.l_50,'EI_Pct_23'],'EI_Pct_24':[self.inputs.l_50,'EI_Pct_24']}
         dic_simulation = {'Headcut detachment leading coefficient (a)':[self.inputs.l_56,'Hdct_Detachment_Coef_a'],'Headcut detachment exponent coefficient (b)':[self.inputs.l_56,'Hdct_Detachment_Exp_Coef_b'],'Headcut erodibility leading coefficient (a)':[self.inputs.l_56,'Hdct_Erodibility_Coef_a'],'Headcut erodibility exponent coefficient (b)':[self.inputs.l_56,'Hdct_Erodibility_Exp_Coef_b'],'Minimum Interception Evaporation Global':[self.inputs.l_56,'Min_Interception_Evaporation'],'Maximum Interception Evaporation Global':[self.inputs.l_56,'Max_Interception_Evaporation'],'Detention Coefficient “a”':[self.inputs.l_56,'Detention_Coef_a'],'Detention Coefficient “b”':[self.inputs.l_56,'Detention_Coef_b'],'RCN Convergence Tolerance':[self.inputs.l_56,'RCN_Convergence_Tolerance'],'RCN Maximum Number of Iterations':[self.inputs.l_56,'RCN_Max_Iterations'],'Available Soil Moisture Ratio for AMC II':[self.inputs.l_56,'Avbl_Soil_Moist_Ratio_AMC_II'],'Maximum Available Sediment Concentration for Sheet Flow':[self.inputs.l_56,'Max_Avbl_Sed_Conc_for_Sht_Flw'],'Maximum Available Sediment Concentration for Concentrated Flow':[self.inputs.l_56,'Max_Avbl_Sed_Conc_for_Conc_Flw'],'Critical Shear Stress':[self.inputs.l_56,'Critical_Shear_Stress'],'Crop Initial Pesticide Amount 1':[self.inputs.l_57,'Crop_Initial_Amount_1'],'Crop Initial Pesticide Amount 2':[self.inputs.l_57,'Crop_Initial_Amount_2'],'Non-crop Initial Pesticide Amount 1':[self.inputs.l_57,'Non-Crop_Initial_Amount_1'],'Non-crop Initial Pesticide Amount 2':[self.inputs.l_57,'Non-Crop_Initial_Amount_2'],'Organic carbon from all sources':[self.inputs.l_58,'OC_All_Sources'],'Organic carbon from sheet & rill':[self.inputs.l_58,'OC_Sheet_and_Rill'],'Organic carbon from feedlot':[self.inputs.l_58,'OC_Feedlot'],'Organic carbon from point source':[self.inputs.l_58,'OC_Point_Source'],'Organic carbon from gully':[self.inputs.l_58,'OC_Gully'],'Organic carbon from pond':[self.inputs.l_58,'OC_Pond'],'Organic carbon from irrigation':[self.inputs.l_58,'OC_Irrigation'],'Nitrogen from all sources':[self.inputs.l_58,'N_All_Sources'],'Nitrogen from sheet & rill':[self.inputs.l_58,'N_Sheet_and_Rill'],'Nitrogen from feedlot':[self.inputs.l_58,'N_Feedlot'],'Nitrogen from point source':[self.inputs.l_58,'N_Point_Source'],'Nitrogen from gully':[self.inputs.l_58,'N_Gully'],'Nitrogen from pond':[self.inputs.l_58,'N_Pond'],'Nitrogen from irrigation':[self.inputs.l_58,'N_Irrigation'],'Phosphorus from all sources':[self.inputs.l_58,'P_All_Sources'],'Phosphorus from sheet & rill':[self.inputs.l_58,'P_Sheet_and_Rill'],'Phosphorus from feedlot':[self.inputs.l_58,'P_Feedlot'],'Phosphorus from point source':[self.inputs.l_58,'P_Point_Source'],'Phosphorus from gully':[self.inputs.l_58,'P_Gully'],'Phosphorus from pond':[self.inputs.l_58,'P_Pond'],'Phosphorus from irrigation':[self.inputs.l_58,'P_Irrigation'],'Sediment from all sources':[self.inputs.l_58,'Sediment_All_Sources'],'Sediment from sheet & rill':[self.inputs.l_58,'Sediment_Sheet_and_Rill'],'Sediment from feedlot':[self.inputs.l_58,'Sediment_Feedlot'],'Sediment from point source':[self.inputs.l_58,'Sediment_Point_Source'],'Sediment from gully':[self.inputs.l_58,'Sediment_Gully'],'Sediment from pond':[self.inputs.l_58,'Sediment_Pond'],'Sediment from irrigation':[self.inputs.l_58,'Sediment_Irrigation'],'Target Average Annual Direct Runoff Load':[self.inputs.l_59,'Target_AA_Direct_Runoff_Load'],'RCN Retention factor':[self.inputs.l_59,'RCN_Retention_Fctr'],'Reach Ratio':[self.inputs.l_59,'Reach_Ratio'],'Available Soil Moisture, AMC-II':[self.inputs.l_59,'Avbl_Soil_Moist_AMC_II'],'Rainfall factor':[self.inputs.l_60,'Rainfall_Fctr'],'10-yr EI':[self.inputs.l_60,'10-Year_EI'],'EI Number':[self.inputs.l_60,'EI_Number'],'Initialization Method Code':[self.inputs.l_60,'Init_Method_Code'],'Inorganic_N_1':[self.inputs.l_61,'Inorganic_N_1'],'Inorganic_N_2':[self.inputs.l_61,'Inorganic_N_2'],'Inorganic_P_1':[self.inputs.l_61,'Inorganic_P_1'],'Inorganic_P_2':[self.inputs.l_61,'Inorganic_P_2'],'Soil_Moisture_1':[self.inputs.l_61,'Soil_Moisture_1'],'Soil_Moisture_2':[self.inputs.l_61,'Soil_Moisture_2'],'Organic_Matter_1':[self.inputs.l_61,'Organic_Matter_1'],'Organic_Matter_2':[self.inputs.l_61,'Organic_Matter_2'],'Organic_N_1':[self.inputs.l_61,'Organic_N_1'],'Organic_N_2':[self.inputs.l_61,'Organic_N_2'],'Organic_P_1':[self.inputs.l_61,'Organic_P_1'],'Organic_P_2':[self.inputs.l_61,'Organic_P_2'],'Surface Residue':[self.inputs.l_61,'Surface_Residue'],'Manning’s n':[self.inputs.l_61,'Mannings_n'],'Snow Depth':[self.inputs.l_61,'Snow_Depth'],'Snow Density':[self.inputs.l_61,'Snow_Density'],'Surface Constant':[self.inputs.l_61,'Surface_Constant']}
         self.dic_name_column = {**dic_spatial,**dic_watershed, **dic_general, **dic_climate, **dic_simulation}
-        
+
+        #Identifiability analysis dialog: same parameter-selection/table/row mechanics as
+        #calibration (category browsing by Spatial/Watershed/General/Climate/Simulation, reusing
+        #the exact same category_inputs_dictionary, plus a search box over self.dic_name_column)
+        self.dlg_identifiability.distributions.addItems(["Uniform","Logaritmic uniform","Normal","Lognormal"])
+        self.dlg_identifiability.add.clicked.connect(self.add_identifiability_table)
+        self.dlg_identifiability.delete_row.clicked.connect(self.delete_identifiability_table)
+        self.dlg_identifiability.search.textChanged.connect(self.search_identifiability_input)
+        self.dlg_identifiability.Spatial.clicked.connect(lambda _,b = "Spatial":self.identifiability_inputs(b))
+        self.dlg_identifiability.Watershed.clicked.connect(lambda _,b = "Watershed":self.identifiability_inputs(b))
+        self.dlg_identifiability.General.clicked.connect(lambda _,b = "General":self.identifiability_inputs(b))
+        self.dlg_identifiability.Climate.clicked.connect(lambda _,b = "Climate":self.identifiability_inputs(b))
+        self.dlg_identifiability.Simulation.clicked.connect(lambda _,b = "Simulation":self.identifiability_inputs(b))
+        self.dlg_identifiability.row_curve_number.currentTextChanged.connect(
+            lambda text: self.dlg_identifiability.parameter.setText(f"Curve Number Shift__{text}" if text else "Curve Number Shift"))
+        self.dlg_identifiability.accept.clicked.connect(self.run_identifiability_analysis)
+        #Relabel the sample-size field (M / Trajectories / N) and preview the total number of
+        #executions, depending on the selected method - same mechanics as change_sensitivity_metod
+        self.dlg_identifiability.sobol.toggled.connect(self.change_identifiability_metod)
+        self.dlg_identifiability.morris.toggled.connect(self.change_identifiability_metod)
+        self.dlg_identifiability.fast.toggled.connect(self.change_identifiability_metod)
+        self.dlg_identifiability.trajectories.textChanged.connect(self.change_identifiability_metod)
+        self.dlg_identifiability.combo_metric.addItems(["NSE","RMSE","PBIAS","KGE"])
+        self.build_calibration_output_radios(self.plugin_directory,self.dlg_identifiability)
+        self.dlg_identifiability.observed_push.clicked.connect(lambda: (self.dlg_calibration_inputs.show(), self.dlg_calibration_inputs.raise_()))
+        for output_radio in self.dlg_identifiability.output_radios.values():
+            output_radio.toggled.connect(lambda checked: self.update_graph_calibration_inputs(self.dlg_identifiability) if checked else None)
+        self.dlg_results_identifiability.browse.clicked.connect(self.browse_results_identifiability)
+        self.dlg_results_identifiability.results.textChanged.connect(self.update_identifiability_results_graph)
+        self.dlg_results_identifiability.pushButton_3.clicked.connect(self.dlg_results_identifiability.close)
+        #Let the user drag the divider to give either the tables or the graph more width, instead
+        #of only the graph side growing when the whole dialog is resized
+        self.dlg_results_identifiability.splitter.setSizes([450,600])
+
         #Change bounds in sensitivity dialog if distribution changed
         self.sensitivity_dialog.distributions.currentIndexChanged.connect(self.change_bounds)
         
@@ -1308,8 +1352,15 @@ class qannagnps():
             
     
     
-    def update_graph_calibration_inputs(self):
-        """Method to update the graph of the inputs of calibration"""
+    def update_graph_calibration_inputs(self,dlg=None):
+        """Method to update the graph of the inputs of calibration. dlg is whichever dialog
+        (calibration or identifiability analysis - both share this same observed-data dialog)
+        currently has the output selection that should label the y-axis; remembered across calls
+        that don't pass one (e.g. the Daily/Monthly/Annual toggle) so it keeps showing the output
+        that was last actually selected, not always calibration's."""
+        if dlg is not None:
+            self.last_observed_output_dlg = dlg
+        dlg = getattr(self,'last_observed_output_dlg',None) or self.dlg_calibration
         #Create and clear axis before drawing
         if not hasattr(self, 'canvas_calibration_inputs_graph'):
             # Si no existe, crear el canvas y añadirlo al layout
@@ -1391,7 +1442,7 @@ class qannagnps():
 
             # 5. Personalización de Ejes
             file_name = os.path.basename(file_path)
-            output_label = self.calibration_output_display_label()
+            output_label = self.calibration_output_display_label(dlg)
             self.ax_calibration_inputs.set_title(f"Observed data ({time_step}) — {file_name}", fontsize=12, color=text_color, weight='bold', pad=12)
             self.ax_calibration_inputs.set_ylabel(f"Observed {output_label}", fontsize=11, color=text_color)
             self.ax_calibration_inputs.set_xlabel('Date', fontsize=11, color=text_color)
@@ -3277,8 +3328,13 @@ class qannagnps():
         #Add remove row in sensitivity analysis table
         self.sensitivity_dialog.add.setIcon(QIcon(os.path.join(self.plugin_directory, "images/add.svg")))
         self.sensitivity_dialog.delete_row.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
+        #Add remove row in identifiability analysis table
+        self.dlg_identifiability.add.setIcon(QIcon(os.path.join(self.plugin_directory, "images/add.svg")))
+        self.dlg_identifiability.delete_row.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
         #Sensitivity analysis
         self.dlg.sensitivity.setIcon(QIcon(os.path.join(self.plugin_directory, "images/balance.svg")))
+        #Identifiability analysis
+        self.dlg.identifiability.setIcon(QIcon(os.path.join(self.plugin_directory, "images/balance.svg")))
         #Information of control files
         self.ctopagnps.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
         self.cpeg.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
@@ -6683,6 +6739,17 @@ class qannagnps():
             self.dlg_calibration.project_calibration.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
         
         
+        #In identifiability analysis
+        self.dlg_identifiability.project_identifiability.clear()
+        self.dlg_identifiability.project_identifiability.addItems(project_names)
+        if not project_names:
+            pass
+        elif self.dlg.name_of_project.text() == "": #we put the last modified folder
+            self.dlg_identifiability.project_identifiability.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
+        else:
+            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive.
+            self.dlg_identifiability.project_identifiability.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
+
         #In scenario analysis
         if update_scenario:
             layout = self.dlg_scenario_analysis.frame.layout()
@@ -6849,79 +6916,72 @@ class qannagnps():
         for i in self.table_buttons:
             i.setToolTip(self.tr("Modify input"))
         
-    def annagnps_inputs(self,section):
-        #Metod to add annangps inputs in the dialog depending on section selection
-        
-        #Delete all elements of vertical layout of scroll area
-        while self.sensitivity_dialog.verticalLayout_2.count():
-            child = self.sensitivity_dialog.verticalLayout_2.takeAt(0)
+    def category_inputs_dictionary(self):
+        """The category -> {subcategory: [parameters]} browsing structure behind the Spatial/
+        Watershed/General/Climate/Simulation buttons. Defined once here and shared by the
+        sensitivity, calibration AND identifiability dialogs (via build_category_inputs) so it
+        never needs to be duplicated again."""
+        dic_spatial = {"TopAgnps":["Pixel Size","Critical Source Area","Minimum Source Channel \nLength"],"Ephemeral Gully":["Absolute CTI","Relative CTI"],"Riparian Buffers":["Cell Threshold","Reach Threshold"],"Hydraulics and hydrology \nfor cells and reaches":["Drainage area \nto concentrated flow","Maximum profile length \nuntil deposition","Maximum Profile Slope"],"Wetland":["Wetness Index Threshold","Erosion Index Threshold","Drainage Area Threshold","Maximum Wetland Ratio","Minimum Wetland Ratio","Barrier Height","Barrier Height Increment","Barrier Height Maximum","Buffer width"],"Pothole":["Pothole Surface Area"]}
+        dic_watershed = {"Aquaculture pond":["Pond area","Pond Depth", "Seepage Rate", "Sediment Delivery Ratio Pond", "Organic Carbon \nCalibration Factor Pond", "Nitrogen Calibration Factor Pond", "Phosphorus Calibration Factor Pond", "Erosion Calibration Factor Pond"],"Cell":["Sheet flow Manning’s n","Concentrated flow \nhydraulic depth","Concentrated flow Manning’s n","Delivery Ratio Pond","Constant USLE C factor","Constant USLE P factor","All Organic Carbon \nCalibration Factor","All Nitrogen Calibration Factor","All Phosphorus Calibration Factor","Sheet and Rill Erosion \nCalibration Factor","Gullies Erosion Calibration Factor"],"Classic Gully":["Head Cut Depth","Erosion Coefficient","Erosion Exponent","Delivery Ratio Gully","Organic Carbon \nCalibration Factor Gully","Nitrogen Calibration Factor Gully","Phosphorus Calibration Factor Gully","Erosion Calibration Factor Gully"],"Ephemeral Gully":["Critical Shear Stress \nEphemeral Gully","Erosion Depth","Delivery Ratio Ephemeral Gully","Manning’s n Ephemeral Gully","Re Plant Period","Organic Carbon","Nitrogen","Phosphorus","Erosion","Headcut detachment leading \ncoefficient a","Headcut erodibility \nleading coefficient a","Headcut detachment exponent \ncoefficient b","Headcut erodibility exponent \ncoefficient b","Maximum Buffer Trapping \nEfficiency TE m"],"Feedlot":["Open Area","Paved Ratio","Roof Area","Upslope Area","Feedlot Initial N","Feedlot Initial P","Feedlot Initial OrgC","Delta N","Delta P","Delta OrgC","Feedlot Max N","Feedlot Max P","Feedlot Max OrgC","Feedlot Pack N","Feedlot Pack P","Feedlot Pack OrgC","Organic Carbon Calibration \nFactor Feedlot","Nitrogen Calibration \nFactor Feedlot","Phosphorus Calibration \nFactor Feedlot","Erosion Calibration \nFactor Feedlot","Cell Buffer Length"],"Field Pond":["Field Pond area","Number of rotation years","Number gate operations","Delivery Ratio Field Pond","Volume of release water","Drain Time","Release rate","Sediment Concentration","Clay content Field Pond","Silt content Field Pond","Organic Carbon Calibration Factor Field Pond","Nitrogen Calibration Factor Field Pond","Phosphorus Calibration Factor Field Pond","Erosion Calibration Factor Field Pond"], "Impoundment":["Impoundment Infiltration","Impoundment Seepage","Permanent Pool Depth","Impound Volume Coefficient","Impound Volume Exponent","Impound Discharge Coefficient","Impound Discharge Exponent","Sediment Clean Out Depth","Sediment Clean Out Year"], "Point Source":["Point Flow","Point Nitrogen","Point Phosphorus","Point Organic Carbon","Organic Carbon Calibration Factor","Nitrogen Calibration Factor","Phosphorus Calibration Factor","Erosion Calibration Factor"], "Reach":["Reach Manning’s n","Reach Flow Depth","Valley Width","Valley n","Delivery Ratio Reach"], "Watershed":["Latitude","Longitude"], "Wetland":["Wetland Area","Initial Water Depth","Minimum Water Depth","Maximum Water Depth","Water Temperature","Potential Daily Infiltration","Weir Coefficient","Weir Width","Weir Height","Soluble N Concentration","Nitrate Loss Rate","Nitrate Loss Rate Coefficient","Temperature Coefficient","Weir Exponent"]}
+        dic_general = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”","Curve Number Shift"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
+        dic_climate = {"Climate Station":["Station Latitude","Station Longitude","Station Elevation","Adiabatic Air Temperature \nLapse Rate","Precipitation Nitrogen","Elevation Difference (1)","Elevation Rain Factor (1)","Elevation Difference (2)","Elevation Rain Factor (2)","2 Yr 24 Hr Precipitation","Rainfall Calibration or Areal \nCorrection Coefficient","Areal Rainfall \nCorrection Exponent","Minimum interception \nevaporation station","Maximum interception \nevaporation station"], "EI Percentage":["EI_Pct_01","EI_Pct_02","EI_Pct_03","EI_Pct_04","EI_Pct_05","EI_Pct_06","EI_Pct_07","EI_Pct_08","EI_Pct_09","EI_Pct_10","EI_Pct_11","EI_Pct_12","EI_Pct_13","EI_Pct_14","EI_Pct_15","EI_Pct_16","EI_Pct_17","EI_Pct_18","EI_Pct_19","EI_Pct_20","EI_Pct_21","EI_Pct_22","EI_Pct_23","EI_Pct_24"]}
+        dic_simulation = {"Global IDs Factors \n and Flags":["Headcut detachment leading coefficient (a)","Headcut detachment exponent coefficient (b)","Headcut erodibility leading coefficient (a)","Headcut erodibility exponent coefficient (b)","Minimum Interception Evaporation Global","Maximum Interception Evaporation Global","Detention Coefficient “a”","Detention Coefficient “b”","RCN Convergence Tolerance","RCN Maximum Number of Iterations","Available Soil Moisture Ratio for AMC II","Maximum Available Sediment Concentration for Sheet Flow","Maximum Available Sediment Concentration for Concentrated Flow","Critical Shear Stress"],"Pesticide Initial Conditions":["Crop Initial Pesticide Amount 1","Crop Initial Pesticide Amount 2","Non-crop Initial Pesticide Amount 1","Non-crop Initial Pesticide Amount 2"],"PL Calibration":["Organic carbon from all sources","Organic carbon from sheet & rill","Organic carbon from feedlot","Organic carbon from point source","Organic carbon from gully","Organic carbon from pond","Organic carbon from irrigation","Nitrogen from all sources","Nitrogen from sheet & rill","Nitrogen from feedlot","Nitrogen from point source","Nitrogen from gully","Nitrogen from pond","Nitrogen from irrigation","Phosphorus from all sources","Phosphorus from sheet & rill","Phosphorus from feedlot","Phosphorus from point source","Phosphorus from gully","Phosphorus from pond","Phosphorus from irrigation","Sediment from all sources","Sediment from sheet & rill","Sediment from feedlot","Sediment from point source","Sediment from gully","Sediment from pond","Sediment from irrigation"],"RCN Calibration":["Target Average Annual Direct Runoff Load","RCN Retention factor","Reach Ratio","Available Soil Moisture, AMC-II"],"Simulation Period":["Rainfall factor","10-yr EI","EI Number","Initialization Method Code"],"Soil Initial Conditions":["Inorganic_N_1" ,"Inorganic_N_2", "Inorganic_P_1","Inorganic_P_2", "Soil_Moisture_1","Soil_Moisture_2", "Organic_Matter_1","Organic_Matter_2","Organic_N_1","Organic_N_2", "Organic_P_1","Organic_P_2","Surface Residue","Manning’s n","Snow Depth","Snow Density","Surface Constant"]}
+        return {
+            "Spatial": (["TopAgnps","Ephemeral Gully","Riparian Buffers","Hydraulics and hydrology \nfor cells and reaches","Wetland","Pothole"], dic_spatial),
+            "Watershed": (["Aquaculture pond","Cell","Classic Gully","Ephemeral Gully","Feedlot","Field Pond", "Impoundment", "Point Source", "Reach", "Watershed", "Wetland"], dic_watershed),
+            "General": (["Management Aquaculture \n Pond Schedule", "Contour", "Crop", "Crop Growth", "Feedlot Management","Fertilizer application", "Fertilizer reference", "Geology", "Hydraulic Geometry", "Irrigation Application", "Management Field", "Management Operation", "Management Schedule", "Non-crop","Pesticide Application", "Pesticide Reference","Reach Nutrient Half-life", "Riparian Buffer", "Runoff Curve", "Soil", "Soil Layers", "Strip Crop", "Tile Drain"], dic_general),
+            "Climate": (["Climate Station", "EI Percentage"], dic_climate),
+            "Simulation": (["Global IDs Factors \n and Flags","Pesticide Initial Conditions","PL Calibration","RCN Calibration","Simulation Period","Soil Initial Conditions"], dic_simulation),
+        }
+
+    def build_category_inputs(self,dlg,project,section,callback):
+        """Method shared by the sensitivity, calibration and identifiability dialogs: fills
+        dlg.verticalLayout_2 with the subcategories of `section` (Spatial/Watershed/General/
+        Climate/Simulation), each wired to open its parameters in dlg.verticalLayout_3 via
+        `callback` (add_parameter_label / add_parameter_label_calibration /
+        add_parameter_label_identifiability)."""
+        while dlg.verticalLayout_2.count():
+            child = dlg.verticalLayout_2.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
-        
-        #Add elements depending on selection
-        #Import master file to check if the files exist
         try:
-            master_file = self.carpeta_guardar_proyectos+f"\\{self.sensitivity_dialog.project_sensitivity.currentText()}\\Processing_inputs\\annagnps_master.csv"
+            master_file = self.carpeta_guardar_proyectos+f"\\{project}\\Processing_inputs\\annagnps_master.csv"
             project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
         except:
             project_df = "nan"
-        
-        #Add buttons
-        if section == "Spatial":
-            inputs_spatial = ["TopAgnps","Ephemeral Gully","Riparian Buffers","Hydraulics and hydrology \nfor cells and reaches","Wetland","Pothole"]
-            dic = {"TopAgnps":["Pixel Size","Critical Source Area","Minimum Source Channel \nLength"],"Ephemeral Gully":["Absolute CTI","Relative CTI"],"Riparian Buffers":["Cell Threshold","Reach Threshold"],"Hydraulics and hydrology \nfor cells and reaches":["Drainage area \nto concentrated flow","Maximum profile length \nuntil deposition","Maximum Profile Slope"],"Wetland":["Wetness Index Threshold","Erosion Index Threshold","Drainage Area Threshold","Maximum Wetland Ratio","Minimum Wetland Ratio","Barrier Height","Barrier Height Increment","Barrier Height Maximum","Buffer width"],"Pothole":["Pothole Surface Area"]}
-            for nombre in inputs_spatial:
-                boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
+        inputs,dic = self.category_inputs_dictionary()[section]
+        #Historically "Spatial" subcategories were always shown, unlike the other sections
+        check_presence = section != "Spatial"
+        for nombre in inputs:
+            if (not check_presence) or self.check_if_input_present_in_master(nombre,project_df):
+                boton = QtWidgets.QPushButton(nombre, dlg.scrollAreaWidgetContents)
                 boton.setObjectName(nombre)
-                self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
+                dlg.verticalLayout_2.addWidget(boton)
                 política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
                 boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
-        if section == "Watershed":
-            inputs_watershed = ["Aquaculture pond","Cell","Classic Gully","Ephemeral Gully","Feedlot","Field Pond", "Impoundment", "Point Source", "Reach", "Watershed", "Wetland"]
-            dic = {"Aquaculture pond":["Pond area","Pond Depth", "Seepage Rate", "Sediment Delivery Ratio Pond", "Organic Carbon \nCalibration Factor Pond", "Nitrogen Calibration Factor Pond", "Phosphorus Calibration Factor Pond", "Erosion Calibration Factor Pond"],"Cell":["Sheet flow Manning’s n","Concentrated flow \nhydraulic depth","Concentrated flow Manning’s n","Delivery Ratio Pond","Constant USLE C factor","Constant USLE P factor","All Organic Carbon \nCalibration Factor","All Nitrogen Calibration Factor","All Phosphorus Calibration Factor","Sheet and Rill Erosion \nCalibration Factor","Gullies Erosion Calibration Factor"],"Classic Gully":["Head Cut Depth","Erosion Coefficient","Erosion Exponent","Delivery Ratio Gully","Organic Carbon \nCalibration Factor Gully","Nitrogen Calibration Factor Gully","Phosphorus Calibration Factor Gully","Erosion Calibration Factor Gully"],"Ephemeral Gully":["Critical Shear Stress \nEphemeral Gully","Erosion Depth","Delivery Ratio Ephemeral Gully","Manning’s n Ephemeral Gully","Re Plant Period","Organic Carbon","Nitrogen","Phosphorus","Erosion","Headcut detachment leading \ncoefficient a","Headcut erodibility \nleading coefficient a","Headcut detachment exponent \ncoefficient b","Headcut erodibility exponent \ncoefficient b","Maximum Buffer Trapping \nEfficiency TE m"],"Feedlot":["Open Area","Paved Ratio","Roof Area","Upslope Area","Feedlot Initial N","Feedlot Initial P","Feedlot Initial OrgC","Delta N","Delta P","Delta OrgC","Feedlot Max N","Feedlot Max P","Feedlot Max OrgC","Feedlot Pack N","Feedlot Pack P","Feedlot Pack OrgC","Organic Carbon Calibration \nFactor Feedlot","Nitrogen Calibration \nFactor Feedlot","Phosphorus Calibration \nFactor Feedlot","Erosion Calibration \nFactor Feedlot","Cell Buffer Length"],"Field Pond":["Field Pond area","Number of rotation years","Number gate operations","Delivery Ratio Field Pond","Volume of release water","Drain Time","Release rate","Sediment Concentration","Clay content Field Pond","Silt content Field Pond","Organic Carbon Calibration Factor Field Pond","Nitrogen Calibration Factor Field Pond","Phosphorus Calibration Factor Field Pond","Erosion Calibration Factor Field Pond"], "Impoundment":["Impoundment Infiltration","Impoundment Seepage","Permanent Pool Depth","Impound Volume Coefficient","Impound Volume Exponent","Impound Discharge Coefficient","Impound Discharge Exponent","Sediment Clean Out Depth","Sediment Clean Out Year"], "Point Source":["Point Flow","Point Nitrogen","Point Phosphorus","Point Organic Carbon","Organic Carbon Calibration Factor","Nitrogen Calibration Factor","Phosphorus Calibration Factor","Erosion Calibration Factor"], "Reach":["Reach Manning’s n","Reach Flow Depth","Valley Width","Valley n","Delivery Ratio Reach"], "Watershed":["Latitude","Longitude"], "Wetland":["Wetland Area","Initial Water Depth","Minimum Water Depth","Maximum Water Depth","Water Temperature","Potential Daily Infiltration","Weir Coefficient","Weir Width","Weir Height","Soluble N Concentration","Nitrate Loss Rate","Nitrate Loss Rate Coefficient","Temperature Coefficient","Weir Exponent"]}
-            for nombre in inputs_watershed:
-                if self.check_if_input_present_in_master(nombre,project_df):
-                    boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
-                    boton.setObjectName(nombre)
-                    self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                    boton.setSizePolicy(política_tamaño)
-                    boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
-        if section == "General":
-            inputs_general = ["Management Aquaculture \n Pond Schedule", "Contour", "Crop", "Crop Growth", "Feedlot Management","Fertilizer application", "Fertilizer reference", "Geology", "Hydraulic Geometry", "Irrigation Application", "Management Field", "Management Operation", "Management Schedule", "Non-crop","Pesticide Application", "Pesticide Reference","Reach Nutrient Half-life", "Riparian Buffer", "Runoff Curve", "Soil", "Soil Layers", "Strip Crop", "Tile Drain"]
-            dic = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”","Curve Number Shift"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
-            for nombre in inputs_general:
-                if self.check_if_input_present_in_master(nombre,project_df):
-                    boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
-                    boton.setObjectName(nombre)
-                    self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                    boton.setSizePolicy(política_tamaño)
-                    boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
-        if section == "Climate":
-            inputs_climate = ["Climate Station", "EI Percentage"]
-            dic = {"Climate Station":["Station Latitude","Station Longitude","Station Elevation","Adiabatic Air Temperature \nLapse Rate","Precipitation Nitrogen","Elevation Difference (1)","Elevation Rain Factor (1)","Elevation Difference (2)","Elevation Rain Factor (2)","2 Yr 24 Hr Precipitation","Rainfall Calibration or Areal \nCorrection Coefficient","Areal Rainfall \nCorrection Exponent","Minimum interception \nevaporation station","Maximum interception \nevaporation station"], "EI Percentage":["EI_Pct_01","EI_Pct_02","EI_Pct_03","EI_Pct_04","EI_Pct_05","EI_Pct_06","EI_Pct_07","EI_Pct_08","EI_Pct_09","EI_Pct_10","EI_Pct_11","EI_Pct_12","EI_Pct_13","EI_Pct_14","EI_Pct_15","EI_Pct_16","EI_Pct_17","EI_Pct_18","EI_Pct_19","EI_Pct_20","EI_Pct_21","EI_Pct_22","EI_Pct_23","EI_Pct_24"]}
-            for nombre in inputs_climate:
-                if self.check_if_input_present_in_master(nombre,project_df):
-                    boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
-                    boton.setObjectName(nombre)
-                    self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                    boton.setSizePolicy(política_tamaño)
-                    boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
-        if section == "Simulation":
-            inputs_simulation = ["Global IDs Factors \n and Flags","Pesticide Initial Conditions","PL Calibration","RCN Calibration","Simulation Period","Soil Initial Conditions"]
-            dic = {"Global IDs Factors \n and Flags":["Headcut detachment leading coefficient (a)","Headcut detachment exponent coefficient (b)","Headcut erodibility leading coefficient (a)","Headcut erodibility exponent coefficient (b)","Minimum Interception Evaporation Global","Maximum Interception Evaporation Global","Detention Coefficient “a”","Detention Coefficient “b”","RCN Convergence Tolerance","RCN Maximum Number of Iterations","Available Soil Moisture Ratio for AMC II","Maximum Available Sediment Concentration for Sheet Flow","Maximum Available Sediment Concentration for Concentrated Flow","Critical Shear Stress"],"Pesticide Initial Conditions":["Crop Initial Pesticide Amount 1","Crop Initial Pesticide Amount 2","Non-crop Initial Pesticide Amount 1","Non-crop Initial Pesticide Amount 2"],"PL Calibration":["Organic carbon from all sources","Organic carbon from sheet & rill","Organic carbon from feedlot","Organic carbon from point source","Organic carbon from gully","Organic carbon from pond","Organic carbon from irrigation","Nitrogen from all sources","Nitrogen from sheet & rill","Nitrogen from feedlot","Nitrogen from point source","Nitrogen from gully","Nitrogen from pond","Nitrogen from irrigation","Phosphorus from all sources","Phosphorus from sheet & rill","Phosphorus from feedlot","Phosphorus from point source","Phosphorus from gully","Phosphorus from pond","Phosphorus from irrigation","Sediment from all sources","Sediment from sheet & rill","Sediment from feedlot","Sediment from point source","Sediment from gully","Sediment from pond","Sediment from irrigation"],"RCN Calibration":["Target Average Annual Direct Runoff Load","RCN Retention factor","Reach Ratio","Available Soil Moisture, AMC-II"],"Simulation Period":["Rainfall factor","10-yr EI","EI Number","Initialization Method Code"],"Soil Initial Conditions":["Inorganic_N_1" ,"Inorganic_N_2", "Inorganic_P_1","Inorganic_P_2", "Soil_Moisture_1","Soil_Moisture_2", "Organic_Matter_1","Organic_Matter_2","Organic_N_1","Organic_N_2", "Organic_P_1","Organic_P_2","Surface Residue","Manning’s n","Snow Depth","Snow Density","Surface Constant"]}
-            for nombre in inputs_simulation:
-                if self.check_if_input_present_in_master(nombre,project_df):
-                    boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents)
-                    boton.setObjectName(nombre)
-                    self.sensitivity_dialog.verticalLayout_2.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                    boton.setSizePolicy(política_tamaño)
-                    boton.clicked.connect(lambda _, b = dic[nombre]: self.annagnps_parameters(b))
-    
+                boton.clicked.connect(lambda _, b = dic[nombre]: self.show_category_parameters(dlg,b,callback))
+
+    def show_category_parameters(self,dlg,parameters,callback):
+        """Method shared by the sensitivity, calibration and identifiability dialogs: shows the
+        actual parameters of a chosen subcategory in dlg.verticalLayout_3, each wired to `callback`
+        to fill in the parameter lineEdit (and the Curve Number Shift dropdown, when applicable)."""
+        while dlg.verticalLayout_3.count():
+            child = dlg.verticalLayout_3.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        for nombre in parameters:
+            boton = QtWidgets.QPushButton(nombre, dlg.scrollAreaWidgetContents_3)
+            boton.setObjectName(nombre)
+            dlg.verticalLayout_3.addWidget(boton)
+            política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+            boton.setSizePolicy(política_tamaño)
+            boton.clicked.connect(lambda _, b = nombre: callback(b))
+
+    def annagnps_inputs(self,section):
+        #Metod to add annangps inputs in the dialog depending on section selection
+        project = self.sensitivity_dialog.project_sensitivity.currentText()
+        self.build_category_inputs(self.sensitivity_dialog,project,section,self.add_parameter_label)
+
     def check_if_input_present_in_master(self,fichero,project_df):
         """Method to check if a file is present in a master file for the inputs of sensitivity and calibration"""
         dictionary_master_file = {"Aquaculture pond":"Aquaculture Pond Data",
@@ -6984,111 +7044,14 @@ class qannagnps():
     
     def calibration_inputs(self,section):
         #Metod to add calibration inputs in the dialog depending on section selection
-        
-        #Delete all elements of vertical layout of scroll area
-        while self.dlg_calibration.verticalLayout_2.count():
-            child = self.dlg_calibration.verticalLayout_2.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-        
-        #Add elements depending on selection
-        
-        #Import master file to check if the files exist
-        try:
-            master_file = self.carpeta_guardar_proyectos+f"\\{self.sensitivity_dialog.project_sensitivity.currentText()}\\Processing_inputs\\annagnps_master.csv"
-            project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
-        except:
-            project_df = "nan"
-            
-        #Add buttons
-        if section == "Spatial":
-            inputs_spatial = ["TopAgnps","Ephemeral Gully","Riparian Buffers","Hydraulics and hydrology \nfor cells and reaches","Wetland","Pothole"]
-            dic = {"TopAgnps":["Pixel Size","Critical Source Area","Minimum Source Channel \nLength"],"Ephemeral Gully":["Absolute CTI","Relative CTI"],"Riparian Buffers":["Cell Threshold","Reach Threshold"],"Hydraulics and hydrology \nfor cells and reaches":["Drainage area \nto concentrated flow","Maximum profile length \nuntil deposition","Maximum Profile Slope"],"Wetland":["Wetness Index Threshold","Erosion Index Threshold","Drainage Area Threshold","Maximum Wetland Ratio","Minimum Wetland Ratio","Barrier Height","Barrier Height Increment","Barrier Height Maximum","Buffer width"],"Pothole":["Pothole Surface Area"]}
-            for nombre in inputs_spatial:
-                boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
-                boton.setObjectName(nombre)
-                self.dlg_calibration.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                boton.setSizePolicy(política_tamaño)
-                boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
-        if section == "Watershed":
-            inputs_watershed = ["Aquaculture pond","Cell","Classic Gully","Ephemeral Gully","Feedlot","Field Pond", "Impoundment", "Point Source", "Reach", "Watershed", "Wetland"]
-            dic = {"Aquaculture pond":["Pond area","Pond Depth", "Seepage Rate", "Sediment Delivery Ratio Pond", "Organic Carbon \nCalibration Factor Pond", "Nitrogen Calibration Factor Pond", "Phosphorus Calibration Factor Pond", "Erosion Calibration Factor Pond"],"Cell":["Sheet flow Manning’s n","Concentrated flow \nhydraulic depth","Concentrated flow Manning’s n","Delivery Ratio Pond","Constant USLE C factor","Constant USLE P factor","All Organic Carbon \nCalibration Factor","All Nitrogen Calibration Factor","All Phosphorus Calibration Factor","Sheet and Rill Erosion \nCalibration Factor","Gullies Erosion Calibration Factor"],"Classic Gully":["Head Cut Depth","Erosion Coefficient","Erosion Exponent","Delivery Ratio Gully","Organic Carbon \nCalibration Factor Gully","Nitrogen Calibration Factor Gully","Phosphorus Calibration Factor Gully","Erosion Calibration Factor Gully"],"Ephemeral Gully":["Critical Shear Stress \nEphemeral Gully","Erosion Depth","Delivery Ratio Ephemeral Gully","Manning’s n Ephemeral Gully","Re Plant Period","Organic Carbon","Nitrogen","Phosphorus","Erosion","Headcut detachment leading \ncoefficient a","Headcut erodibility \nleading coefficient a","Headcut detachment exponent \ncoefficient b","Headcut erodibility exponent \ncoefficient b","Maximum Buffer Trapping \nEfficiency TE m"],"Feedlot":["Open Area","Paved Ratio","Roof Area","Upslope Area","Feedlot Initial N","Feedlot Initial P","Feedlot Initial OrgC","Delta N","Delta P","Delta OrgC","Feedlot Max N","Feedlot Max P","Feedlot Max OrgC","Feedlot Pack N","Feedlot Pack P","Feedlot Pack OrgC","Organic Carbon Calibration \nFactor Feedlot","Nitrogen Calibration \nFactor Feedlot","Phosphorus Calibration \nFactor Feedlot","Erosion Calibration \nFactor Feedlot","Cell Buffer Length"],"Field Pond":["Field Pond area","Number of rotation years","Number gate operations","Delivery Ratio Field Pond","Volume of release water","Drain Time","Release rate","Sediment Concentration","Clay content Field Pond","Silt content Field Pond","Organic Carbon Calibration Factor Field Pond","Nitrogen Calibration Factor Field Pond","Phosphorus Calibration Factor Field Pond","Erosion Calibration Factor Field Pond"], "Impoundment":["Impoundment Infiltration","Impoundment Seepage","Permanent Pool Depth","Impound Volume Coefficient","Impound Volume Exponent","Impound Discharge Coefficient","Impound Discharge Exponent","Sediment Clean Out Depth","Sediment Clean Out Year"], "Point Source":["Point Flow","Point Nitrogen","Point Phosphorus","Point Organic Carbon","Organic Carbon Calibration Factor","Nitrogen Calibration Factor","Phosphorus Calibration Factor","Erosion Calibration Factor"], "Reach":["Reach Manning’s n","Reach Flow Depth","Valley Width","Valley n","Delivery Ratio Reach"], "Watershed":["Latitude","Longitude"], "Wetland":["Wetland Area","Initial Water Depth","Minimum Water Depth","Maximum Water Depth","Water Temperature","Potential Daily Infiltration","Weir Coefficient","Weir Width","Weir Height","Soluble N Concentration","Nitrate Loss Rate","Nitrate Loss Rate Coefficient","Temperature Coefficient","Weir Exponent"]}
-            for nombre in inputs_watershed:
-                if self.check_if_input_present_in_master(nombre,project_df):
-                    boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
-                    boton.setObjectName(nombre)
-                    self.dlg_calibration.verticalLayout_2.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                    boton.setSizePolicy(política_tamaño)
-                    boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
-        if section == "General":
-            inputs_general = ["Management Aquaculture \n Pond Schedule", "Contour", "Crop", "Crop Growth", "Feedlot Management","Fertilizer application", "Fertilizer reference", "Geology", "Hydraulic Geometry", "Irrigation Application", "Management Field", "Management Operation", "Management Schedule", "Non-crop","Pesticide Application", "Pesticide Reference","Reach Nutrient Half-life", "Riparian Buffer", "Runoff Curve", "Soil", "Soil Layers", "Strip Crop", "Tile Drain"]
-            dic = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”","Curve Number Shift"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
-            for nombre in inputs_general:
-                if self.check_if_input_present_in_master(nombre,project_df):
-                    boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
-                    boton.setObjectName(nombre)
-                    self.dlg_calibration.verticalLayout_2.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                    boton.setSizePolicy(política_tamaño)
-                    boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
-        if section == "Climate":
-            inputs_climate = ["Climate Station", "EI Percentage"]
-            dic = {"Climate Station":["Station Latitude","Station Longitude","Station Elevation","Adiabatic Air Temperature \nLapse Rate","Precipitation Nitrogen","Elevation Difference (1)","Elevation Rain Factor (1)","Elevation Difference (2)","Elevation Rain Factor (2)","2 Yr 24 Hr Precipitation","Rainfall Calibration or Areal \nCorrection Coefficient","Areal Rainfall \nCorrection Exponent","Minimum interception \nevaporation station","Maximum interception \nevaporation station"], "EI Percentage":["EI_Pct_01","EI_Pct_02","EI_Pct_03","EI_Pct_04","EI_Pct_05","EI_Pct_06","EI_Pct_07","EI_Pct_08","EI_Pct_09","EI_Pct_10","EI_Pct_11","EI_Pct_12","EI_Pct_13","EI_Pct_14","EI_Pct_15","EI_Pct_16","EI_Pct_17","EI_Pct_18","EI_Pct_19","EI_Pct_20","EI_Pct_21","EI_Pct_22","EI_Pct_23","EI_Pct_24"]}
-            for nombre in inputs_climate:
-                if self.check_if_input_present_in_master(nombre,project_df):
-                    boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
-                    boton.setObjectName(nombre)
-                    self.dlg_calibration.verticalLayout_2.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                    boton.setSizePolicy(política_tamaño)
-                    boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
-        if section == "Simulation":
-            inputs_simulation = ["Global IDs Factors \n and Flags","Pesticide Initial Conditions","PL Calibration","RCN Calibration","Simulation Period","Soil Initial Conditions"]
-            dic = {"Global IDs Factors \n and Flags":["Headcut detachment leading coefficient (a)","Headcut detachment exponent coefficient (b)","Headcut erodibility leading coefficient (a)","Headcut erodibility exponent coefficient (b)","Minimum Interception Evaporation Global","Maximum Interception Evaporation Global","Detention Coefficient “a”","Detention Coefficient “b”","RCN Convergence Tolerance","RCN Maximum Number of Iterations","Available Soil Moisture Ratio for AMC II","Maximum Available Sediment Concentration for Sheet Flow","Maximum Available Sediment Concentration for Concentrated Flow","Critical Shear Stress"],"Pesticide Initial Conditions":["Crop Initial Pesticide Amount 1","Crop Initial Pesticide Amount 2","Non-crop Initial Pesticide Amount 1","Non-crop Initial Pesticide Amount 2"],"PL Calibration":["Organic carbon from all sources","Organic carbon from sheet & rill","Organic carbon from feedlot","Organic carbon from point source","Organic carbon from gully","Organic carbon from pond","Organic carbon from irrigation","Nitrogen from all sources","Nitrogen from sheet & rill","Nitrogen from feedlot","Nitrogen from point source","Nitrogen from gully","Nitrogen from pond","Nitrogen from irrigation","Phosphorus from all sources","Phosphorus from sheet & rill","Phosphorus from feedlot","Phosphorus from point source","Phosphorus from gully","Phosphorus from pond","Phosphorus from irrigation","Sediment from all sources","Sediment from sheet & rill","Sediment from feedlot","Sediment from point source","Sediment from gully","Sediment from pond","Sediment from irrigation"],"RCN Calibration":["Target Average Annual Direct Runoff Load","RCN Retention factor","Reach Ratio","Available Soil Moisture, AMC-II"],"Simulation Period":["Rainfall factor","10-yr EI","EI Number","Initialization Method Code"],"Soil Initial Conditions":["Inorganic_N_1" ,"Inorganic_N_2", "Inorganic_P_1","Inorganic_P_2", "Soil_Moisture_1","Soil_Moisture_2", "Organic_Matter_1","Organic_Matter_2","Organic_N_1","Organic_N_2", "Organic_P_1","Organic_P_2","Surface Residue","Manning’s n","Snow Depth","Snow Density","Surface Constant"]}
-            for nombre in inputs_simulation:
-                if self.check_if_input_present_in_master(nombre,project_df):
-                    boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents)
-                    boton.setObjectName(nombre)
-                    self.dlg_calibration.verticalLayout_2.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-                    boton.setSizePolicy(política_tamaño)
-                    boton.clicked.connect(lambda _, b = dic[nombre]: self.calibration_parameters(b))
-    
-    def annagnps_parameters(self, parameters):
-        #Metod to add parameters in the dialog depending on input selection
-        #Delete all elements of vertical layout of scroll area
-        while self.sensitivity_dialog.verticalLayout_3.count():
-            child = self.sensitivity_dialog.verticalLayout_3.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-        #Add elements
-        for nombre in parameters:
-            boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents_3)
-            boton.setObjectName(nombre)
-            self.sensitivity_dialog.verticalLayout_3.addWidget(boton)
-            política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-            boton.setSizePolicy(política_tamaño)
-            boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label(b))
-    
-    
-    def calibration_parameters(self, parameters):
-        #Metod to add parameters in the dialog depending on input selection
-        #Delete all elements of vertical layout of scroll area
-        while self.dlg_calibration.verticalLayout_3.count():
-            child = self.dlg_calibration.verticalLayout_3.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-        #Add elements
-        for nombre in parameters:
-            boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents_3)
-            boton.setObjectName(nombre)
-            self.dlg_calibration.verticalLayout_3.addWidget(boton)
-            política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-            boton.setSizePolicy(política_tamaño)
-            boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label_calibration(b))
-    
+        project = self.dlg_calibration.project_calibration.currentText()
+        self.build_category_inputs(self.dlg_calibration,project,section,self.add_parameter_label_calibration)
+
+    def identifiability_inputs(self,section):
+        #Metod to add identifiability inputs in the dialog depending on section selection
+        project = self.dlg_identifiability.project_identifiability.currentText()
+        self.build_category_inputs(self.dlg_identifiability,project,section,self.add_parameter_label_identifiability)
+
     def add_sensitivity_table(self):
         #Metod to add sensitivity analysis parameters to table
         if self.sensitivity_dialog.table.columnCount() == 0:
@@ -7317,7 +7280,9 @@ class qannagnps():
             selected_project = self.sensitivity_dialog.project_sensitivity.currentText()
         elif information == "Calibration":
             selected_project = self.dlg_calibration.project_calibration.currentText()
-        
+        elif information == "Identifiability_analysis":
+            selected_project = self.dlg_identifiability.project_identifiability.currentText()
+
         #Move all the folders to the new folder
         for core in range(1,self.number_cores+1):
             origen = Path(self.carpeta_guardar_proyectos +"\\"+selected_project)
@@ -7452,15 +7417,16 @@ class qannagnps():
                     columns = ["Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_N_Ld_Mass","EV_N_Ld_Ratio","EV_N_Ld_UA","EV_N_Yld_Mass","EV_N_Yld_Ratio","EV_N_Yld_UA","EV_OC_Ld_Mass","EV_OC_Ld_Ratio","EV_OC_Ld_UA","EV_OC_Yld_Mass","EV_OC_Yld_Ratio","EV_OC_Yld_UA","Reserved","Reserved","Reserved","Reserved","Reserved","Reserved","EV_P_Ld_Mass","EV_P_Ld_Ratio","EV_P_Ld_UA","EV_P_Yld_Mass","EV_P_Yld_Ratio","EV_P_Yld_UA","Reserved","Reserved","Reserved","EV_Sed_Eros_Mass","EV_Sed_Eros_Ratio","EV_Sed_Eros_UA","EV_Sed_Ld_Mass","EV_Sed_Ld_Ratio","EV_Sed_Ld_UA","EV_Sed_Yld_Mass","EV_Sed_Yld_Ratio","EV_Sed_Yld_UA","EV_Wtr_Ld_Mass","EV_Wtr_Ld_Ratio","EV_Wtr_Ld_UA","EV_Wtr_Yld_Mass","EV_Wtr_Yld_Ratio","EV_Wtr_Yld_UA","EV_LS_Rnof_All_Srcs","EV_LS_Yld_All_Srcs","EV_Gullies_Erosion"]
                     modify_input("Output Options - EV","EV_P_Yld_Mass",columns,"out_ev")
         
-        elif information == "Calibration":
+        elif information == "Calibration" or information == "Identifiability_analysis":
             #Todos los outputs calibrables (streamflow, sedimento, N, P, OC, pesticidas) viven en un
             #único fichero (AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv), así que basta con activar
-            #este output, sea cual sea el que se vaya a usar como objetivo de la calibración.
+            #este output, sea cual sea el que se vaya a usar como objetivo de la calibración o del
+            #análisis de identificabilidad.
             for core in range(1,self.number_cores+1):
                 columns = ["CCHE1D", "CONCEPTS_XML", "Gaging_Station_Hyd", "REMM", "Gaging_Station_Evt"]
                 modify_input("Output Options - TBL","Gaging_Station_Hyd",columns,"out_tbl")
-        
-    
+
+
     def setup_calibration_ui_enhancements(self):
         """Method to apply the modern control-panel style to the calibration dialogs and add the objective metric selector"""
         plugin_directory = os.path.dirname(os.path.realpath(__file__))
@@ -7484,7 +7450,7 @@ class qannagnps():
 
         #Refresh the observed-data graph (title/y-axis label) when the output to calibrate changes
         for output_radio in self.dlg_calibration.output_radios.values():
-            output_radio.toggled.connect(lambda checked: self.update_graph_calibration_inputs() if checked else None)
+            output_radio.toggled.connect(lambda checked: self.update_graph_calibration_inputs(self.dlg_calibration) if checked else None)
 
         #Switch the observed-data graph between daily/monthly/annual aggregation
         for time_step_radio in [self.dlg_calibration_inputs.daily,self.dlg_calibration_inputs.monthly,
@@ -7497,6 +7463,7 @@ class qannagnps():
             self.dlg_calibration_inputs: ["frame"],
             self.dlg_calibration_results: ["frame_2","frame","frame_4"],
             self.dlg_fiteval_calibration: ["frame_2","frame_3","frame_4"],
+            self.dlg_identifiability: ["frame","frame_4","frame_5","frame_6","frame_7"],
         }
         for dialog,card_frames in dialogs_card_frames.items():
             dialog.setStyleSheet(self.modern_panel_stylesheet(card_frames))
@@ -7506,9 +7473,12 @@ class qannagnps():
                     self.apply_card_shadow(frame)
 
 
-    def build_calibration_output_radios(self,plugin_directory):
-        """Method to populate the "Studied Output" list of calibration.ui with one radio button per
-        calibratable output (CALIBRATION_OUTPUTS), grouped under a bold category label, in order"""
+    def build_calibration_output_radios(self,plugin_directory,dlg=None):
+        """Method to populate the "Studied Output" list of calibration.ui (or, when dlg is given,
+        another dialog built with the exact same objectNames - e.g. identifiability.ui) with one
+        radio button per calibratable output (CALIBRATION_OUTPUTS), grouped under a bold category
+        label, in order"""
+        dlg = dlg or self.dlg_calibration
         icons_by_category = {
             "Streamflow": QIcon(os.path.join(plugin_directory,"images","water.svg")),
             "Erosion": QIcon(os.path.join(plugin_directory,"images","erosion.svg")),
@@ -7518,10 +7488,10 @@ class qannagnps():
             "Pesticide": QIcon(os.path.join(plugin_directory,"images","nutrient.svg")),
         }
 
-        layout = self.dlg_calibration.verticalLayout_5
-        container = self.dlg_calibration.scrollAreaWidgetContents_2
+        layout = dlg.verticalLayout_5
+        container = dlg.scrollAreaWidgetContents_2
 
-        self.dlg_calibration.output_radios = {}
+        dlg.output_radios = {}
         current_category = None
         for category,key,label,source,column in CALIBRATION_OUTPUTS:
             if category != current_category:
@@ -7537,7 +7507,7 @@ class qannagnps():
             radio.setIcon(icons_by_category[category])
             radio.setChecked(key=="streamflow")
             layout.addWidget(radio)
-            self.dlg_calibration.output_radios[key] = radio
+            dlg.output_radios[key] = radio
 
         layout.addStretch()
 
@@ -8059,46 +8029,52 @@ class qannagnps():
         
     
     
-    def calibration_selected_output(self):
-        """Method to obtain the (category, key, label, source, column) tuple for the output currently selected to calibrate"""
+    def calibration_selected_output(self,dlg=None):
+        """Method to obtain the (category, key, label, source, column) tuple for the output currently
+        selected to calibrate. dlg defaults to the calibration dialog, but the identifiability
+        analysis dialog (which has its own, separately-built copy of the same output radios) can
+        be passed instead, since it needs the exact same output-selection mechanism."""
+        dlg = dlg or self.dlg_calibration
         for category,key,label,source,column in CALIBRATION_OUTPUTS:
-            radio = self.dlg_calibration.output_radios.get(key)
+            radio = dlg.output_radios.get(key)
             if radio is not None and radio.isChecked():
                 return category,key,label,source,column
         #Fallback (should not normally happen): first option
         return CALIBRATION_OUTPUTS[0]
 
 
-    def calibration_output_source(self):
+    def calibration_output_source(self,dlg=None):
         """Method to obtain the AnnAGNPS output file group ("gaging_station"/"ephemeral_gully") for the output selected to calibrate"""
-        return self.calibration_selected_output()[3]
+        return self.calibration_selected_output(dlg)[3]
 
 
-    def calibration_output_column(self):
+    def calibration_output_column(self,dlg=None):
         """Method to obtain the column name read (and, for ephemeral gully, summed) for the output selected to calibrate"""
-        return self.calibration_selected_output()[4]
+        return self.calibration_selected_output(dlg)[4]
 
 
-    def calibration_output_display_label(self):
+    def calibration_output_display_label(self,dlg=None):
         """Method to obtain a human-readable label for the output currently selected to calibrate"""
-        return self.calibration_selected_output()[2]
+        return self.calibration_selected_output(dlg)[2]
 
 
-    def calibration_output_required_message(self):
+    def calibration_output_required_message(self,dlg=None):
         """Method to obtain the message explaining which control-file setting is required for the output selected to calibrate"""
-        if self.calibration_output_source() == "gaging_station":
+        if self.calibration_output_source(dlg) == "gaging_station":
             return ("AnnAGNPS_TBL_Gaging_Station_Data_Hyd output not found. \n"
                     "The column 'Gaging_Station_Hyd' in the project's 'Output Options - TBL' control file must be set to T.")
         return ("AnnAGNPS_SIM_Ephemeral_Gully_Summary output not found. \n"
                 "Every column in the project's 'Output Options - SIM' control file must be set to T.")
 
 
-    def check_calibration_output_prerequisites(self):
-        """Method to check, before starting the calibration, that the saved project's control files
-        already enable the AnnAGNPS output required for the output currently selected to calibrate.
-        Returns an error message string if a prerequisite is missing, or None if everything is fine."""
-        source = self.calibration_output_source()
-        project = self.dlg_calibration.project_calibration.currentText()
+    def check_calibration_output_prerequisites(self,dlg=None,project=None):
+        """Method to check, before starting the calibration (or identifiability analysis), that the
+        saved project's control files already enable the AnnAGNPS output required for the output
+        currently selected. Returns an error message string if a prerequisite is missing, or None
+        if everything is fine."""
+        dlg = dlg or self.dlg_calibration
+        source = self.calibration_output_source(dlg)
+        project = project if project is not None else dlg.project_calibration.currentText()
         processing_inputs = self.carpeta_guardar_proyectos+f"\\{project}\\Processing_inputs"
         master_file = processing_inputs+r"\annagnps_master.csv"
 
@@ -8108,7 +8084,7 @@ class qannagnps():
             return f"Could not read the project's master file ({master_file}) to check the required outputs."
 
         name_master = "Output Options - TBL" if source=="gaging_station" else "Output Options - SIM"
-        required_message = self.calibration_output_required_message()
+        required_message = self.calibration_output_required_message(dlg)
 
         if name_master not in project_df.iloc[:,0].values:
             return required_message
@@ -8663,8 +8639,606 @@ class qannagnps():
         
         #MENSAJE DE ÉXITO
         self.warning_message("Succes in the sensitiviy analysis ")
-    
-    
+
+
+    ###########################################################################################
+    # IDENTIFIABILITY ANALYSIS
+    # A sensitivity analysis (Sobol/Morris/FAST, via SALib) whose "output" is the goodness-of-fit
+    # metric between simulated and observed data (the same metric/observed-data machinery as
+    # calibration), instead of a raw AnnAGNPS output value. Parameters that strongly influence the
+    # fit quality are "identifiable" from the available observed data; parameters with little
+    # influence aren't - the calibration can't meaningfully pin them down. Reuses
+    # Sensitivity_Parallelization to actually run AnnAGNPS (the parameter-setting logic is
+    # identical) and calibration's observed-data/metric helpers, so this section only adds the
+    # SALib sampling + goodness-of-fit collection glue.
+    ###########################################################################################
+
+    def search_identifiability_input(self,*args):
+        """Method to (re)build the identifiability dialog's searchable parameter list, exactly like
+        calibration's search box: filters self.dic_name_column live and lists matches in
+        verticalLayout_3. Complements (does not replace) the Spatial/Watershed/General/Climate/
+        Simulation category buttons wired to identifiability_inputs."""
+        texto = str(self.dlg_identifiability.search.text())
+        elementos = [i for i in self.dic_name_column.keys() if texto.lower() in i.lower()]
+
+        while self.dlg_identifiability.verticalLayout_3.count():
+            child = self.dlg_identifiability.verticalLayout_3.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        for nombre in elementos:
+            boton = QtWidgets.QPushButton(nombre, self.dlg_identifiability.scrollAreaWidgetContents_3)
+            boton.setObjectName(nombre)
+            self.dlg_identifiability.verticalLayout_3.addWidget(boton)
+            política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+            boton.setSizePolicy(política_tamaño)
+            boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label_identifiability(b))
+
+
+    def add_parameter_label_identifiability(self,nombre):
+        """Method to add the parameter to the lineEdit (or, for "Curve Number Shift", show the
+        Curve_Number_ID dropdown instead of the plain row field, exactly like calibration/sensitivity)"""
+        project = self.dlg_identifiability.project_identifiability.currentText()
+        self.update_curve_number_shift_widget(self.dlg_identifiability,project,nombre,'identifiability_curve_number_rows')
+
+
+    def add_identifiability_table(self):
+        """Method to add identifiability analysis parameters to the table"""
+        if self.dlg_identifiability.table.columnCount() == 0:
+            nombres_columnas = ["Parameter","Distribution","Distribution parameters","Row"]
+            self.dlg_identifiability.table.setColumnCount(len(nombres_columnas))
+            self.dlg_identifiability.table.setHorizontalHeaderLabels(nombres_columnas)
+            self.dlg_identifiability.table.setColumnWidth(nombres_columnas.index("Parameter"), 140)
+            self.dlg_identifiability.table.setColumnWidth(nombres_columnas.index("Distribution parameters"), 160)
+
+        def add_element(columna,texto):
+            item = QTableWidgetItem(texto)
+            self.dlg_identifiability.table.setItem(numero_filas, columna, item)
+            item.setTextAlignment(Qt.AlignCenter)
+
+        numero_filas = self.dlg_identifiability.table.rowCount()
+        self.dlg_identifiability.table.setRowCount(numero_filas + 1)
+        add_element(0,self.dlg_identifiability.parameter.text())
+        distribution = [self.dlg_identifiability.distributions.itemText(i) for i in range(self.dlg_identifiability.distributions.count())][self.dlg_identifiability.distributions.currentIndex()]
+        add_element(1,distribution)
+        if distribution in ("Uniform","Logaritmic uniform"):
+            add_element(2,f"min:{self.dlg_identifiability.first.text()},max:{self.dlg_identifiability.second.text()}")
+        else: #Normal or Lognormal
+            add_element(2,f"mean:{self.dlg_identifiability.first.text()},stdv:{self.dlg_identifiability.second.text()}")
+        #Add row (for "Curve Number Shift", translate the chosen Curve_Number_ID name back to its
+        #row index; every other parameter keeps using the plain row field as before)
+        if self.dlg_identifiability.row_curve_number.isVisible():
+            fila = getattr(self,'identifiability_curve_number_rows',{}).get(self.dlg_identifiability.row_curve_number.currentText(),"0")
+            add_element(3,str(fila))
+        else:
+            add_element(3,self.dlg_identifiability.row.text())
+
+
+        self.change_identifiability_metod()
+
+
+    def delete_identifiability_table(self):
+        """Method to delete identifiability analysis parameters from the table"""
+        numero_filas = self.dlg_identifiability.table.rowCount()
+        if numero_filas > 0:
+            self.dlg_identifiability.table.removeRow(numero_filas - 1)
+        if numero_filas == 1:
+            self.dlg_identifiability.table.setColumnCount(0)
+        self.change_identifiability_metod()
+
+
+    def change_identifiability_metod(self):
+        """Method to relabel the sample-size field and preview the resulting total number of
+        AnnAGNPS executions, depending on the selected SALib method - mirrors
+        change_sensitivity_metod exactly (Sobol: label "M", total = M*(2D+2); Morris: label
+        "Trajectories", total = trajectories*(D+1)), extended with FAST, whose sampler
+        (fast_sampler.sample(problem, N, M=4)) generates N*D rows and requires N > 4*M^2 = 64
+        with the default M."""
+        d = self.dlg_identifiability.table.rowCount()
+        n_text = self.dlg_identifiability.trajectories.text()
+        if self.dlg_identifiability.sobol.isChecked():
+            self.dlg_identifiability.label_6.setText("M")
+            try:
+                if n_text=="" or d==0:
+                    self.dlg_identifiability.lineEdit_6.setText("")
+                else:
+                    self.dlg_identifiability.lineEdit_6.setText(str(int(n_text)*(2*d+2)))
+                self.dlg_identifiability.file_save.setText("identifiability_sobol.csv")
+            except:
+                pass
+        elif self.dlg_identifiability.morris.isChecked():
+            self.dlg_identifiability.label_6.setText("Trajectories")
+            try:
+                if n_text=="" or d==0:
+                    self.dlg_identifiability.lineEdit_6.setText("")
+                else:
+                    self.dlg_identifiability.lineEdit_6.setText(str(int(n_text)*(d+1)))
+                self.dlg_identifiability.file_save.setText("identifiability_morris.csv")
+            except:
+                pass
+        elif self.dlg_identifiability.fast.isChecked():
+            self.dlg_identifiability.label_6.setText("N")
+            try:
+                if n_text=="" or d==0:
+                    self.dlg_identifiability.lineEdit_6.setText("")
+                else:
+                    self.dlg_identifiability.lineEdit_6.setText(str(int(n_text)*d))
+                self.dlg_identifiability.file_save.setText("identifiability_fast.csv")
+            except:
+                pass
+
+
+    def create_dictionary_identifiability(self):
+        """Method to create the dictionary of the identifiability analysis and sample the chosen
+        method (Sobol/Morris/FAST). Only the 4 simplest SALib distributions are offered here
+        (Uniform/Log-uniform/Normal/Lognormal): Triangular and Normal-truncated need extra
+        parameter fields that sensitivity analysis builds dynamically into its own layout, which
+        this dialog doesn't replicate."""
+        def distribution_parameters_fun(row):
+            texto = str(self.dlg_identifiability.table.item(row, 2).text())
+            parameters = [float(x.split(":")[-1]) for x in texto.split(",")]
+            distribution_name = str(self.dlg_identifiability.table.item(row, 1).text())
+            distribution = {"Uniform":"unif","Logaritmic uniform":"logunif","Normal":"norm","Lognormal":"lognorm"}[distribution_name]
+            return distribution, parameters
+
+        self.dic_data = {}
+        for i in range(self.dlg_identifiability.table.rowCount()):
+            name = self.dlg_identifiability.table.item(i, 0).text()
+            dis,param = distribution_parameters_fun(i)
+            if name in self.dic_data:name = name+"__1"
+            self.dic_data[name] = [dis,param,self.dlg_identifiability.table.item(i, 3).text()]
+
+        self.problem = {'num_vars': len(self.dic_data),'names': list(self.dic_data.keys()),'bounds': [x[1] for x in self.dic_data.values()],"dists":[x[0] for x in self.dic_data.values()]}
+
+        n = int(self.dlg_identifiability.trajectories.text())
+        if self.dlg_identifiability.sobol.isChecked():
+            self.param_values = saltelli.sample(self.problem, n)
+        elif self.dlg_identifiability.morris.isChecked():
+            self.param_values = sample_morris(self.problem, n)
+        else: #FAST
+            self.param_values = fast_sampler.sample(self.problem, n)
+
+
+    def run_identifiability_analysis(self):
+        """Method to run the identifiability analysis"""
+        self.end_execution = 0
+        if self.dlg.project.text()=="":
+            self.warning_message("Please select a working directory where the files are going to be loaded")
+            return
+
+        if self.dlg_identifiability.table.rowCount()==0:
+            self.warning_message("Please add at least one parameter before running the identifiability analysis.")
+            return
+
+        #Check that an observed data file has been selected (same dialog/field as calibration)
+        observed_file_path = self.dlg_calibration_inputs.lineEdit.text()
+        if observed_file_path == "" or not os.path.isfile(observed_file_path):
+            self.warning_message("Please select an observed data file before running the identifiability analysis.")
+            return
+
+        #Check that the saved project already has the AnnAGNPS output enabled that the selected output needs
+        prerequisite_error = self.check_calibration_output_prerequisites(self.dlg_identifiability,self.dlg_identifiability.project_identifiability.currentText())
+        if prerequisite_error:
+            self.warning_message(prerequisite_error)
+            return
+
+        #Check the number of samples is valid for FAST (N > 4*M^2 = 64 with the default M=4)
+        try:
+            n_samples = int(self.dlg_identifiability.trajectories.text())
+        except ValueError:
+            self.warning_message("Please enter a valid number for the number of samples.")
+            return
+        if self.dlg_identifiability.fast.isChecked() and n_samples <= 64:
+            self.warning_message("FAST requires a number of samples greater than 64 (4*M^2 with the default M=4). Please increase it.")
+            return
+
+        #Close dialogs
+        self.dlg_identifiability.close()
+        self.dlg.close()
+
+        #Start with the identifiability progress dialog (same look/detail as calibration's: live
+        #progress bar, status text, execution count, objective metric, last result, Stop button -
+        #"best result" is hidden since identifiability explores the parameter space rather than
+        #optimizing towards one)
+        self.dlg_identifiability_progress = CalibrationProgressDialog(
+            title="Running identifiability analysis…",
+            window_title="Identifiability analysis progress",
+            show_best=False,
+            stop_button_text="Stop analysis")
+        self.enable_raise_on_show(self.dlg_identifiability_progress)
+        self.dlg_identifiability_progress.stop_requested.connect(self.stop_identifiability_by_user)
+        self.dlg_identifiability_progress.set_status("Starting identifiability analysis...")
+        self.dlg_identifiability_progress.show()
+        QCoreApplication.processEvents()
+
+        #Create the dictionary with the input data and the parameter values
+        self.create_dictionary_identifiability()
+
+        #Obtain the number of cores to work with
+        self.number_cores = QThreadPool.globalInstance().maxThreadCount() - 1
+
+        #Obtener la direccoin de los raster ahora que están en la carpeta de "Identifiability_analysis"
+        self.declare_rasters_sensitivity_analysis("Identifiability_analysis")
+
+        #Move the files from the save project to working directory + name of the project + "Identifiability_analysis"
+        self.dlg_identifiability_progress.set_status("Moving files to the working directory...")
+        self.move_files_to_working_directory_sensitivity_analysis("Identifiability_analysis")
+        if self.end_execution:
+            return
+
+        #Modifiy the inputs so that the required output are displayed
+        self.modify_input_sensitivity_match_output("Identifiability_analysis")
+
+        #Si se ha escogido la opción de "Pixel Size" se obtienen todos los DEMs con todos los tamaños de píxeles
+        if "Pixel Size" in list(self.dic_data.keys()):
+            self.resample_rasters_sensitivity()
+        else:
+            self.nombre_mdt_sensitivity ="nan"
+            self.extension_mdt_sensitivity ="nan"
+            self.nombre_buffer_sensitivity = "nan"
+            self.extension_buffer_sensitivity ="nan"
+            self.nombre_vegetation_sensitivity ="nan"
+            self.extension_vegetation_sensitivity ="nan"
+
+        #Results are obtained
+        self.resultados = []
+        self.numero_ejecucion = 0
+        self.end_execution = False
+
+        #Check if preprocessing is going to be executed
+        #(i.split("__")[0]: repeated parameters are stored as "Name__1", "Name__2"... in dic_data,
+        #but dic_name_column is only keyed by the original parameter name)
+        self.execute_preprocessing_sensitivity = False
+        for i in self.dic_data.keys():
+            if self.dic_name_column[i.split("__")[0]][0]=="Spatial":
+                self.execute_preprocessing_sensitivity = True
+
+        #We do the identifiability analysis (reusing the sensitivity analysis task/execution engine)
+        self.manager = QgsApplication.instance().taskManager()
+        self.carpetas_libres = list(range(1,self.number_cores+1))
+        self.tareas_pendientes = list(range(len(self.param_values)))
+        self.terminadas = 0
+        self.tareas_activas = []
+        self.lanzar_siguiente_identifiability()
+
+
+    def lanzar_siguiente_identifiability(self):
+        """Method to run next execution in the parallelization of the identifiability analysis"""
+        if not self.tareas_pendientes:
+            return
+
+        while self.tareas_pendientes and self.carpetas_libres:
+            n_tarea = self.tareas_pendientes.pop(0)
+            id_carpeta = self.carpetas_libres.pop(0)
+            task = Sensitivity_Parallelization(n_tarea, id_carpeta,self.execute_preprocessing_sensitivity,self.direccion_sensitivity,
+                self.dic_data,self.param_values,self.executable_directory,self.plugin_dir,self.dic_name_column,self.nombre_mdt_sensitivity,
+                self.extension_mdt_sensitivity,self.fichero_buf_sensitivity,self.nombre_buffer_sensitivity,self.extension_buffer_sensitivity,
+                self.fichero_veg_sensitivity,self.nombre_vegetation_sensitivity,self.extension_vegetation_sensitivity,self.inputs,self.epsg_sensitivity,
+                self.unique_soil_sensitivity, self.fichero_soil_sensitivity,self.column_soil_sensitivity,self.unique_use_sensitivity,self.fichero_manag_sensitivity,
+                self.column_use_sensitivity,self.project_df)
+
+            self.tareas_activas.append(task)
+            task.taskCompleted.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_identifiability(t, f, n))
+            task.taskTerminated.connect(lambda t=task, f=id_carpeta,n = n_tarea: self.finalizar_tarea_identifiability(t, f, n))
+            self.manager.addTask(task)
+
+
+    def finalizar_tarea_identifiability(self,task, id_carpeta,n):
+        """Method that will be executed after each execution in AnnAGNPS in the parallelization of the identifiability analysis"""
+        if task in self.tareas_activas:
+            self.tareas_activas.remove(task)
+
+        if task.status() != QgsTask.Complete:
+            if len(self.tareas_pendientes) > 0:
+                self.stop_identifiability_execution(task)
+            return
+
+        resultado = self.obtain_identifiability_metric(id_carpeta, n)
+        if self.end_execution:
+            self.tareas_pendientes = []
+            for t in self.tareas_activas[:]:
+                try:
+                    if t:
+                        t.cancel()
+                except (RuntimeError, ReferenceError):
+                    pass
+            self.tareas_activas = []
+            self.dlg_identifiability_progress.close()
+            return
+
+        self.resultados.append(resultado)
+        self.terminadas += 1
+        self.carpetas_libres.append(id_carpeta)
+
+        metric_name = self.dlg_identifiability.combo_metric.currentText()
+        self.dlg_identifiability_progress.update_progress(
+            self.terminadas,len(self.param_values),len(self.tareas_activas),
+            metric_name,resultado.get(metric_name))
+
+        if self.terminadas >= len(self.param_values):
+            self.run_identifiability_analysis_two()
+        else:
+            if self.tareas_pendientes:
+                self.lanzar_siguiente_identifiability()
+
+
+    def obtain_identifiability_metric(self,core,n):
+        """Method to obtain the goodness-of-fit metric (for the output selected, against the
+        observed data - exactly as in calibration) for one identifiability analysis execution"""
+        data_to_save = {}
+        for k,i in enumerate(self.dic_data.keys()):
+            valor = self.param_values[n][k]
+            #"Curve Number Shift" is always rounded to an integer before being applied - report
+            #that same rounded value here instead of the raw sampled one (matches calibration)
+            if i.split("__")[0] == "Curve Number Shift":
+                valor = int(round(valor))
+            data_to_save[i.replace("\n", " ")] = valor
+
+        #Obtain df of observed (same file/parsing as calibration)
+        file_path = self.dlg_calibration_inputs.lineEdit.text()
+        df_observed = pd.read_csv(file_path, sep=',', header=None)
+        df_observed.columns = ['date', 'value']
+        df_observed['date'] = pd.to_datetime(df_observed['date'], format='%d/%m/%Y', errors='coerce')
+        df_observed['value'] = pd.to_numeric(df_observed['value'], errors='coerce')
+        df_observed = df_observed.dropna().sort_values('date')
+
+        #Obtain df of simulated, from the AnnAGNPS output file required by the output selected
+        source = self.calibration_output_source(self.dlg_identifiability)
+        column = self.calibration_output_column(self.dlg_identifiability)
+        try:
+            if source == "gaging_station":
+                df = self.read_gaging_station_table(core)
+                df_simulated = df[['date',column]].rename(columns={column:'value'})
+            else: #"ephemeral_gully"
+                df_simulated = self.read_ephemeral_gully_summary(core,column)
+            df_simulated['value'] = pd.to_numeric(df_simulated['value'],errors='coerce')
+        except Exception as e:
+            self.end_execution = True
+            self.warning_message(f"{self.calibration_output_required_message(self.dlg_identifiability)}\n\nDetails: {e}")
+            return data_to_save
+
+        #Aggregate both series to the time step chosen in the "Observed data" dialog (shared with calibration)
+        time_step = self.calibration_observed_time_step()
+        if time_step == "Monthly":
+            df_observed = df_observed.set_index('date').resample('MS').sum().reset_index()
+            df_simulated = df_simulated.set_index('date').resample('MS').sum().reset_index()
+        elif time_step == "Annual":
+            df_observed = df_observed.set_index('date').resample('YS').sum().reset_index()
+            df_simulated = df_simulated.set_index('date').resample('YS').sum().reset_index()
+
+        if source == "ephemeral_gully":
+            df_merged = pd.merge(df_observed, df_simulated, on='date', how='left', suffixes=('_observed', '_simulated'))
+            df_merged['value_simulated'] = df_merged['value_simulated'].fillna(0)
+        else:
+            df_merged = pd.merge(df_observed, df_simulated, on='date', suffixes=('_observed', '_simulated'))
+        obs = df_merged['value_observed'].values
+        sim = df_merged['value_simulated'].values
+
+        metric = self.dlg_identifiability.combo_metric.currentText()
+        metric_value, value_to_minimize = self.compute_calibration_metric(obs,sim,metric)
+        data_to_save[metric] = metric_value
+
+        return data_to_save
+
+
+    def stop_identifiability_execution(self,task):
+        """Método para detener el análisis de identificabilidad de forma segura"""
+        self.tareas_pendientes = []
+        for t in self.tareas_activas[:]:
+            try:
+                if t and t != task:
+                    t.cancel()
+            except (RuntimeError, ReferenceError):
+                pass
+        self.tareas_activas = []
+        try:
+            msg = f"Analysis stopped in task {task.n}. Reason: {task.error_msg}"
+        except (RuntimeError, ReferenceError, AttributeError):
+            msg = "Identifiability analysis stopped due to an unexpected error."
+        self.warning_message(msg)
+        self.dlg_identifiability_progress.close()
+
+
+    def stop_identifiability_by_user(self):
+        """Method called when the user clicks 'Stop analysis' on the identifiability progress
+        dialog. Unlike calibration, partial results can't be salvaged here: Sobol/Morris/FAST need
+        the complete, exact sample matrix to compute sensitivity indices, so stopping early means
+        starting over."""
+        self.end_execution = True
+        self.tareas_pendientes = []
+        for t in self.tareas_activas[:]:
+            try:
+                if t:
+                    t.cancel()
+                    if hasattr(t,"kill_running_processes"):
+                        t.kill_running_processes()
+            except (RuntimeError, ReferenceError):
+                pass
+        self.tareas_activas = []
+        self.dlg_identifiability_progress.close()
+        self.warning_message("Identifiability analysis stopped by the user. No results were saved: Sobol/Morris/FAST need every execution to finish to compute the sensitivity indices.")
+
+
+    def run_identifiability_analysis_two(self):
+        """Method to save the results of the identifiability analysis and calculate the sensitivity
+        indexes of the goodness-of-fit metric (i.e. which parameters are identifiable)"""
+        results_df = pd.DataFrame(self.resultados)
+        metric = self.dlg_identifiability.combo_metric.currentText()
+        path = self.direccion_sensitivity + "\\"+self.dlg_identifiability.file_save.text()
+
+        input_names = [x.replace("\n"," ") for x in self.dic_data.keys()]
+        Y = np.array(results_df[metric], dtype=float)
+
+        with open(path, 'w', encoding='utf-8-sig') as f:
+            if self.dlg_identifiability.sobol.isChecked():
+                f.write(f"Sobol sensitivity indexes of {metric} (identifiability)\n")
+                si = sobol.analyze(self.problem, Y)
+                f.write("Parameter,S1,S1_conf,ST,ST_conf\n")
+                for k,name in enumerate(input_names):
+                    f.write(f"{name},{si['S1'][k]},{si['S1_conf'][k]},{si['ST'][k]},{si['ST_conf'][k]}\n")
+            elif self.dlg_identifiability.morris.isChecked():
+                f.write(f"Morris sensitivity indexes of {metric} (identifiability)\n")
+                si = analyze_morris(self.problem,np.array(self.param_values),Y)
+                f.write("Parameter,mu_star,sigma,mu,mu_star_conf\n")
+                for k,name in enumerate(input_names):
+                    f.write(f"{name},{si['mu_star'][k]},{si['sigma'][k]},{si['mu'][k]},{si['mu_star_conf'][k]}\n")
+            else: #FAST
+                f.write(f"FAST sensitivity indexes of {metric} (identifiability)\n")
+                si = fast_analyze.analyze(self.problem, Y)
+                f.write("Parameter,S1,ST\n")
+                for k,name in enumerate(input_names):
+                    f.write(f"{name},{si['S1'][k]},{si['ST'][k]}\n")
+            #Marker line (mirrors "Results of each iteration" in write_calibration_report) so the
+            #results dialog can tell apart the per-parameter sensitivity indices above from the
+            #per-execution raw results below - they have entirely different columns, and without
+            #this marker they used to get parsed as one single (nonsensical) table
+            f.write("Per-execution results\n")
+
+        results_df.to_csv(path, mode='a', index=False, float_format='%.10f', encoding='utf-8')
+
+        self.dlg_identifiability_progress.close()
+
+        self.dlg_results_identifiability.results.setText(path)
+        self.warning_message("Success in the identifiability analysis")
+
+
+    def browse_results_identifiability(self):
+        """Method to browse results for the identifiability analysis"""
+        try:
+            fname = QFileDialog.getOpenFileName(self.dlg_results_identifiability, "Select Results for identifiability analysis",self.direccion+"\\Identifiability_analysis", "CSV files (*.csv)")
+        except:
+            fname = QFileDialog.getOpenFileName(self.dlg_results_identifiability, "Select Results for identifiability analysis","C:\\" , "CSV files (*.csv)")
+        if fname[0]!="":
+            self.dlg_results_identifiability.results.setText(fname[0])
+
+
+    def update_identifiability_results_graph(self):
+        """Method to display the identifiability analysis results: the per-parameter sensitivity
+        indices (table_results, one row per parameter) and the raw per-execution results
+        (table_executions, one row per AnnAGNPS execution) in two separate tables, since they have
+        entirely different columns - cramming both into a single table under one header (the old
+        behaviour) is what made it unreadable and also silently broke the bar chart below (parsing
+        the second block as if it were more index rows made the value column non-numeric)."""
+        path = self.dlg_results_identifiability.results.text()
+        if not (os.path.exists(path) and os.path.isfile(path)):
+            return
+        try:
+            with open(path,"r",encoding="utf-8-sig") as f:
+                lineas = [linea.rstrip("\n") for linea in f.readlines()]
+            titulo = lineas[0].strip()
+            header = [x.strip() for x in lineas[1].split(",")]
+            filas = []
+            i = 2
+            while i < len(lineas) and lineas[i].strip()!="" and "," in lineas[i]:
+                filas.append([x.strip() for x in lineas[i].split(",")])
+                i += 1
+            #Skip the "Per-execution results" marker line to reach the raw execution table
+            while i < len(lineas) and "," not in lineas[i]:
+                i += 1
+            exec_header,exec_filas = [],[]
+            if i < len(lineas):
+                exec_header = [x.strip() for x in lineas[i].split(",")]
+                for linea in lineas[i+1:]:
+                    if linea.strip()=="" or "," not in linea:
+                        break
+                    exec_filas.append([x.strip() for x in linea.split(",")])
+        except Exception:
+            return
+
+        #Sensitivity indices table (one row per parameter)
+        table = self.dlg_results_identifiability.table_results
+        table.setColumnCount(len(header))
+        table.setHorizontalHeaderLabels(header)
+        table.setRowCount(len(filas))
+        for r,fila in enumerate(filas):
+            for c,valor in enumerate(fila):
+                item = QTableWidgetItem(valor)
+                item.setTextAlignment(Qt.AlignCenter)
+                table.setItem(r,c,item)
+
+        #Per-execution results table (one row per AnnAGNPS execution)
+        table_exec = self.dlg_results_identifiability.table_executions
+        table_exec.setColumnCount(len(exec_header))
+        table_exec.setHorizontalHeaderLabels(exec_header)
+        table_exec.setRowCount(len(exec_filas))
+        for r,fila in enumerate(exec_filas):
+            for c,valor in enumerate(fila):
+                item = QTableWidgetItem(valor)
+                item.setTextAlignment(Qt.AlignCenter)
+                table_exec.setItem(r,c,item)
+
+        #Graph: Sobol/FAST get a bar chart of S1 per parameter; Morris gets the same mu*/sigma
+        #scatter (with monotonic/non-monotonic classification, error bars and 1:1 line) used in
+        #the sensitivity analysis results dialog, instead of a bar chart
+        canvas_attr = "canvas_identifiability_results"
+        dialog = self.dlg_results_identifiability
+        if not hasattr(self,canvas_attr):
+            setattr(self,canvas_attr,FigureCanvas(plt.Figure(figsize=(15, 6))))
+            layout = QVBoxLayout(dialog.frame)
+            dialog.frame.setLayout(layout)
+            layout.addWidget(getattr(self,canvas_attr))
+
+        canvas = getattr(self,canvas_attr)
+        canvas.figure.clear()
+        ax = canvas.figure.subplots()
+
+        try:
+            if "mu_star" in header: #Morris
+                idx_mu_star = header.index("mu_star")
+                idx_sigma = header.index("sigma")
+                idx_mu = header.index("mu")
+                idx_conf = header.index("mu_star_conf")
+                nombres = [f[0] for f in filas]
+                mu_star = [float(f[idx_mu_star]) for f in filas]
+                sigma = [float(f[idx_sigma]) for f in filas]
+                mu = [float(f[idx_mu]) for f in filas]
+                mu_star_conf = [float(f[idx_conf]) for f in filas]
+
+                add_label_monotonic = True
+                add_label_non_monotonic = True
+                for i,(x,y,conf) in enumerate(zip(mu_star,sigma,mu_star_conf)):
+                    #If the difference between mu and mu_star is higher than 5%, it's non-monotonic
+                    difference = 0 if x==0 else (abs(x)-abs(mu[i]))/abs(x)
+                    if difference>0.05:
+                        ax.errorbar(x,y,xerr=conf,color="blue",ecolor="black",marker="*",capsize=5,
+                            label="Non-Monotonic" if add_label_non_monotonic else None)
+                        add_label_non_monotonic = False
+                    else:
+                        ax.errorbar(x,y,xerr=conf,color="maroon",ecolor="black",marker="o",capsize=5,
+                            label="Monotonic" if add_label_monotonic else None)
+                        add_label_monotonic = False
+                    ax.annotate("\n".join(textwrap.wrap(nombres[i],width=20,break_long_words=False)),
+                        (x,y),textcoords="offset points",xytext=(10,10),ha="center",fontweight="bold",fontsize=8)
+
+                maximo = max([mu_star[i]+mu_star_conf[i] for i in range(len(mu_star))]+sigma) if mu_star else 0
+                if maximo>0:
+                    ax.plot([0,maximo*1.1],[0,maximo*1.1],color="red",linestyle="--")
+                    ax.set_xlim(0,maximo*1.1)
+                    ax.set_ylim(0,maximo*1.1)
+                legend = ax.legend(loc="lower center",bbox_to_anchor=(0.9,1.01),ncol=1,frameon=False)
+                legend.get_frame().set_alpha(0)
+                ax.set_xlabel(r"Mean of Elementary Effects ($\mu_{i}^{*}$)")
+                ax.set_ylabel(r"Standard Deviation of Elementary Effects ($\sigma_{i}$)")
+                ax.set_title(titulo, size=10, weight="bold", color="#2c3e50")
+            else: #Sobol / FAST
+                nombres = [f[0] for f in filas]
+                valores = [float(f[1]) for f in filas]
+                ax.bar(nombres, valores, color="#aecbe3", edgecolor="#3f6ea5")
+                ax.set_ylabel(header[1])
+                ax.set_title(titulo, size=10, weight="bold", color="#2c3e50")
+                ax.tick_params(axis="x", rotation=45, labelsize=8)
+            canvas.figure.set_facecolor("#ffffff")
+            ax.set_facecolor("#ffffff")
+            canvas.figure.subplots_adjust(bottom=0.35)
+        except Exception:
+            pass
+
+        canvas.draw()
+        self.dlg_results_identifiability.print_graph.clicked.connect(lambda _, b=[self.dlg_results_identifiability,canvas]:self.figure_settings(b))
+        self.dlg_results_identifiability.show()
+        self.dlg_results_identifiability.raise_()
+
+
     def write_calibration_report(self,path):
         """Method to write the calibration report (optimized inputs, best metric, best combination
         results and the full iteration history so far) to the given path. Shared by the final saved
@@ -9144,6 +9718,8 @@ class qannagnps():
             selected_project = self.sensitivity_dialog.project_sensitivity.currentText()
         elif information == "Calibration":
             selected_project = self.dlg_calibration.project_calibration.currentText()
+        elif information == "Identifiability_analysis":
+            selected_project = self.dlg_identifiability.project_identifiability.currentText()
         csv_file = self.carpeta_guardar_proyectos +"\\"+selected_project+"\\"+selected_project+".csv"
         project_df = pd.read_csv(csv_file,encoding = "ISO-8859-1",delimiter=",")
         self.project_df = project_df

@@ -11,9 +11,11 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
 
     stop_requested = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, title="Calibrating…", window_title="Calibration progress",
+                 show_best=True, stop_button_text="Stop calibration"):
         super(CalibrationProgressDialog, self).__init__(parent)
-        self.setWindowTitle("Calibration progress")
+        self.show_best = show_best
+        self.setWindowTitle(window_title)
         self.setMinimumWidth(420)
         self.setWindowModality(Qt.NonModal)
         #Each parallel AnnAGNPS/TopAGNPS execution opens its own console window, which can end up
@@ -57,7 +59,7 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(8)
 
-        title = QtWidgets.QLabel("Calibrating…", self)
+        title = QtWidgets.QLabel(title, self)
         bold_font = title.font()
         bold_font.setBold(True)
         bold_font.setPointSize(bold_font.pointSize()+1)
@@ -92,13 +94,16 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
         self.last_label = QtWidgets.QLabel("Last result: -", self)
         layout.addWidget(self.last_label)
 
-        self.best_label = QtWidgets.QLabel("Best result so far: -", self)
-        best_font = self.best_label.font()
-        best_font.setBold(True)
-        self.best_label.setFont(best_font)
-        layout.addWidget(self.best_label)
+        if show_best:
+            self.best_label = QtWidgets.QLabel("Best result so far: -", self)
+            best_font = self.best_label.font()
+            best_font.setBold(True)
+            self.best_label.setFont(best_font)
+            layout.addWidget(self.best_label)
+        else:
+            self.best_label = None
 
-        self.stop_button = QtWidgets.QPushButton("Stop calibration", self)
+        self.stop_button = QtWidgets.QPushButton(stop_button_text, self)
         self.stop_button.clicked.connect(self.stop_requested.emit)
         layout.addWidget(self.stop_button, alignment=Qt.AlignRight)
 
@@ -108,7 +113,7 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
         self.status_label.setText(text)
 
 
-    def update_progress(self,completed,total,active,metric_name,last_value,best_value):
+    def update_progress(self,completed,total,active,metric_name,last_value,best_value=None):
         """Update the progress bar and the execution/metric labels"""
         self.status_label.setText("Running AnnAGNPS executions...")
         self.progress_bar.setMaximum(max(total,1))
@@ -117,7 +122,8 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
         self.running_label.setText(f"Running now: {active}")
         self.metric_label.setText(f"Objective metric: {metric_name}")
         self.last_label.setText(f"Last result: {last_value:.4f}" if last_value is not None else "Last result: -")
-        self.best_label.setText(f"Best result so far: {best_value:.4f}" if best_value is not None else "Best result so far: -")
+        if self.show_best:
+            self.best_label.setText(f"Best result so far: {best_value:.4f}" if best_value is not None else "Best result so far: -")
 
 
     def disable_stop(self):
