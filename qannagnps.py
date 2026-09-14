@@ -38,6 +38,7 @@ from pathlib import Path
 
 import subprocess
 import os
+import zlib
 import numpy as np
 import pandas as pd
 import math
@@ -104,6 +105,7 @@ from .ui.calibration_results import calibration_results
 from .ui.fiteval_calibration import fiteval_calibration
 from .ui.calibration_progress import CalibrationProgressDialog
 from .ui.scenario_analysis import scenario_analysis
+from .ui.ephemeral_gully_analysis import ephemeral_gully_analysis
 from .ui.identifiability import IdentifiabilityDialog
 from .ui.results_identifiability import ResultsIdentifiabilityDialog
 
@@ -133,6 +135,29 @@ qgis_processing_lock = threading.Lock()
 #privileges needed.
 CARPETA_GUARDAR_PROYECTOS = os.path.join(os.path.expanduser("~"), "QAnnAGNPS_Projects")
 
+#Module-level (instead of a method of the main class) so it's also reachable from the
+#Sensitivity_Parallelization/Calibration_Parallelization task classes, which run in their own
+#worker objects without access to the main class's instance methods.
+def clear_folder_contents(folder_path):
+    """Method to delete everything already inside a folder (without deleting the folder itself).
+    Called once at the very start of a TopAGNPS/AnnAGNPS execution, right before its outputs start
+    being produced, so a leftover file from a previous execution that isn't regenerated this time
+    (e.g. AnnAGNPS failing to produce one specific output) doesn't silently keep looking like a
+    valid, current result - which could otherwise go unnoticed until it produces wrong data
+    somewhere that reads it later, e.g. scenario analysis."""
+    folder = Path(folder_path)
+    if not folder.is_dir():
+        return
+    for item in folder.iterdir():
+        try:
+            if item.is_file() or item.is_symlink():
+                item.unlink()
+            elif item.is_dir():
+                shutil.rmtree(item)
+        except Exception:
+            pass
+
+
 #Value told to the Bayesian optimizer (as the value to minimize) for a calibration execution that
 #failed (e.g. AnnAGNPS rejected the sampled parameter combination as out of range). It just needs
 #to be clearly worse than any real objective-function value, so the optimizer learns to steer away
@@ -144,6 +169,13 @@ CALIBRATION_FAILURE_PENALTY = 1e6
 #  "gaging_station"  -> AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv (watershed-outlet daily table;
 #                       streamflow, sediment, N, P, OC and pesticide loadings all live here)
 #  "ephemeral_gully"  -> AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv (summed across every gully per day)
+#Fixed palette used to colour each project's line in the scenario analysis graph. Colors are
+#assigned to a project by name (see scenario_project_color), not by plot order, so a project keeps
+#the same color no matter which other projects happen to be checked/unchecked alongside it.
+#Kept clear of black/near-black tones on purpose, since observed data is always plotted in solid
+#black - so no project color can ever be confused with it.
+SCENARIO_PROJECT_COLORS = ['#3f6ea5','#e67e22','#2e8b57','#c0392b','#8e44ad','#16a085','#d4ac0d','#e84393','#7f8c8d','#795548']
+
 #"column" is the column read from that file (for ephemeral_gully, the column that gets summed).
 #Grouped and ordered by category so the calibration dialog lists them together, not interleaved.
 CALIBRATION_OUTPUTS = [
@@ -170,6 +202,54 @@ CALIBRATION_OUTPUTS = [
     ("Pesticide", "pesticide_total", "Pesticide: Total (kg)", "gaging_station", "Pesticide: Total [kg]"),
     ("Pesticide", "pesticide_attached", "Pesticide: Attached (kg)", "gaging_station", "Pesticide: Attached [kg]"),
     ("Pesticide", "pesticide_dissolved", "Pesticide: Dissolved (kg)", "gaging_station", "Pesticide: Dissolved [kg]"),
+]
+
+#The erosion output shown by the dedicated ephemeral gully analysis window - looked up from
+#CALIBRATION_OUTPUTS by key so both lists always agree on its column/label.
+EPHEMERAL_GULLY_EROSION_OUTPUT = next(o for o in CALIBRATION_OUTPUTS if o[1]=="erosion_ephemeral_gully")
+EPHEMERAL_GULLY_EROSION_COLUMN = EPHEMERAL_GULLY_EROSION_OUTPUT[4]
+EPHEMERAL_GULLY_EROSION_LABEL = EPHEMERAL_GULLY_EROSION_OUTPUT[2]
+
+#The accumulated-volume output - same AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv file/reader as
+#erosion (read_ephemeral_gully_summary), just its sibling column in [m^3] instead of [Mg]
+EPHEMERAL_GULLY_VOLUME_COLUMN = "Total accumulated volume [m^3]"
+EPHEMERAL_GULLY_VOLUME_LABEL = "Volume: Ephemeral Gully (m³)"
+
+#Column names of AnnAGNPS_SIM_Ephemeral_Gully_Sections.csv, in order. Unlike every other AnnAGNPS
+#output file (whose header is a single row starting with "Gregorian Day"), this file's header is
+#spread across several metadata rows (with a "Ridge Line"/"Barrier"/"Headcut" category row above the
+#field-name row, then a units row) - the exact same 27 columns every time, so they're hardcoded here
+#rather than parsed dynamically. Each (date, Gully ID) group has 41 rows: one "Nickpoint" row (the
+#scour hole immediately downstream of the gully mouth, before the headcut starts migrating upstream)
+#followed by 40 fixed sections along the gully's maximum potential length, numbered 1 (most
+#downstream) to 40 (most upstream). A section's width being 0 means the gully hasn't migrated far
+#enough upstream to reach it yet.
+EPHEMERAL_GULLY_SECTIONS_COLUMNS = [
+    "Gregorian Day","Month","Day","Year","Cell ID","Gully ID",
+    "Ridge Line Drainage Area","Ridge Line Distance from Mouth",
+    "Barrier Drainage Area","Barrier Distance from Mouth",
+    "Headcut Migration Distance","Gully Slope","Section Number","Area Ratio",
+    "Drainage Area","Distance Dnstream","Distance Upstream","Code",
+    "Width Downstream","Width Upstream","Average Width","Average Depth",
+    "Peak Discharge","Headcut Migration Volume","Headcut Migration Erosion",
+    "Total Gully Accumulation Volume","Total Gully Accumulation Erosion",
+]
+
+#The outputs shown by the dedicated ephemeral gully analysis window: (key, display label, resample
+#method used to aggregate to Monthly/Annual - ignored for "active_gullies", which computes its own
+#period-correct aggregation, see read_ephemeral_gully_active_count). Erosion, volume and migration
+#rate are additive flows (a monthly total makes sense as a sum of daily amounts - for migration rate,
+#summing the daily length increases across a month reconstructs that month's total length gained);
+#gully length and width are state/snapshot values (the headcut's current position, or the current
+#average section width), so summing multiple readings across a period would be meaningless - the
+#period's last reading is used instead.
+EPHEMERAL_GULLY_OUTPUTS = [
+    ("erosion", EPHEMERAL_GULLY_EROSION_LABEL, "sum"),
+    ("volume", EPHEMERAL_GULLY_VOLUME_LABEL, "sum"),
+    ("length", "Total Gully Length (m)", "last"),
+    ("width", "Average Gully Width (m)", "last"),
+    ("active_gullies", "Active Gully Count", "sum"),
+    ("migration_rate", "Gully Migration Rate (m/day)", "sum"),
 ]
 
 
@@ -285,6 +365,7 @@ class qannagnps():
         self.dlg_calibration_results = calibration_results()
         self.dlg_fiteval_calibration= fiteval_calibration()
         self.dlg_scenario_analysis = scenario_analysis()
+        self.dlg_ephemeral_gully_analysis = ephemeral_gully_analysis()
         self.dlg_identifiability = IdentifiabilityDialog()
         self.dlg_results_identifiability = ResultsIdentifiabilityDialog()
 
@@ -298,6 +379,7 @@ class qannagnps():
                        self.dlg_results_sensitivity,self.dlg_figure_settings,self.dlg_calibration,
                        self.dlg_calibration_inputs,self.dlg_calibration_results,
                        self.dlg_fiteval_calibration,self.dlg_scenario_analysis,
+                       self.dlg_ephemeral_gully_analysis,
                        self.dlg_identifiability,self.dlg_results_identifiability]:
             self.enable_raise_on_show(dialog)
 
@@ -384,18 +466,86 @@ class qannagnps():
         
         #Open scenario analysis
         self.dlg.scenario.clicked.connect(self.dlg_scenario_analysis_show)
-        
+
+        #Open ephemeral gully analysis (a scenario-analysis-style window dedicated only to
+        #ephemeral gully erosion), from a button in scenario analysis's own header
+        self.dlg_scenario_analysis.button_ephemeral_gully.setIcon(QIcon(os.path.join(self.plugin_dir,"images","erosion.svg")))
+        self.apply_flat_icon_style([self.dlg_scenario_analysis.button_ephemeral_gully])
+        self.dlg_scenario_analysis.button_ephemeral_gully.clicked.connect(self.dlg_ephemeral_gully_analysis_show)
+
         #Update graph scenario analysis when date changed
         self.dlg_scenario_analysis.start_date.editingFinished.connect(lambda b=True:self.update_scenario_analysis_graph(b))
         self.dlg_scenario_analysis.end_date.editingFinished.connect(lambda b=True:self.update_scenario_analysis_graph(b))
         
+        #Studied Output list for scenario analysis: the exact same CALIBRATION_OUTPUTS list/mechanism
+        #used by calibration and identifiability analysis, so the same observed-data output types
+        #are available here too
+        #(self.plugin_dir, not self.plugin_directory: at this point in initGui, self.plugin_directory
+        #still holds its __init__-time placeholder value (os.getcwd()) and only gets corrected to
+        #the plugin's own folder later on - self.plugin_dir is already correct from __init__)
+        self.build_calibration_output_radios(self.plugin_dir,self.dlg_scenario_analysis)
+
         #Update scenario analysis graph when output changed
-        for rb in self.dlg_scenario_analysis.frame_2.findChildren(QRadioButton):
+        for rb in self.dlg_scenario_analysis.output_radios.values():
             rb.toggled.connect(lambda _, b=False: self.update_scenario_analysis_graph(b))
-        
+
+        #Optional observed data to compare against the simulated projects in scenario analysis
+        #(a separate file/field from calibration's own "Observed data" dialog, so loading one
+        #doesn't silently change the other)
+        self.dlg_scenario_analysis.browse_observed.setIcon(QIcon(os.path.join(self.plugin_dir,"images","search.svg")))
+        self.dlg_scenario_analysis.clear_observed.setIcon(QIcon(os.path.join(self.plugin_dir,"images","remove.svg")))
+        self.apply_flat_icon_style([self.dlg_scenario_analysis.browse_observed,self.dlg_scenario_analysis.clear_observed])
+        self.dlg_scenario_analysis.browse_observed.clicked.connect(self.browse_observed_scenario)
+        self.dlg_scenario_analysis.clear_observed.clicked.connect(self.clear_observed_scenario)
+
+        #Time step (Daily/Monthly/Annual) to aggregate the scenario analysis graph
+        for time_step_radio in [self.dlg_scenario_analysis.daily,self.dlg_scenario_analysis.monthly,self.dlg_scenario_analysis.annual]:
+            time_step_radio.toggled.connect(lambda checked: self.update_scenario_analysis_graph(False) if checked else None)
+
+        #Info button explaining how to use scenario analysis
+        self.dlg_scenario_analysis.button_info.setIcon(QIcon(os.path.join(self.plugin_dir,"images","documents_information.svg")))
+        self.apply_flat_icon_style([self.dlg_scenario_analysis.button_info])
+        self.dlg_scenario_analysis.button_info.clicked.connect(self.show_scenario_analysis_help)
+
         #Button to run the scenarios that don´t have the required outptu
+        self.dlg_scenario_analysis.execute_scenario.setToolTip(
+            "Runs AnnAGNPS again on the selected projects that don't yet have the output required "
+            "for this graph (enabling it in their control files first if needed).\n"
+            "Projects that were already run with this output enabled don't need this button - just "
+            "check them above to plot them.")
         self.dlg_scenario_analysis.execute_scenario.clicked.connect(self.execute_scenario_analysis)
-        
+
+        #Ephemeral gully analysis: same wiring pattern as scenario analysis above, but for the
+        #dedicated ephemeral-gully-only window
+        self.dlg_ephemeral_gully_analysis.start_date.editingFinished.connect(lambda b=True:self.update_ephemeral_gully_graph(b))
+        self.dlg_ephemeral_gully_analysis.end_date.editingFinished.connect(lambda b=True:self.update_ephemeral_gully_graph(b))
+
+        self.dlg_ephemeral_gully_analysis.browse_observed.setIcon(QIcon(os.path.join(self.plugin_dir,"images","search.svg")))
+        self.dlg_ephemeral_gully_analysis.clear_observed.setIcon(QIcon(os.path.join(self.plugin_dir,"images","remove.svg")))
+        self.apply_flat_icon_style([self.dlg_ephemeral_gully_analysis.browse_observed,self.dlg_ephemeral_gully_analysis.clear_observed])
+        self.dlg_ephemeral_gully_analysis.browse_observed.clicked.connect(self.browse_observed_ephemeral_gully)
+        self.dlg_ephemeral_gully_analysis.clear_observed.clicked.connect(self.clear_observed_ephemeral_gully)
+
+        #Studied Output list (erosion / total gully length / average gully width)
+        for output_radio in [self.dlg_ephemeral_gully_analysis.output_erosion,self.dlg_ephemeral_gully_analysis.output_volume,
+                             self.dlg_ephemeral_gully_analysis.output_length,self.dlg_ephemeral_gully_analysis.output_width,
+                             self.dlg_ephemeral_gully_analysis.output_active_gullies,self.dlg_ephemeral_gully_analysis.output_migration_rate]:
+            output_radio.toggled.connect(lambda checked: self.update_ephemeral_gully_graph(False) if checked else None)
+
+        for time_step_radio in [self.dlg_ephemeral_gully_analysis.daily,self.dlg_ephemeral_gully_analysis.monthly,self.dlg_ephemeral_gully_analysis.annual]:
+            time_step_radio.toggled.connect(lambda checked: self.update_ephemeral_gully_graph(False) if checked else None)
+
+        self.dlg_ephemeral_gully_analysis.button_info.setIcon(QIcon(os.path.join(self.plugin_dir,"images","documents_information.svg")))
+        self.apply_flat_icon_style([self.dlg_ephemeral_gully_analysis.button_info])
+        self.dlg_ephemeral_gully_analysis.button_info.clicked.connect(self.show_ephemeral_gully_analysis_help)
+
+        self.dlg_ephemeral_gully_analysis.execute_ephemeral_gully.setToolTip(
+            "Runs AnnAGNPS again on the selected projects that don't yet have ephemeral gully erosion "
+            "enabled (enabling it in their control files first if needed).\n"
+            "Projects that were already run with this output enabled don't need this button - just "
+            "check them above to plot them.")
+        self.dlg_ephemeral_gully_analysis.execute_ephemeral_gully.clicked.connect(self.execute_ephemeral_gully_analysis)
+
         #Fiteval for calibration
         self.dlg_fiteval_calibration.nash.textChanged.connect(self.calibration_bootstraping_update)
         
@@ -633,7 +783,10 @@ class qannagnps():
         
         #Botón para cargar el proyecto
         self.dlg.pb_load.clicked.connect(self.load_project)
-        
+
+        #Botón para borrar un proyecto guardado
+        self.dlg.pb_delete_project.clicked.connect(self.delete_project)
+
         #Cargar los proyectos existentes
         self.update_saved_projects(update_scenario = False)
         
@@ -794,7 +947,7 @@ class qannagnps():
 
 
         #Diccionario analisis de sensibilidad nombre en el dialogo - [nombre del archivo, nombre de la columna]
-        dic_spatial = {'Pixel Size':['Spatial','TOPAGNPS.csv','FILENAME'],'Critical Source Area':['Spatial','TOPAGNPS.csv','CSA'],'Minimum Source Channel \nLength':['Spatial','TOPAGNPS.csv','MSCL'],'Absolute CTI':['Spatial','PEG.csv','CTI_value'],'Relative CTI':['Spatial','PEG.csv','Accum_pct'],'Cell Threshold':['Spatial','AGBUF.csv','C_THRESHOLD'],'Reach Threshold':['Spatial','AGBUF.csv','R_THRESHOLD'],'Drainage area \nto concentrated flow':['Spatial','AGFLOW.csv','Area'],'Maximum profile length \nuntil deposition':['Spatial','AGFLOW.csv','Length'],'Maximum Profile Slope':['Spatial','AGFLOW.csv','MxSlope'],'Wetness Index Threshold':['Spatial','AGWET.csv','WI_Threshold'],'Erosion Index Threshold':['Spatial','AGWET.csv','Erosion_Index_Threshold'],'Drainage Area Threshold':['Spatial','AGWET.csv','DA_Threshold'],'Maximum Wetland Ratio':['Spatial','AGWET.csv','Max_Wetland_Ratio'],'Minimum Wetland Ratio':['Spatial','AGWET.csv','Min_Wetland_Ratio'],'Barrier Height':['Spatial','AGWET.csv','Barrier_Height'],'Barrier Height Increment':['Spatial','AGWET.csv','Barrier_Height_Increment'],'Barrier Height Maximum':['Spatial','AGWET.csv','Barrier_Height_Max'],'Buffer width':['Spatial','AGWET.csv','Buffer_Width'],'Pothole Surface Area':['Spatial','POTHOLE.csv','POTHOLE_SURFACE_AREA']}
+        dic_spatial = {'Pixel Size':['Spatial','TOPAGNPS.csv','FILENAME'],'Critical Source Area':['Spatial','TOPAGNPS.csv','CSA'],'Minimum Source Channel \nLength':['Spatial','TOPAGNPS.csv','MSCL'],'Absolute CTI':['Spatial','PEG.csv','CTI_value'],'Relative CTI':['Spatial','PEG.csv','Accum_pct'],'Cell Threshold':['Spatial','AGBUF.csv','C_THRESHOLD'],'Reach Threshold':['Spatial','AGBUF.csv','R_THRESHOLD'],'Wetness Index Threshold':['Spatial','AGWET.csv','WI_Threshold'],'Erosion Index Threshold':['Spatial','AGWET.csv','Erosion_Index_Threshold'],'Drainage Area Threshold':['Spatial','AGWET.csv','DA_Threshold'],'Maximum Wetland Ratio':['Spatial','AGWET.csv','Max_Wetland_Ratio'],'Minimum Wetland Ratio':['Spatial','AGWET.csv','Min_Wetland_Ratio'],'Barrier Height':['Spatial','AGWET.csv','Barrier_Height'],'Barrier Height Increment':['Spatial','AGWET.csv','Barrier_Height_Increment'],'Barrier Height Maximum':['Spatial','AGWET.csv','Barrier_Height_Max'],'Buffer width':['Spatial','AGWET.csv','Buffer_Width'],'Pothole Surface Area':['Spatial','POTHOLE.csv','POTHOLE_SURFACE_AREA']}
         dic_watershed = {'Pond area':[self.inputs.l_2,'Pond_Area'],'Pond Depth':[self.inputs.l_2,'Pond_Depth'],'Seepage Rate':[self.inputs.l_2,'Seepage_Rate'],'Sediment Delivery Ratio Pond':[self.inputs.l_2,'Sediment_Delivery_Ratio'],'Organic Carbon \nCalibration Factor Pond':[self.inputs.l_2,'OC_Calib_Fctr'],'Nitrogen Calibration Factor Pond':[self.inputs.l_2,'N_Calib_Fctr'],'Phosphorus Calibration Factor Pond':[self.inputs.l_2,'P_Calib_Fctr'],'Erosion Calibration Factor Pond':[self.inputs.l_2,'Erosion_Calib_Fctr'],'Sheet flow Manning’s n':[self.inputs.l_3,'Sheet_Flow_Mannings_n'],'Concentrated flow \nhydraulic depth':[self.inputs.l_3,'Conc_Flow_Hydraulic_Depth'],'Concentrated flow Manning’s n':[self.inputs.l_3,'Conc_Flow_Mannings_n'],'Delivery Ratio Pond':[self.inputs.l_3,'Delivery_Ratio'],'Constant USLE C factor':[self.inputs.l_3,'Constant_USLE_C_Fctr'],'Constant USLE P factor':[self.inputs.l_3,'Constant_USLE_P_Fctr'],'All Organic Carbon \nCalibration Factor':[self.inputs.l_3,'All_OC_Calib_Fctr'],'All Nitrogen Calibration Factor':[self.inputs.l_3,'All_N_Calib_Fctr'],'All Phosphorus Calibration Factor':[self.inputs.l_3,'All_P_Calib_Fctr'],'Sheet and Rill Erosion \nCalibration Factor':[self.inputs.l_3,'Sheet_and_Rill_Erosion_Calib_Fctr'],'Gullies Erosion Calibration Factor':[self.inputs.l_3,'Gullies_Erosion_Calib_Fctr'],'Head Cut Depth':[self.inputs.l_4,'Headcut_Depth'],'Erosion Coefficient':[self.inputs.l_4,'Erosion_Coef'],'Erosion Exponent':[self.inputs.l_4,'Erosion_exp'],'Delivery Ratio Gully':[self.inputs.l_4,'Delivery_Ratio'],'Organic Carbon \nCalibration Factor Gully':[self.inputs.l_4,'OC_Calib_Fctr'],'Nitrogen Calibration Factor Gully':[self.inputs.l_4,'N_Calib_Fctr'],'Phosphorus Calibration Factor Gully':[self.inputs.l_4,'P_Calib_Fctr'],'Erosion Calibration Factor Gully':[self.inputs.l_4,'Erosion_Calib_Fctr'],'Critical Shear Stress \nEphemeral Gully':[self.inputs.l_5,'Critical_Shear_Stress'],'Erosion Depth':[self.inputs.l_5,'Erosion_Depth'],'Delivery Ratio Ephemeral Gully':[self.inputs.l_5,'Delivery_Ratio'],'Manning’s n Ephemeral Gully':[self.inputs.l_5,'Mannings_n'],'Re Plant Period':[self.inputs.l_5,'Replant_Period'],'Organic Carbon':[self.inputs.l_5,'OC_Calib_Fctr'],'Nitrogen':[self.inputs.l_5,'N_Calib_Fctr'],'Phosphorus':[self.inputs.l_5,'P_Calib_Fctr'],'Erosion':[self.inputs.l_5,'Erosion_Calib_Fctr'],'Headcut detachment leading \ncoefficient a':[self.inputs.l_5,'Headcut_Dtach/Erod_Coef_a'],'Headcut erodibility \nleading coefficient a':[self.inputs.l_5,'Headcut_Dtach/Erod_Coef_a'],'Headcut detachment exponent \ncoefficient b':[self.inputs.l_5,'Headcut_Dtach/Erod_Exp_Coef_b'],'Headcut erodibility exponent \ncoefficient b':[self.inputs.l_5,'Headcut_Dtach/Erod_Exp_Coef_b'],'Maximum Buffer Trapping \nEfficiency TE m':[self.inputs.l_5,'Max_Trapping_Efficiency'],'Open Area':[self.inputs.l_6,'Open_Area'],'Paved Ratio':[self.inputs.l_6,'Paved_Ratio'],'Roof Area':[self.inputs.l_6,'Roof_Area'],'Upslope Area':[self.inputs.l_6,'Upslope_Area'],'Feedlot Initial N':[self.inputs.l_6,'Initial_N'],'Feedlot Initial P':[self.inputs.l_6,'Initial_P'],'Feedlot Initial OrgC':[self.inputs.l_6,'Initial_OC'],'Delta N':[self.inputs.l_6,'Delta_N'],'Delta P':[self.inputs.l_6,'Delta_P'],'Delta OrgC':[self.inputs.l_6,'Delta_OC'],'Feedlot Max N':[self.inputs.l_6,'Max_N'],'Feedlot Max P':[self.inputs.l_6,'Max_P'],'Feedlot Max OrgC':[self.inputs.l_6,'Max_OC'],'Feedlot Pack N':[self.inputs.l_6,'Pack_N'],'Feedlot Pack P':[self.inputs.l_6,'Pack_P'],'Feedlot Pack OrgC':[self.inputs.l_6,'Pack_OC'],'Organic Carbon Calibration \nFactor Feedlot':[self.inputs.l_6,'OC_Calib_Fctr'],'Nitrogen Calibration \nFactor Feedlot':[self.inputs.l_6,'N_Calib_Fctr'],'Phosphorus Calibration \nFactor Feedlot':[self.inputs.l_6,'P_Calib_Fct'],'Erosion Calibration \nFactor Feedlot':[self.inputs.l_6,'Erosion_Calib_Fctr'],'Cell Buffer Length':[self.inputs.l_6,'Cell_Buffer_Length'],'Field Pond area':[self.inputs.l_7,'Pond_Area'],'Number of rotation years':[self.inputs.l_7,'Number_of_Rotation_Years'],'Number gate operations':[self.inputs.l_7,'Number_of_Gate_Operations'],'Delivery Ratio Field Pond':[self.inputs.l_7,'Delivery_Ratio'],'Volume of release water':[self.inputs.l_7,'Volume_of_Release_Water'],'Drain Time':[self.inputs.l_7,'Drain_Time'],'Release rate':[self.inputs.l_7,'Release_Rate'],'Sediment Concentration':[self.inputs.l_7,'Sediment_Conc'],'Clay content Field Pond':[self.inputs.l_7,'Clay_Content'],'Silt content Field Pond':[self.inputs.l_7,'Silt_Content'],'Organic Carbon Calibration Factor Field Pond':[self.inputs.l_7,'OC_Calib_Fctr'],'Nitrogen Calibration Factor Field Pond':[self.inputs.l_7,'N_Calib_Fctr'],'Phosphorus Calibration Factor Field Pond':[self.inputs.l_7,'P_Calib_Fctr'],'Erosion Calibration Factor Field Pond':[self.inputs.l_7,'Erosion_Calib_Fctr'],'Impoundment Infiltration':[self.inputs.l_8,'Infiltration'],'Impoundment Seepage':[self.inputs.l_8,'Seepage'],'Permanent Pool Depth':[self.inputs.l_8,'Permanent_Pool_Depth'],'Impound Volume Coefficient':[self.inputs.l_8,'Volume_Coef'],'Impound Volume Exponent':[self.inputs.l_8,'Volume_Exp'],'Impound Discharge Coefficient':[self.inputs.l_8,'Discharge_Coef'],'Impound Discharge Exponent':[self.inputs.l_8,'Discharge_Exp'],'Sediment Clean Out Depth':[self.inputs.l_8,'Sed_Clean_Out_Depth'],'Sediment Clean Out Year':[self.inputs.l_8,'Sed_Clean_Out_Year'],'Point Flow':[self.inputs.l_9,'Point_Flow'],'Point Nitrogen':[self.inputs.l_9,'Point_N'],'Point Phosphorus':[self.inputs.l_9,'Point_P'],'Point Organic Carbon':[self.inputs.l_9,'Point_OC'],'Organic Carbon Calibration Factor':[self.inputs.l_9,'OC_Calib_Fctr'],'Nitrogen Calibration Factor':[self.inputs.l_9,'N_Calib_Fctr'],'Phosphorus Calibration Factor':[self.inputs.l_9,'P_Calib_Fctr'],'Erosion Calibration Factor':[self.inputs.l_9,'Erosion_Calib_Fctr'],'Reach Manning’s n':[self.inputs.l_10,'Mannings_n'],'Reach Flow Depth':[self.inputs.l_10,'Flow_Depth'],'Valley Width':[self.inputs.l_10,'Valley_Width'],'Valley n':[self.inputs.l_10,'Valley_Mannings_n'],'Delivery Ratio Reach':[self.inputs.l_10,'Delivery_Ratio'],'Latitude':[self.inputs.l_12,'Latitude'],'Longitude':[self.inputs.l_12,'Longitude'],'Wetland Area':[self.inputs.l_13,'Wetland_Area'],'Initial Water Depth':[self.inputs.l_13,'Initial_Water_Depth'],'Minimum Water Depth':[self.inputs.l_13,'Min_Water_Depth'],'Maximum Water Depth':[self.inputs.l_13,'Max_Water_Depth'],'Water Temperature':[self.inputs.l_13,'Water_Temperature'],'Potential Daily Infiltration':[self.inputs.l_13,'Potential_Daily_Infiltration'],'Weir Coefficient':[self.inputs.l_13,'Weir_Coef'],'Weir Width':[self.inputs.l_13,'Weir_Width'],'Weir Height':[self.inputs.l_13,'Weir_Height'],'Soluble N Concentration':[self.inputs.l_13,'Soluble_N_Conc'],'Nitrate Loss Rate':[self.inputs.l_13,'Nitrate-N_Loss_Rate'],'Nitrate Loss Rate Coefficient':[self.inputs.l_13,'Nitrate-N_Loss_Rate_Coef'],'Temperature Coefficient':[self.inputs.l_13,'Temperature_Coef'],'Weir Exponent':[self.inputs.l_13,'Weir_Exp']}
         dic_general = {'Maximum Pool Depth':[self.inputs.l_24,'Max_Pool_Depth'],'Minimum Pool Depth':[self.inputs.l_24,'Min_Pool_Depth'],'Fill/Release Volume':[self.inputs.l_24,'Fill/Release_Vol'],'Fill/Drain Time':[self.inputs.l_24,'Fill/Drain_Time'],'Fill/Release Rate':[self.inputs.l_24,'Fill/Release_Rate'],'Fill/Drain All':[self.inputs.l_24,'Fill/Drain_All_Code'],'Total Sediment Concentration':[self.inputs.l_24,'Total_Sed_Conc'],'Clay Content Pond Schedule':[self.inputs.l_24,'Clay_Content'],'Silt Content Pond Schedule':[self.inputs.l_24,'Silt_Content'],'Total Nitrogen':[self.inputs.l_24,'Total_N'],'Dissolved Nitrogen':[self.inputs.l_24,'Dissolved_N'],'Total Phosphorus':[self.inputs.l_24,'Total_P'],'Dissolved Phosphorus':[self.inputs.l_24,'Dissolved_P'],'Sediment Concentration—Winter':[self.inputs.l_24,'Sed_Conc_Winter'],'Total Nitrogen—Winter':[self.inputs.l_24,'Total_N_Winter'],'Dissolved Nitrogen—Winter':[self.inputs.l_24,'Dissolved_N_Winter'],'Total Phosphorus—Winter':[self.inputs.l_24,'Total_P_Winter'],'Dissolved Phosphorus—Winter':[self.inputs.l_24,'Dissolved_P_Winter'],'Sediment Concentration—Spring':[self.inputs.l_24,'Sed_Conc_Spring'],'Total Nitrogen—Spring':[self.inputs.l_24,'Total_N_Spring'],'Dissolved Nitrogen—Spring':[self.inputs.l_24,'Dissolved_N_Spring'],'Total Phosphorus—Spring':[self.inputs.l_24,'Total_P_Spring'],'Dissolved Phosphorus—Spring':[self.inputs.l_24,'Dissolved_P_Spring'],'Sediment Concentration—Summer':[self.inputs.l_24,'Sed_Conc_Summer'],'Total Nitrogen—Summer':[self.inputs.l_24,'Total_N_Summer'],'Dissolved Nitrogen—Summer':[self.inputs.l_24,'Dissolved_N_Summer'],'Total Phosphorus—Summer':[self.inputs.l_24,'Total_P_Summer'],'Dissolved Phosphorus—Summer':[self.inputs.l_24,'Dissolved_P_Summer'],'Sediment Concentration—Autumn':[self.inputs.l_24,'Sed_Conc_Autumn'],'Total Nitrogen—Autumn':[self.inputs.l_24,'Total_N_Autumn'],'Dissolved Nitrogen—Autumn':[self.inputs.l_24,'Dissolved_N_Autumn'],'Total Phosphorus—Autumn':[self.inputs.l_24,'Total_P_Autumn'],'Dissolved Phosphorus—Autumn':[self.inputs.l_24,'Dissolved_P_Autumn'],'Furrow Slope':[self.inputs.l_25,'Furrow_Slope'],'Yield Units Harvested per Area':[self.inputs.l_26,'Yield_Units_Harvested'],'Residue Mass Ratio':[self.inputs.l_26,'Residue_Mass_Ratio'],'Surface decomposition Crop':[self.inputs.l_26,'Surface_Decomp'],'Sub-surface decomposition Crop':[self.inputs.l_26,'Subsurface_Decomp'],'USLE C-Factor Crop':[self.inputs.l_26,'USLE_C_Fctr'],'Moisture Depletion':[self.inputs.l_26,'Moisture_Depletion'],'Crop Residue_30%':[self.inputs.l_26,'Crop_Residue_30%'],'Crop Residue_60%':[self.inputs.l_26,'Crop_Residue_60%'],'Crop Residue_90%':[self.inputs.l_26,'Crop_Residue_90%'],'Yield Unit Mass':[self.inputs.l_26,'Yield_Unit_Mass'],'Harvest C-N Ratio':[self.inputs.l_26,'Harvest_CN_Ratio'],'N Uptake':[self.inputs.l_26,'N_Uptake'],'P Uptake':[self.inputs.l_26,'P_Uptake'],'Harvest C-P Ratio':[self.inputs.l_26,'Harvest_CP_Ratio'],'Growth Time Ini':[self.inputs.l_26,'Growth_Time_Ini'],'Growth Time Dev':[self.inputs.l_26,'Growth_Time_Dev'],'Growth Time Mat':[self.inputs.l_26,'Growth_Time_Mat'],'Basal Crop Coefficient (“Kcb-ini”) crop':[self.inputs.l_26,'Basal_Crop_Coef_Ini'],'Basal Crop Coefficient (“Kcb-mid”) crop':[self.inputs.l_26,'Basal_Crop_Coef_Mid'],'Basal Crop Coefficient (“Kcb-end”) crop':[self.inputs.l_26,'Basal_Crop_Coef_End'],'Root Mass':[self.inputs.l_27,'Root_Mass'],'Canopy Cover':[self.inputs.l_27,'Canopy_Cover'],'Rain Fall Height':[self.inputs.l_27,'Rain_Fall_Height'],'Pack Remove Ratio':[self.inputs.l_28,'Pack_Remove_Ratio'],'Pack Start N':[self.inputs.l_28,'Pack_Start_N'],'Pack Start P':[self.inputs.l_28,'Pack_Start_P'],'Pack Start OrgC':[self.inputs.l_28,'Pack_Start_OC'],'Pack Change N':[self.inputs.l_28,'Pack_Change_N'],'Pack Change P':[self.inputs.l_28,'Pack_Change_P'],'Pack Change OrgC':[self.inputs.l_28,'Pack_Change_OC'],'Fertilizer Rate':[self.inputs.l_29,'Application_Rate'],'Fertilizer Inorganic N':[self.inputs.l_30,'Inorganic_N'],'Fertilizer Organic N':[self.inputs.l_30,'Organic_N'],'Fertilizer Inorganic P':[self.inputs.l_30,'Inorganic_P'],'Fertilizer Organic P':[self.inputs.l_30,'Organic_P'],'Fertilizer Organic Matter':[self.inputs.l_30,'Organic_Matter'],'Delay Time':[self.inputs.l_31,'Delay_Time'],'Water Table':[self.inputs.l_31,'Water_Table'],'Aquifer Saturated \nHydraulic Conductivity':[self.inputs.l_31,'Aquifer_Sat_Hyd_Conduct'],'K-vadose Saturated \nHydraulic Conductivity':[self.inputs.l_31,'Vadose_Sat_Hyd_Conduct'],'Aquifer Porosity':[self.inputs.l_31,'Porosity'],'Aquifer Field Capacity':[self.inputs.l_31,'Field_Capacity'],'Aquifer Specific Yield':[self.inputs.l_31,'Specific_Yield'],'Aquifer Thickness':[self.inputs.l_31,'Thickness'],'Aquifer Soluble Nitrogen':[self.inputs.l_31,'Soluble_N'],'Aquifer Soluble Phosphorus':[self.inputs.l_31,'Soluble_P'],'Channel Length Coefficient':[self.inputs.l_32,'Channel_Length_Coef'],'Channel Length Exponent':[self.inputs.l_32,'Channel_Length_Exp'],'Channel Width Coefficient':[self.inputs.l_32,'Channel_Width_Coef'],'Channel Width Exponent':[self.inputs.l_32,'Channel_Width_Exp'],'Channel Depth Coefficient':[self.inputs.l_32,'Channel_Depth_Coef'],'Channel Depth Exponent':[self.inputs.l_32,'Channel_Depth_Exp'],'Valley Width Coefficient':[self.inputs.l_32,'Valley_Width_Coef'],'Valley Width Exponent':[self.inputs.l_32,'Valley_Width_Exp'],'Cycle Duration':[self.inputs.l_33,'Cycle_Duration'],'Amount Lost':[self.inputs.l_33,'Amount_Lost'],'Application Rate':[self.inputs.l_33,'Application_Rate'],'Tailwater Recovery':[self.inputs.l_33,'Tailwater_Recovery'],'Depletion Lower Limit':[self.inputs.l_33,'Depletion_Lower_Limit'],'Application Amount':[self.inputs.l_33,'Application_Amount'],'Area Fraction':[self.inputs.l_33,'Area_Fraction'],'Interval Number':[self.inputs.l_33,'Interval_Number'],'Interval Days':[self.inputs.l_33,'Interval_Days'],'Chemical Multiple':[self.inputs.l_33,'Chemical_Multiple'],'Sediment Rate':[self.inputs.l_33,'Sediment_Rate'],'Depletion Upper Limit':[self.inputs.l_33,'Depletion_Upper_Limit'],'Percent Rock Cover':[self.inputs.l_34,'Percent_Rock_Cover'],'Random Roughness':[self.inputs.l_34,'Random_Roughness'],'Terrace Horizontal Distance':[self.inputs.l_34,'Terrace_Horizontal_Distance'],'Terrace grade':[self.inputs.l_34,'Terrace_Grade'],'Residue Cover Remaining':[self.inputs.l_35,'Residue_Cover_Remaining'],'Residue Weight Remaining':[self.inputs.l_35,'Residue_Weight_Remaining'],'Area Disturbed':[self.inputs.l_35,'Area_Disturbed'],'Initial Random Roughness':[self.inputs.l_35,'Initial_Random_Roughness'],'Final Random Roughness':[self.inputs.l_35,'Final_Random_Roughness'],'Operation Tillage Depth':[self.inputs.l_35,'Operation_Tillage_Depth'],'Added Surface Residue':[self.inputs.l_35,'Added_Surface_Residue'],'Surface Decomposition \nmanagement':[self.inputs.l_35,'Surface_Decomp'],'Sub-surface Decomposition \nmanagement':[self.inputs.l_35,'Subsurface_Decomp'],'Surface Residue_30%':[self.inputs.l_35,'Surface_Residue_30%'],'Surface Residue_60%':[self.inputs.l_35,'Surface_Residue_60%'],'Surface Residue_90%':[self.inputs.l_35,'Surface_Residue_90%'],'Post Event Manning’s n':[self.inputs.l_36,'Post_Event_Mannings_n'],'Post Event Surface Constant':[self.inputs.l_36,'Post_Event_Surface_Constant'],'Operation Residue Change':[self.inputs.l_36,'Operation_Residue_Change'],'Tile Drain Controlled Depth':[self.inputs.l_36,'Tile_Drain_Controlled_Depth'],'Annual Root Mass':[self.inputs.l_37,'Annual_Root_Mass'],'Annual Cover Ratio':[self.inputs.l_37,'Annual_Cover_Ratio'],'Annual Rain Fall Height':[self.inputs.l_37,'Annual_Rain_Fall_Height'],'Surface Residue Cover':[self.inputs.l_37,'Surface_Cover_Residue'],'USLE C-Factor Non Crop':[self.inputs.l_37,'USLE_C-Fctr'],'Basal Crop Coefficient (“Kcb-mid”) Non Crop':[self.inputs.l_37,'Basal_Crop_Coef_Mid'],'Pesticide Rate':[self.inputs.l_38,'Application_Rate'],'Pesticide Depth':[self.inputs.l_38,'Depth'],'Pesticide Foliage Fraction':[self.inputs.l_38,'Foliage_Fraction'],'Pesticide Soil Fraction':[self.inputs.l_38,'Soil_Fraction'],'Pesticide Solubility':[self.inputs.l_39,'Solubility'],'Pesticide Partition':[self.inputs.l_39,'Partition'],'Pesticide Soil Half-life':[self.inputs.l_39,'Soil_Half-life'],'Pesticide Foliage Half-life':[self.inputs.l_39,'Foliage_Halflife'],'Pesticide Washoff':[self.inputs.l_39,'Washoff'],'Metabolite Transformation':[self.inputs.l_39,'Metabolite_Transformation'],'Pesticide Reach Half-life':[self.inputs.l_39,'Reach_Halflife'],'Reach Nitrogen Half-life':[self.inputs.l_40,'N_Half-life'],'Reach Phosphorus Half-life':[self.inputs.l_40,'P_Half-life'],'Reach Organic Carbon Half-life':[self.inputs.l_40,'OC_Half-life'],'Slope':[self.inputs.l_41,'Buffer_Slope'],'Maximum Trapping \nEfficiency “TE-m”':[self.inputs.l_41,'Max_Trap_Efficiency'],'Effective Buffer Width':[self.inputs.l_41,'Eff_Wdth_Thru_Buffer'],'Effective Concentrated \nFlow Width':[self.inputs.l_41,'Eff_Wdth_Along_Buffer'],'Drainage Area to Upstream \nPortion of Buffer':[self.inputs.l_41,'Drainage_Area_to_Buffer'],'Actual Trapping Efficiency \n“TE-a” Clay':[self.inputs.l_41,'Actual_Trap_Efficiency_Clay'],'Actual Trapping Efficiency \n“TE-a” Silt':[self.inputs.l_41,'Actual_Trap_Efficiency_Silt'],'Actual Trapping Efficiency \n“TE-a” Sand':[self.inputs.l_41,'Actual_Trap_Efficiency_Sand'],'Actual Trapping Efficiency \n“TE-a” Sm Agg':[self.inputs.l_41,'Actual_Trap_Efficiency_Sm_Agg'],'Actual Trapping Efficiency \n“TE-a” Lg Agg':[self.inputs.l_41,'Actual_Trap_Efficiency_Lg_Agg'],'Fraction Trapped “TE-ps” Clay':[self.inputs.l_41,'Fraction_Trapped_Clay'],'Fraction Trapped “TE-ps” Silt':[self.inputs.l_41,'Fraction_Trapped_Silt'],'Fraction Trapped “TE-ps” Sand':[self.inputs.l_41,'Fraction_Trapped_Sand'],'Fraction Trapped “TE-ps” Sm Agg':[self.inputs.l_41,'Fraction_Trapped_Sm_Agg'],'Fraction Trapped “TE-ps” Lg Agg':[self.inputs.l_41,'Fraction_Trapped_Lg_Agg'],'Curve Number “A”':[self.inputs.l_42,'CN_A'],'Curve Number “B”':[self.inputs.l_42,'CN_B'],'Curve Number “C”':[self.inputs.l_42,'CN_C'],'Curve Number “D”':[self.inputs.l_42,'CN_D'],'Curve Number Shift':[self.inputs.l_42,['CN_A','CN_B','CN_C','CN_D']],'K-factor':[self.inputs.l_43,'K_Factor'],'Albedo':[self.inputs.l_43,'Albedo'],'Time to consolidation':[self.inputs.l_43,'Time_to_Consolidation'],'Impervious Depth':[self.inputs.l_43,'Impervious_Depth'],'Specific Gravity':[self.inputs.l_43,'Specific_Gravity'],'Layer Depth':[self.inputs.l_44,'Layer_Depth'],'Bulk Density':[self.inputs.l_44,'Bulk_Density'],'Clay Ratio':[self.inputs.l_44,'Clay_Ratio'],'Silt Ratio':[self.inputs.l_44,'Silt_Ratio'],'Sand Ratio':[self.inputs.l_44,'Sand_Ratio'],'Rock Ratio':[self.inputs.l_44,'Rock_Ratio'],'Very Fine Sand Ratio':[self.inputs.l_44,'Very_Fine_Sand_Ratio'],'CaCO3':[self.inputs.l_44,'CaCO3_Content'],'Saturated Conductivity':[self.inputs.l_44,'Saturated_Conductivity'],'Field Capacity':[self.inputs.l_44,'Field_Capacity'],'Wilting Point':[self.inputs.l_44,'Wilting_Point'],'Base Saturation':[self.inputs.l_44,'Base_Saturation'],'Unstable Aggregate Ratio':[self.inputs.l_44,'Unstable_Aggregate_Ratio'],'pH':[self.inputs.l_44,'pH'],'Organic Matter Ratio':[self.inputs.l_44,'Organic_Matter_Ratio'],'Organic N Ratio':[self.inputs.l_44,'Organic_N_Ratio'],'Inorganic N Ratio':[self.inputs.l_44,'Inorganic_N_Ratio'],'Organic P Ratio':[self.inputs.l_44,'Organic_P_Ratio'],'Inorganic P Ratio':[self.inputs.l_44,'Inorganic_P_Ratio'],'P Factor':[self.inputs.l_45,'P_Factor'],'Sediment Delivery Ratio Strip Crop':[self.inputs.l_45,'Delivery_Ratio'],'Drain Rate':[self.inputs.l_46,'Drain_Rate'],'Invert Depth':[self.inputs.l_46,'Invert_Depth']}
         dic_climate = {'Station Latitude':[self.inputs.l_48,'Latitude'],'Station Longitude':[self.inputs.l_48,'Longitude'],'Station Elevation':[self.inputs.l_48,'Elevation'],'Adiabatic Air Temperature \nLapse Rate':[self.inputs.l_48,'Temperature_Lapse_Rate'],'Precipitation Nitrogen':[self.inputs.l_48,'Precipitation_N'],'Elevation Difference (1)':[self.inputs.l_48,'1st_Elevation_Difference'],'Elevation Rain Factor (1)':[self.inputs.l_48,'1st_Elevation_Rain_Factor'],'Elevation Difference (2)':[self.inputs.l_48,'2nd_Elevation_Difference'],'Elevation Rain Factor (2)':[self.inputs.l_48,'2nd_Elevation_Rain_Factor'],'2 Yr 24 Hr Precipitation':[self.inputs.l_48,'2_Yr_24_hr_Precipitation'],'Rainfall Calibration or Areal \nCorrection Coefficient':[self.inputs.l_48,'Calibration_or_Areal_Correction_Coefficient'],'Areal Rainfall \nCorrection Exponent':[self.inputs.l_48,'Calibration_or_Areal_Correction_Exponent'],'Minimum interception \nevaporation station':[self.inputs.l_48,'Minimum_Interception_Evaporation'],'Maximum interception \nevaporation station':[self.inputs.l_48,'Maximum_Interception_Evaporation'],'EI_Pct_01':[self.inputs.l_50,'EI_Pct_01'],'EI_Pct_02':[self.inputs.l_50,'EI_Pct_02'],'EI_Pct_03':[self.inputs.l_50,'EI_Pct_03'],'EI_Pct_04':[self.inputs.l_50,'EI_Pct_04'],'EI_Pct_05':[self.inputs.l_50,'EI_Pct_05'],'EI_Pct_06':[self.inputs.l_50,'EI_Pct_06'],'EI_Pct_07':[self.inputs.l_50,'EI_Pct_07'],'EI_Pct_08':[self.inputs.l_50,'EI_Pct_08'],'EI_Pct_09':[self.inputs.l_50,'EI_Pct_09'],'EI_Pct_10':[self.inputs.l_50,'EI_Pct_10'],'EI_Pct_11':[self.inputs.l_50,'EI_Pct_11'],'EI_Pct_12':[self.inputs.l_50,'EI_Pct_12'],'EI_Pct_13':[self.inputs.l_50,'EI_Pct_13'],'EI_Pct_14':[self.inputs.l_50,'EI_Pct_14'],'EI_Pct_15':[self.inputs.l_50,'EI_Pct_15'],'EI_Pct_16':[self.inputs.l_50,'EI_Pct_16'],'EI_Pct_17':[self.inputs.l_50,'EI_Pct_17'],'EI_Pct_18':[self.inputs.l_50,'EI_Pct_18'],'EI_Pct_19':[self.inputs.l_50,'EI_Pct_19'],'EI_Pct_20':[self.inputs.l_50,'EI_Pct_20'],'EI_Pct_21':[self.inputs.l_50,'EI_Pct_21'],'EI_Pct_22':[self.inputs.l_50,'EI_Pct_22'],'EI_Pct_23':[self.inputs.l_50,'EI_Pct_23'],'EI_Pct_24':[self.inputs.l_50,'EI_Pct_24']}
@@ -887,6 +1040,79 @@ class qannagnps():
         
         return proyectos_sin_output
     
+    def modify_scenario_project_input(self,proyecto,name_master,column,new_columns,name_new_file):
+        """Method to modify (or create, if missing) one AnnAGNPS control file of a saved project,
+        so that a given column is set to "T" - used to enable the specific output a scenario/
+        ephemeral gully analysis "Execute" button needs before re-running AnnAGNPS. Shared by
+        execute_scenario_analysis and execute_ephemeral_gully_analysis."""
+        master_file = self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs\\annagnps_master.csv"
+        project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
+
+        if name_master in project_df.iloc[:,0].values:
+            file = Path(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==name_master].iloc[0,1])
+            data = pd.read_csv(file,encoding = "ISO-8859-1",delimiter=",")
+            # Eliminar espacios al inicio y final de los nombres de columnas
+            data.columns = data.columns.str.strip()
+            data[column].iloc[0] = "T"
+            data.to_csv(file, index=False, float_format='%.5f')
+
+        else:
+            columns = new_columns
+            data = pd.DataFrame(columns=columns, data=[[""] * len(columns)])
+            data[column].iloc[0] = "T"
+            nombre = name_new_file
+            file = Path(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"\\simulation\\"+f"{nombre}.csv")
+            data.to_csv(file, index=False, float_format='%.5f')
+            project_df.loc[len(project_df)] = [name_master, f".\simulation\{nombre}.csv"]
+            project_df.to_csv(master_file, index=False, float_format='%.5f')
+
+
+    def run_annagnps_for_scenario_project(self,proyecto):
+        """Method to (re-)run AnnAGNPS for one saved project, once the output an "Execute" button
+        needs has already been enabled in its control files (modify_scenario_project_input).
+        Shared by execute_scenario_analysis and execute_ephemeral_gully_analysis. Returns True if
+        AnnAGNPS reported an error for this project."""
+        #Clear any leftover Processing_outputs from a previous execution first, so a file that
+        #isn't regenerated this time doesn't keep looking like a valid, current result
+        clear_folder_contents(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_outputs")
+        #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
+        self.time_start_processing = datetime.now()
+
+        #EJECUCIÓN DE ANNAGNPS
+        def execute_bat():
+           def main():
+               f = open(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
+               linea_uno = "CD /d {}".format(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs")
+               linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
+               f.write("{} \n".format(linea_uno))
+               f.write("{} \n".format(linea_dos))
+               f.close()
+           main()
+        execute_bat()
+
+        subprocess.call(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
+
+        #If error file of AnnAGNPS is opened, then return a error message
+        try:
+            open(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"AnnAGNPS_LOG_Error.csv", "r+")
+        except PermissionError:
+            self.warning_message("Error AnnAGNPS\n\nClose AnnAGNPS_LOG_Error.csv before the start of execution")
+        except:
+            pass
+
+        #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
+        time.sleep(1)
+        error_occurred = False
+        if path.exists(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"AnnAGNPS_LOG_Error.csv"):
+            if os.stat(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"AnnAGNPS_LOG_Error.csv").st_size>0:
+                error_occurred = True
+
+        #Los outputs de AnnAGNPS se guardan en Processing_outputs
+        self.save_files_processing_in_folder_scenario(proyecto)
+
+        return error_occurred
+
+
     def execute_scenario_analysis(self):
         """Method to execute the project that don´t have the required output"""
         #First select the projects that don´t have the required output
@@ -894,79 +1120,16 @@ class qannagnps():
         if len(projects_without_output) == 0:
             self.warning_message("All the projects have the required outputs, there is no need of execution")
             return
-        
-        #Do the execution
-        #Function to modify or create the required file to display the required output
-        def modify_input(proyecto,name_master,column,new_columns,name_new_file):
-            master_file = self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs\\annagnps_master.csv"
-            project_df = pd.read_csv(master_file,encoding = "ISO-8859-1",delimiter=",")
 
-            if name_master in project_df.iloc[:,0].values:
-                file = Path(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"\\"+project_df[project_df.iloc[:,0]==name_master].iloc[0,1])
-                data = pd.read_csv(file,encoding = "ISO-8859-1",delimiter=",")
-                # Eliminar espacios al inicio y final de los nombres de columnas
-                data.columns = data.columns.str.strip()
-                data[column].iloc[0] = "T"
-                data.to_csv(file, index=False, float_format='%.5f')
-                
-            else:
-                columns = new_columns
-                data = pd.DataFrame(columns=columns, data=[[""] * len(columns)])
-                data[column].iloc[0] = "T"
-                nombre = name_new_file
-                file = Path(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"\\simulation\\"+f"{nombre}.csv")
-                data.to_csv(file, index=False, float_format='%.5f')
-                project_df.loc[len(project_df)] = [name_master, f".\simulation\{nombre}.csv"]
-                project_df.to_csv(master_file, index=False, float_format='%.5f')
-        
-        
         errors_projects = []
         for proyecto in projects_without_output:
             #Modify the master file
             columns = ["CCHE1D", "CONCEPTS_XML", "Gaging_Station_Hyd", "REMM", "Gaging_Station_Evt"]
-            modify_input(proyecto,"Output Options - TBL","Gaging_Station_Hyd",columns,"out_tbl")
-            
-            #Execute
-            #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
-            self.time_start_processing = datetime.now()
-            
-            
-            #EJECUCIÓN DE ANNAGNPS
-            #os.chdir(self.direccion+"\\"+directory)
-            def execute_bat():
-               def main():
-                   f = open(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat","w+")
-                   linea_uno = "CD /d {}".format(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs")
-                   linea_dos = r"CALL {}\AnnAGNPS_v6.00.r.058_release_64-bit.exe".format(self.executable_directory)
-                   f.write("{} \n".format(linea_uno))
-                   f.write("{} \n".format(linea_dos))
-                   f.close()
-               main()
-            execute_bat()
+            self.modify_scenario_project_input(proyecto,"Output Options - TBL","Gaging_Station_Hyd",columns,"out_tbl")
 
-            subprocess.call(self.executable_directory+"\\"+"EjecutarAnnAGNPS.bat")
+            if self.run_annagnps_for_scenario_project(proyecto):
+                errors_projects.append(proyecto)
 
-            
-            #If error file of AnnAGNPS is opened, then return a error message
-            try:
-                open(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"AnnAGNPS_LOG_Error.csv", "r+") 
-            except PermissionError:
-                self.warning_message("Error AnnAGNPS","Close AnnAGNPS_LOG_Error.csv before the start of execution")
-                return
-            except:
-                pass
-                        
-            #PONER MENSAJE DE ERROR SI ANNAGNPS FUNCIONA MAL
-            time.sleep(1)
-            if path.exists(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"AnnAGNPS_LOG_Error.csv"):
-                if os.stat(self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_inputs"+"AnnAGNPS_LOG_Error.csv").st_size>0:
-                    errors_projects.append(proyecto)
-            
-            #Los outputs de AnnAGNPS se guardan en Processing_outputs
-            self.save_files_processing_in_folder_scenario(proyecto)
-        
-        
-        
         if len(errors_projects)==0:
             self.warning_message("Executions completed")
         else:
@@ -977,7 +1140,57 @@ class qannagnps():
 
         #Update graph
         self.update_scenario_analysis_graph()
-        
+
+
+    def select_projects_without_output_ephemeral_gully(self):
+        """Method to select, among the checked projects in the ephemeral gully analysis window, the
+        ones that don't yet have both AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv (daily/monthly/annual
+        total erosion) and AnnAGNPS_SIM_Ephemeral_Gully_Sections.csv (per-gully, per-section detail:
+        widths, distances, etc.) - both are produced together by AnnAGNPS whenever the "Gully" column
+        of the project's "Output Options - SIM" control file is set to T"""
+        proyectos_seleccionados = [name for name, cb in self.checkboxes_project_ephemeral_gully.items() if cb.isChecked()]
+
+        proyectos_sin_output = []
+        for proyecto in proyectos_seleccionados:
+            outputs_folder = self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_outputs"
+            if not os.path.exists(outputs_folder+"\\AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv") or \
+               not os.path.exists(outputs_folder+"\\AnnAGNPS_SIM_Ephemeral_Gully_Sections.csv"):
+                proyectos_sin_output.append(proyecto)
+
+        return proyectos_sin_output
+
+
+    def execute_ephemeral_gully_analysis(self):
+        """Method to execute the checked projects in the ephemeral gully analysis window that don't
+        yet have the ephemeral gully erosion output enabled"""
+        projects_without_output = self.select_projects_without_output_ephemeral_gully()
+        if len(projects_without_output) == 0:
+            self.warning_message("All the projects have the required outputs, there is no need of execution")
+            return
+
+        errors_projects = []
+        for proyecto in projects_without_output:
+            #Enable the "Gully" column of Output Options - SIM, which is what produces both
+            #AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv and AnnAGNPS_SIM_Ephemeral_Gully_Sections.csv
+            #(same as the "Ephemeral" output in sensitivity analysis)
+            columns = ["Cell_Components","Conversion_Units","Sht/Rill_Eros_Sed_Yld","Feedlots","Insitu_N_Inorg","Insitu_N_Org","Insitu_Residue","Insitu_OC","Insitu_P_Inorg","Insitu_P_Org","Insitu_Soil_Moist_Daily","Irrigation","Pesticide_App","Pesticide_Insitu","Gully","Reach_Acc_Mass","Reach_Acc_Ratio","LS_Yld_All_Srcs","Reach_Ld_Nutr","Reserved","Reach_Ld_Sed","Reach_Ld_Wtr","Impound_Routing_A","Reserved","Reach_Routing_Pest","Reach_Routing","Reach_Routing_Wtr","Runoff_Curve_Num","Schd_Oprs","Soil_Part_Distrib","Pond_Release/Yield","Winter_Thermal","Reserved","USLE_Params","Baseflow","Insitu_Soil_Moist_Wsh d_Sum","Wetland_Effects","Pot_ET_Adjust","LS_Rnof_All_Srcs","Riparian_Buffers"]
+            self.modify_scenario_project_input(proyecto,"Output Options - SIM","Gully",columns,"out_sim")
+
+            if self.run_annagnps_for_scenario_project(proyecto):
+                errors_projects.append(proyecto)
+
+        if len(errors_projects)==0:
+            self.warning_message("Executions completed")
+        else:
+            project_error_string = '","'.join(errors_projects)
+            files_error = [self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_outputs\\AnnAGNPS_LOG_Error.csv" for proyecto in errors_projects]
+            files_error_string = '","'.join(files_error)
+            self.warning_message(f"The execution of the next projects gave error:{project_error_string}\nPlease check the next files to see the errors: {files_error_string}")
+
+        #Update graph
+        self.update_ephemeral_gully_graph()
+
+
     def dlg_scenario_analysis_show(self):
         """Method to show the scenario analysis with all the projects"""
         lista = [
@@ -986,20 +1199,16 @@ class qannagnps():
         ]
 
         # Si ya tienes layout en Qt Designer
-        layout = self.dlg_scenario_analysis.frame.layout()
+        layout = self.dlg_scenario_analysis.projects_container.layout()
         if layout is None:
-            layout = QVBoxLayout(self.dlg_scenario_analysis.frame)
-    
+            layout = QVBoxLayout(self.dlg_scenario_analysis.projects_container)
+
         while layout.count():
             item = layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
                 widget.blockSignals(True)
                 widget.deleteLater()
-
-        # 1️Añadir el label arriba
-        label = QLabel("Available projects")
-        layout.addWidget(label)
 
         #Update available projects
         self.update_available_projects_scenario()
@@ -1009,7 +1218,16 @@ class qannagnps():
         
         # Mostrar el diálogo
         self.dlg_scenario_analysis.show()
-        
+
+    def scenario_project_color(self,proyecto):
+        """Method to obtain a stable color for one project's line in the scenario analysis graph.
+        Based on the project's name (via a hash), not on plot/selection order, so a project keeps
+        the exact same color across redraws no matter which other projects are checked/unchecked
+        at the same time - checking/unchecking another project used to shift everyone else's color."""
+        index = zlib.crc32(proyecto.encode('utf-8')) % len(SCENARIO_PROJECT_COLORS)
+        return SCENARIO_PROJECT_COLORS[index]
+
+
     def update_available_projects_scenario(self):
         """Method to update the available projects in scenario analysis"""
         lista = [
@@ -1017,8 +1235,8 @@ class qannagnps():
             if os.path.isdir(os.path.join(self.carpeta_guardar_proyectos, f))
         ]
         
-        layout = self.dlg_scenario_analysis.frame.layout()
-        
+        layout = self.dlg_scenario_analysis.projects_container.layout()
+
         # 2️Crear los checkboxes
         self.checkboxes_project_scenario = {}
 
@@ -1034,152 +1252,582 @@ class qannagnps():
         layout.addItem(spacer)
     
     
+    def scenario_analysis_time_step(self):
+        """Method to obtain the time step selected for the scenario analysis graph (Daily/Monthly/Annual)"""
+        if self.dlg_scenario_analysis.monthly.isChecked():
+            return "Monthly"
+        if self.dlg_scenario_analysis.annual.isChecked():
+            return "Annual"
+        return "Daily"
+
+
     def obtain_data_scenario_analysis(self,proyecto,date_changed):
-        """Method to obtain data from the scenario analysis"""
-        
-        #First select the column of the information you want to see
-        dictionary_columns = {self.dlg_scenario_analysis.total_discharge.text():"Total Streamflow",
-            self.dlg_scenario_analysis.total_pesticide.text():"Pesticide: Total",
-            self.dlg_scenario_analysis.total_carbon.text():"Organic Carbon: Total",
-            self.dlg_scenario_analysis.total_phosphorus.text():"Phosphorus: Total",
-            self.dlg_scenario_analysis.total_nitrogen.text():"Nitrogen: Total",
-            self.dlg_scenario_analysis.total_sediment.text():"Sediment: All: Total"}
-            
-            
-        selected_radio_button = next((w.text() for w in self.dlg_scenario_analysis.frame_2.findChildren(QRadioButton) if w.isChecked()), None)
-        column = dictionary_columns[selected_radio_button]
-        
-        fichero = self.carpeta_guardar_proyectos+f"\\{proyecto}\\Processing_outputs\AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"
-        if os.path.exists(fichero):
-            first_column = "Gregorian Day"
-            file = open(fichero)
-            csvreader = csv.reader(file)
-            rows = []
-            for row in csvreader:
-               rows.append(row)
-            lista = []
-            a = 0
-            for i in rows:
-               try:
-                   if i[0]==first_column:
-                       a = 1
-                       lista.append(i)
-                   elif a ==1:
-                       lista.append(i[:-1])
-               except:
-                   continue
-               
-            df_simulated = pd.DataFrame(columns = lista[0],data = lista[1:])
-            df_simulated = df_simulated[df_simulated["Reach ID"]=="OUTLET"]
-            df_simulated['date'] = pd.to_datetime(df_simulated[['Year', 'Month', 'Day']])
-            # Encontrar la columna que contiene la información
-            total_col = [col for col in df_simulated.columns if column in col][0]
-            
-            # Seleccionar solo la columna 'Date' y la columna de la información
-            df_simulated = df_simulated[['date', total_col]]
-            df_simulated[total_col] = df_simulated[total_col].astype(float)
-            
-            #Filter by date
-            if date_changed:
-                try:
-                    fecha_inicio = pd.to_datetime(self.dlg_scenario_analysis.start_date.text())
-                    fecha_fin = pd.to_datetime(self.dlg_scenario_analysis.end_date.text())
-                    df_simulated = df_simulated[(df_simulated["date"] >= fecha_inicio) & (df_simulated["date"] <= fecha_fin)]
-                except:
-                    pass
-            
-            return df_simulated,total_col
-        
-        else:
+        """Method to obtain data from the scenario analysis, for the output currently selected in
+        the "Studied Output" list (the same CALIBRATION_OUTPUTS list/mechanism used by calibration
+        and identifiability analysis, so scenario analysis can compare against the exact same set
+        of observed-data output types)"""
+        source = self.calibration_output_source(self.dlg_scenario_analysis)
+        column = self.calibration_output_column(self.dlg_scenario_analysis)
+        project_folder = self.carpeta_guardar_proyectos+f"\\{proyecto}"
+
+        try:
+            if source == "gaging_station":
+                df = self.read_gaging_station_table(project_folder)
+                df_simulated = df[['date',column]].rename(columns={column:'value'})
+            else: #"ephemeral_gully"
+                df_simulated = self.read_ephemeral_gully_summary(project_folder,column)
+            df_simulated['value'] = pd.to_numeric(df_simulated['value'],errors='coerce')
+        except Exception:
             return 0,0
-    
-    def update_scenario_analysis_graph(self,date_changed=False): 
+
+        #Aggregate to the time step selected (Daily/Monthly/Annual)
+        time_step = self.scenario_analysis_time_step()
+        if time_step == "Monthly":
+            df_simulated = df_simulated.set_index('date').resample('MS').sum().reset_index()
+        elif time_step == "Annual":
+            df_simulated = df_simulated.set_index('date').resample('YS').sum().reset_index()
+
+        #Filter by date
+        if date_changed:
+            try:
+                fecha_inicio = pd.to_datetime(self.dlg_scenario_analysis.start_date.text())
+                fecha_fin = pd.to_datetime(self.dlg_scenario_analysis.end_date.text())
+                df_simulated = df_simulated[(df_simulated["date"] >= fecha_inicio) & (df_simulated["date"] <= fecha_fin)]
+            except:
+                pass
+
+        return df_simulated,self.calibration_output_display_label(self.dlg_scenario_analysis)
+
+
+    def browse_observed_scenario(self):
+        """Method to select the (optional) observed data file for scenario analysis - a CSV with
+        two columns (date, value), same format as calibration's observed data. Kept as its own
+        separate file (self.scenario_observed_file), independent from calibration's own "Observed
+        data" dialog, so loading one never silently changes what the other is using."""
+        try:
+            fname = QFileDialog.getOpenFileName(self.dlg_scenario_analysis,"Select observed data for scenario analysis",self.direccion,"CSV files (*.csv)")
+        except Exception:
+            fname = QFileDialog.getOpenFileName(self.dlg_scenario_analysis,"Select observed data for scenario analysis","C:\\","CSV files (*.csv)")
+        if fname[0]=="":
+            return
+        self.scenario_observed_file = fname[0]
+        self.dlg_scenario_analysis.observed_path.setText(os.path.basename(fname[0]))
+        self.dlg_scenario_analysis.observed_path.setToolTip(fname[0])
+        self.update_scenario_analysis_graph()
+
+
+    def clear_observed_scenario(self):
+        """Method to remove the observed data currently loaded in scenario analysis, if any"""
+        self.scenario_observed_file = ""
+        self.dlg_scenario_analysis.observed_path.clear()
+        self.dlg_scenario_analysis.observed_path.setToolTip("")
+        self.update_scenario_analysis_graph()
+
+
+    def obtain_observed_data_scenario_analysis(self,date_changed):
+        """Method to obtain the observed data series selected in scenario analysis (if any), to be
+        plotted alongside the simulated projects for visual comparison. Returns None if no valid
+        observed data file is currently selected."""
+        file_path = getattr(self,'scenario_observed_file',"")
+        if file_path=="" or not os.path.isfile(file_path):
+            return None
+        try:
+            df_observed = pd.read_csv(file_path,sep=',',header=None)
+            df_observed.columns = ['date','value']
+            df_observed['date'] = pd.to_datetime(df_observed['date'],format='%d/%m/%Y',errors='coerce')
+            df_observed['value'] = pd.to_numeric(df_observed['value'],errors='coerce')
+            df_observed = df_observed.dropna().sort_values('date')
+        except Exception:
+            return None
+
+        #Aggregate to the same time step selected for the simulated projects (Daily/Monthly/Annual)
+        time_step = self.scenario_analysis_time_step()
+        if time_step == "Monthly":
+            df_observed = df_observed.set_index('date').resample('MS').sum().reset_index()
+        elif time_step == "Annual":
+            df_observed = df_observed.set_index('date').resample('YS').sum().reset_index()
+
+        if date_changed:
+            try:
+                fecha_inicio = pd.to_datetime(self.dlg_scenario_analysis.start_date.text())
+                fecha_fin = pd.to_datetime(self.dlg_scenario_analysis.end_date.text())
+                df_observed = df_observed[(df_observed["date"] >= fecha_inicio) & (df_observed["date"] <= fecha_fin)]
+            except:
+                pass
+
+        if len(df_observed)==0:
+            return None
+        return df_observed['date'],df_observed['value'],df_observed['value'].sum()
+
+
+    def setup_graph_hover(self,canvas,ax,hover_series):
+        """Method to show, on mouse hover over a project-comparison graph (scenario analysis,
+        ephemeral gully analysis), a thin vertical line that follows the cursor's exact date - not
+        snapped to the nearest data point, so it tracks smoothly everywhere even where the
+        underlying data is sparse (e.g. ephemeral gully length/width only change on event dates) -
+        plus a tooltip with that date and, for every plotted series (each project's line, plus
+        "Observed" if present), its value as of that date: the series' last recorded point at or
+        before the cursor (matching how these values actually behave - unchanged until the next
+        recorded event), or omitted if the cursor is before the series' first point. hover_series is
+        {label: (dates_as_matplotlib_numbers, values)}, each sorted ascending by date.
+        The hover handler is connected only once per canvas - a redraw just replaces the canvas'
+        stored series/axes/artists (_hover_series/_hover_ax/_hover_annotation/_hover_vline), which
+        the handler re-reads on every mouse move, so it keeps working correctly after the graph is
+        refreshed with new data."""
+        canvas._hover_series = hover_series
+        canvas._hover_ax = ax
+
+        #The axes (and every artist on it) are recreated on every redraw (canvas.figure.clear()
+        #above), so the annotation and the vertical line themselves must be recreated here every
+        #time, even though the mouse-move handler below only needs connecting once per canvas
+        annotation = ax.annotate("",xy=(0,0),xytext=(15,15),textcoords="offset points",
+            bbox=dict(boxstyle="round",fc="#ffffff",ec="#d8dee4"),
+            fontsize=9,color="#2c3e50",zorder=10)
+        annotation.set_visible(False)
+        canvas._hover_annotation = annotation
+
+        vline = ax.axvline(x=0,color='#3f6ea5',linestyle='--',linewidth=1,alpha=0.6,zorder=1)
+        vline.set_visible(False)
+        canvas._hover_vline = vline
+
+        if getattr(canvas,'_hover_connected',False):
+            return
+        canvas._hover_connected = True
+
+        def hide_hover():
+            annotation = getattr(canvas,'_hover_annotation',None)
+            vline = getattr(canvas,'_hover_vline',None)
+            changed = False
+            if annotation is not None and annotation.get_visible():
+                annotation.set_visible(False)
+                changed = True
+            if vline is not None and vline.get_visible():
+                vline.set_visible(False)
+                changed = True
+            if changed:
+                canvas.draw_idle()
+
+        def on_move(event):
+            current_ax = getattr(canvas,'_hover_ax',None)
+            annotation = getattr(canvas,'_hover_annotation',None)
+            vline = getattr(canvas,'_hover_vline',None)
+            if current_ax is None or annotation is None or vline is None:
+                return
+            if event.inaxes != current_ax or event.xdata is None:
+                hide_hover()
+                return
+
+            #For each series, the value as of the cursor's date is its last recorded point at or
+            #before that date (searchsorted on the ascending-sorted x array) - a series with no
+            #point yet at/before the cursor is simply skipped, rather than showing a future value
+            series = getattr(canvas,'_hover_series',{}) or {}
+            value_lines = []
+            for label,(xs,ys) in series.items():
+                if len(xs)==0:
+                    continue
+                idx = int(np.searchsorted(xs,event.xdata,side='right'))-1
+                if idx < 0:
+                    continue
+                value_lines.append(f"{label}: {ys[idx]:,.2f}")
+            if not value_lines:
+                hide_hover()
+                return
+
+            cursor_date = mdates.num2date(event.xdata).strftime("%Y-%m-%d")
+            text = "\n".join([cursor_date]+value_lines)
+
+            vline.set_xdata([event.xdata,event.xdata])
+            vline.set_visible(True)
+
+            #Flip the tooltip to the left of the cursor near the right edge of the axes, otherwise
+            #it would render past the edge of the canvas and become invisible
+            bbox = current_ax.get_window_extent()
+            near_right_edge = bbox.width>0 and (event.x-bbox.x0) > bbox.width*0.75
+            annotation.set_position((-15 if near_right_edge else 15,15))
+            annotation.set_ha('right' if near_right_edge else 'left')
+
+            annotation.xy = (event.xdata,event.ydata)
+            annotation.set_text(text)
+            annotation.set_visible(True)
+            canvas.draw_idle()
+
+        canvas.mpl_connect('motion_notify_event',on_move)
+        canvas.mpl_connect('axes_leave_event',lambda event: hide_hover())
+
+
+    def render_project_comparison_graph(self,dlg,canvas_attr,ax_attr,dictionary_results,observed,output_label,date_changed):
+        """Shared plotting logic for the "compare selected projects against each other (and
+        optionally observed data)" graphs - used by both scenario analysis and ephemeral gully
+        analysis. dictionary_results is {project_name: [dates, values, total]}; observed is either
+        None or (dates, values, total) as returned by an obtain_observed_data_* method. Draws one
+        line per project (stable color per project name, scenario_project_color), an optional
+        observed-data scatter overlay, adaptive date-axis ticks, and the modern "control panel"
+        styling; updates dlg's start_date/end_date with the plotted range unless date_changed."""
+        #Create the canvas of the graph (once) and insert it into frame_3's own layout (defined in
+        #the .ui: title label, line, then this canvas, then the "Print Plot" button row)
+        if not hasattr(self,canvas_attr):
+            setattr(self,canvas_attr,FigureCanvas(plt.Figure(figsize=(15, 6))))
+            layout = dlg.frame_3.layout()
+            layout.insertWidget(2,getattr(self,canvas_attr))
+        canvas = getattr(self,canvas_attr)
+
+        if len(dictionary_results)==0 and observed is None:
+            return
+
+        canvas.figure.clear()
+        ax = canvas.figure.subplots()
+        setattr(self,ax_attr,ax)
+
+        #Colors matching the modern "control panel" style of the rest of the plugin
+        card_color = '#ffffff'
+        text_color = '#2c3e50'
+        grid_color = '#d8dee4'
+        canvas.figure.set_facecolor(card_color)
+        ax.set_facecolor(card_color)
+
+        #One line per selected project, in a color fixed per project name (scenario_project_color)
+        #so a project's color never shifts when another project gets checked/unchecked. The total
+        #(sum over the plotted period) is folded into the legend label itself, instead of a
+        #separate crammed line of text below the graph
+        all_dates = []
+        hover_series = {}
+        for proyecto in dictionary_results.keys():
+            dates,values,total = dictionary_results[proyecto]
+            all_dates.extend(dates.tolist())
+            ax.plot(
+                dates.to_numpy(),values.to_numpy(),
+                label=f"{proyecto} (Σ={total:,.2f})",
+                color=self.scenario_project_color(proyecto),
+                linewidth=2,solid_capstyle='round',zorder=2)
+            hover_series[proyecto] = (mdates.date2num(dates.to_numpy()),values.to_numpy())
+
+        #Observed data: drawn as standalone dots (no connecting line), unlike the simulated
+        #projects' continuous lines - observed data is punctual (one measurement per date),
+        #while the simulated output is continuous, so the plot style reflects that difference
+        if observed is not None:
+            obs_dates,obs_values,obs_total = observed
+            all_dates.extend(obs_dates.tolist())
+            ax.scatter(
+                obs_dates.to_numpy(),obs_values.to_numpy(),
+                label=f"Observed (Σ={obs_total:,.2f})",
+                color='#000000',edgecolors='#ffffff',linewidths=1,s=32,zorder=3)
+            hover_series["Observed"] = (mdates.date2num(obs_dates.to_numpy()),obs_values.to_numpy())
+
+        ax.set_xlabel("Date",size=11,color=text_color)
+        ax.set_ylabel(output_label,size=11,color=text_color)
+
+        #--- Eje X: ticks mensuales (mostrando el año) en vez de un tick por cada punto de datos,
+        #que era lo que hacía que se viera todo apelotonado. El intervalo entre ticks se adapta a
+        #la duración total del periodo mostrado, para que tampoco se saturen en periodos largos.
+        span_days = (max(all_dates)-min(all_dates)).days if len(all_dates)>1 else 0
+        if span_days > 365:
+            ax.xaxis.set_major_locator(mdates.MonthLocator(interval=max(1,round(span_days/365*2))))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+        elif span_days > 60:
+            ax.xaxis.set_major_locator(mdates.MonthLocator())
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+            ax.xaxis.set_minor_locator(mdates.WeekdayLocator())
+        else:
+            ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b %Y'))
+        plt.setp(ax.xaxis.get_majorticklabels(),rotation=30,ha='right')
+
+        #Marco suave, a juego con las tarjetas del diálogo
+        for spine in ax.spines.values():
+            spine.set_color(grid_color)
+            spine.set_linewidth(1)
+
+        ax.tick_params(axis='both',which='major',length=6,width=1,labelsize=9,colors=text_color,direction='out')
+        ax.grid(axis='y',linestyle='--',linewidth=0.7,color=grid_color,alpha=0.8,zorder=0)
+        ax.set_axisbelow(True)
+
+        ax.legend(loc='best',fontsize=9,frameon=True,facecolor=card_color,edgecolor=grid_color)
+
+        #Ajustar márgenes (más espacio abajo para las etiquetas de fecha rotadas) y dibujar
+        canvas.figure.subplots_adjust(left=0.1,right=0.97,top=0.95,bottom=0.28)
+
+        #Lock in the axis limits computed from the real data before adding the (initially placed at
+        #x=0/hidden) hover line/annotation - axvline's x=0 is a real data coordinate on a date axis
+        #(the year 1 AD), so without this it would silently pull the x-axis autoscale to include it,
+        #squeezing the actual data into a sliver at the right of the graph
+        xlim,ylim = ax.get_xlim(),ax.get_ylim()
+
+        #Hover tooltip showing the date and every plotted series' value under the cursor
+        self.setup_graph_hover(canvas,ax,hover_series)
+
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        canvas.draw()
+
+        #Put the dates in the text if another project was selected
+        if not date_changed and len(dictionary_results)>0:
+            xmin, xmax = ax.get_xlim()
+            dlg.start_date.setText(mdates.num2date(xmin).strftime("%Y-%m-%d"))
+            dlg.end_date.setText(mdates.num2date(xmax).strftime("%Y-%m-%d"))
+
+        #Save figure
+        dlg.print_graph.clicked.connect(lambda _, b= [dlg,canvas]:self.figure_settings(b))
+
+
+    def update_scenario_analysis_graph(self,date_changed=False):
         """Method to udpate the graph of scenario analysis"""
-        #Create the graph
         #Obtain data for all the checkboxes
         proyectos_seleccionados = [name for name, cb in self.checkboxes_project_scenario.items() if cb.isChecked()]
-        
-        dictionary_results = {}
-        for proyecto in proyectos_seleccionados:
-            df_simulated,total_col = self.obtain_data_scenario_analysis(proyecto,date_changed)
-            if type(df_simulated) != int and type(total_col)!= int:
-                #Save values
-                dictionary_results[proyecto] = [df_simulated.date,df_simulated[total_col],df_simulated[total_col].sum()]
-        
-        #Add the graph
-        if not hasattr(self, 'canvas_scenario'):
-            #Create the canvas of the graph
-            # Si no existe, crear el canvas y añadirlo al layout
-            self.canvas_scenario = FigureCanvas(plt.Figure(figsize=(15, 6)))
-            # Asignar un layout al QFrame si no tiene uno
-            layout = QVBoxLayout(self.dlg_scenario_analysis.frame_3)
-            self.dlg_scenario_analysis.frame_3.setLayout(layout)
-            #Add canvas to layout
-            layout.addWidget(self.canvas_scenario)
-        
-        #Add graph
-        if len(dictionary_results)>0:
-            self.canvas_scenario.figure.clear()
-            self.ax_scenario_graph = self.canvas_scenario.figure.subplots()
-            
-            
-            for i in dictionary_results.keys():
-                self.ax_scenario_graph.plot(dictionary_results[i][0].to_numpy(),dictionary_results[i][1].to_numpy(),label = i,linewidth=2)
-            
-            
-            self.ax_scenario_graph.legend()
-            self.ax_scenario_graph.set_xlabel("Time (s)",size = 12,family="arial",weight = "bold",color = "black")
-            self.ax_scenario_graph.set_ylabel(total_col,size = 12,family="arial",weight = "bold",color = "black")
-            self.ax_scenario_graph.tick_params(axis = "both",colors = "black",labelsize = 9)
-            
-            #Change background color
-            self.canvas_scenario.figure.set_facecolor('#f0f0f0')
-            self.ax_scenario_graph.set_facecolor('#f0f0f0')
-            
-            # Ajustar los márgenes para añadir más espacio por debajo y por la izquierda
-            self.canvas_scenario.figure.subplots_adjust(wspace=0.7) #spacing beteween two graphs
-            self.canvas_scenario.figure.subplots_adjust(left=0.2, bottom=0.2)
-            
-            
-            #Put the sums in the graph
-            texto_sumas = ",".join([
-                f"{proyecto}: {dictionary_results[proyecto][2]:.2f}"
-                for proyecto in dictionary_results
-            ])
 
-            # Añadirlo debajo del gráfico
-            self.canvas_scenario.figure.text(
-                0.5, 0.01,
-                texto_sumas,
-                ha='center',
-                va='bottom',
-                fontsize=8,
-                weight='bold',
-                color='black'
-            )
-            
-            
-            #Draw canvas
-            self.canvas_scenario.draw()
-            
-            #Put the dates in the text if another project was selected
-            if not date_changed and len(dictionary_results)>0:
-                xmin, xmax = self.ax_scenario_graph.get_xlim()
-                self.dlg_scenario_analysis.start_date.setText(mdates.num2date(xmin).strftime("%Y-%m-%d"))
-                self.dlg_scenario_analysis.end_date.setText(mdates.num2date(xmax).strftime("%Y-%m-%d"))
-            
-            
-            
-            self.canvas_scenario.figure.subplots_adjust(bottom=0.25)
-            
-            
-            
-            #Save figure
-            self.dlg_scenario_analysis.print_graph.clicked.connect(lambda _, b= [self.dlg_scenario_analysis,self.canvas_scenario]:self.figure_settings(b))
-            
-       
-    
-    def save_figures(self): 
+        dictionary_results = {}
+        output_label = None
+        for proyecto in proyectos_seleccionados:
+            df_simulated,output_label = self.obtain_data_scenario_analysis(proyecto,date_changed)
+            if type(df_simulated) != int:
+                #Save values
+                dictionary_results[proyecto] = [df_simulated.date,df_simulated['value'],df_simulated['value'].sum()]
+
+        #Optional observed/measured data, to compare visually against the simulated projects above
+        observed = self.obtain_observed_data_scenario_analysis(date_changed)
+        output_label = output_label or self.calibration_output_display_label(self.dlg_scenario_analysis)
+
+        self.render_project_comparison_graph(self.dlg_scenario_analysis,'canvas_scenario','ax_scenario_graph',
+            dictionary_results,observed,output_label,date_changed)
+
+
+    def dlg_ephemeral_gully_analysis_show(self):
+        """Method to show the ephemeral gully analysis window with all the saved projects - the same
+        project-comparison mechanism as scenario analysis, but restricted to ephemeral gully erosion"""
+        layout = self.dlg_ephemeral_gully_analysis.projects_container.layout()
+        if layout is None:
+            layout = QVBoxLayout(self.dlg_ephemeral_gully_analysis.projects_container)
+
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.blockSignals(True)
+                widget.deleteLater()
+
+        #Update available projects
+        self.update_available_projects_ephemeral_gully()
+
+        #Update graph
+        self.update_ephemeral_gully_graph()
+
+        # Mostrar el diálogo
+        self.dlg_ephemeral_gully_analysis.show()
+
+
+    def update_available_projects_ephemeral_gully(self):
+        """Method to update the available projects in the ephemeral gully analysis window"""
+        lista = [
+            f for f in os.listdir(self.carpeta_guardar_proyectos)
+            if os.path.isdir(os.path.join(self.carpeta_guardar_proyectos, f))
+        ]
+
+        layout = self.dlg_ephemeral_gully_analysis.projects_container.layout()
+
+        self.checkboxes_project_ephemeral_gully = {}
+
+        for name in lista:
+            checkbox = QCheckBox(name)
+            layout.addWidget(checkbox)
+            self.checkboxes_project_ephemeral_gully[name] = checkbox
+            setattr(self.dlg_ephemeral_gully_analysis, name, checkbox)
+            getattr(self.dlg_ephemeral_gully_analysis, name).stateChanged.connect(lambda _: self.update_ephemeral_gully_graph(False))
+
+        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+
+
+    def ephemeral_gully_time_step(self):
+        """Method to obtain the time step selected for the ephemeral gully analysis graph (Daily/Monthly/Annual)"""
+        if self.dlg_ephemeral_gully_analysis.monthly.isChecked():
+            return "Monthly"
+        if self.dlg_ephemeral_gully_analysis.annual.isChecked():
+            return "Annual"
+        return "Daily"
+
+
+    def ephemeral_gully_selected_output(self):
+        """Method to obtain the (key, display label, aggregation method) tuple - see
+        EPHEMERAL_GULLY_OUTPUTS - for the output currently selected in the ephemeral gully analysis
+        window's "Studied Output" list"""
+        dlg = self.dlg_ephemeral_gully_analysis
+        radios_by_key = {
+            "erosion": dlg.output_erosion,
+            "volume": dlg.output_volume,
+            "length": dlg.output_length,
+            "width": dlg.output_width,
+            "active_gullies": dlg.output_active_gullies,
+            "migration_rate": dlg.output_migration_rate,
+        }
+        for output in EPHEMERAL_GULLY_OUTPUTS:
+            if radios_by_key[output[0]].isChecked():
+                return output
+        return EPHEMERAL_GULLY_OUTPUTS[0]
+
+
+    def resample_ephemeral_gully_series(self,df,agg):
+        """Method to aggregate a ('date','value') series to the Monthly/Annual time step selected in
+        the ephemeral gully analysis window, if any (Daily leaves it untouched). agg is "sum" for an
+        additive output (erosion) or "last" for a state/snapshot output (gully length/width), where
+        the period's last reading is kept instead of a meaningless sum of several readings."""
+        time_step = self.ephemeral_gully_time_step()
+        freq = {"Monthly":"MS","Annual":"YS"}.get(time_step)
+        if freq is None:
+            return df
+        df = df.set_index('date')
+        df = df.resample(freq).sum() if agg=="sum" else df.resample(freq).last().dropna()
+        return df.reset_index()
+
+
+    def obtain_data_ephemeral_gully_analysis(self,proyecto,date_changed):
+        """Method to obtain one project's data for the output currently selected in the ephemeral
+        gully analysis window's "Studied Output" list - see EPHEMERAL_GULLY_OUTPUTS"""
+        key,output_label,agg = self.ephemeral_gully_selected_output()
+        project_folder = self.carpeta_guardar_proyectos+f"\\{proyecto}"
+        time_step = self.ephemeral_gully_time_step()
+
+        try:
+            if key == "erosion":
+                df_simulated = self.read_ephemeral_gully_summary(project_folder,EPHEMERAL_GULLY_EROSION_COLUMN)
+            elif key == "volume":
+                df_simulated = self.read_ephemeral_gully_summary(project_folder,EPHEMERAL_GULLY_VOLUME_COLUMN)
+            elif key == "length":
+                df_simulated = self.read_ephemeral_gully_total_length(project_folder)
+            elif key == "width":
+                df_simulated = self.read_ephemeral_gully_average_width(project_folder)
+            elif key == "active_gullies":
+                df_simulated = self.read_ephemeral_gully_active_count(project_folder,time_step)
+            else: #"migration_rate"
+                df_simulated = self.read_ephemeral_gully_migration_rate(project_folder)
+            df_simulated['value'] = pd.to_numeric(df_simulated['value'],errors='coerce')
+        except Exception:
+            return 0,0
+
+        #Aggregate to the time step selected (Daily/Monthly/Annual). active_gullies already computed
+        #its own period-correct aggregation above (a plain sum/last would double- or under-count
+        #gullies active across several days within the same period)
+        if key != "active_gullies":
+            df_simulated = self.resample_ephemeral_gully_series(df_simulated,agg)
+
+        #Filter by date
+        if date_changed:
+            try:
+                fecha_inicio = pd.to_datetime(self.dlg_ephemeral_gully_analysis.start_date.text())
+                fecha_fin = pd.to_datetime(self.dlg_ephemeral_gully_analysis.end_date.text())
+                df_simulated = df_simulated[(df_simulated["date"] >= fecha_inicio) & (df_simulated["date"] <= fecha_fin)]
+            except:
+                pass
+
+        return df_simulated,output_label
+
+
+    def browse_observed_ephemeral_gully(self):
+        """Method to select the (optional) observed ephemeral gully erosion data file - a CSV with
+        two columns (date, value), same format as scenario analysis's/calibration's observed data.
+        Kept as its own separate file (self.ephemeral_gully_observed_file)."""
+        try:
+            fname = QFileDialog.getOpenFileName(self.dlg_ephemeral_gully_analysis,"Select observed ephemeral gully erosion data",self.direccion,"CSV files (*.csv)")
+        except Exception:
+            fname = QFileDialog.getOpenFileName(self.dlg_ephemeral_gully_analysis,"Select observed ephemeral gully erosion data","C:\\","CSV files (*.csv)")
+        if fname[0]=="":
+            return
+        self.ephemeral_gully_observed_file = fname[0]
+        self.dlg_ephemeral_gully_analysis.observed_path.setText(os.path.basename(fname[0]))
+        self.dlg_ephemeral_gully_analysis.observed_path.setToolTip(fname[0])
+        self.update_ephemeral_gully_graph()
+
+
+    def clear_observed_ephemeral_gully(self):
+        """Method to remove the observed data currently loaded in the ephemeral gully analysis window, if any"""
+        self.ephemeral_gully_observed_file = ""
+        self.dlg_ephemeral_gully_analysis.observed_path.clear()
+        self.dlg_ephemeral_gully_analysis.observed_path.setToolTip("")
+        self.update_ephemeral_gully_graph()
+
+
+    def obtain_observed_data_ephemeral_gully(self,date_changed):
+        """Method to obtain the observed ephemeral gully erosion data selected (if any), to be
+        plotted alongside the simulated projects for visual comparison. Returns None if no valid
+        observed data file is currently selected."""
+        file_path = getattr(self,'ephemeral_gully_observed_file',"")
+        if file_path=="" or not os.path.isfile(file_path):
+            return None
+        try:
+            df_observed = pd.read_csv(file_path,sep=',',header=None)
+            df_observed.columns = ['date','value']
+            df_observed['date'] = pd.to_datetime(df_observed['date'],format='%d/%m/%Y',errors='coerce')
+            df_observed['value'] = pd.to_numeric(df_observed['value'],errors='coerce')
+            df_observed = df_observed.dropna().sort_values('date')
+        except Exception:
+            return None
+
+        #Aggregate to the same time step selected for the simulated projects (Daily/Monthly/Annual)
+        _,_,agg = self.ephemeral_gully_selected_output()
+        df_observed = self.resample_ephemeral_gully_series(df_observed,agg)
+
+        if date_changed:
+            try:
+                fecha_inicio = pd.to_datetime(self.dlg_ephemeral_gully_analysis.start_date.text())
+                fecha_fin = pd.to_datetime(self.dlg_ephemeral_gully_analysis.end_date.text())
+                df_observed = df_observed[(df_observed["date"] >= fecha_inicio) & (df_observed["date"] <= fecha_fin)]
+            except:
+                pass
+
+        if len(df_observed)==0:
+            return None
+        return df_observed['date'],df_observed['value'],df_observed['value'].sum()
+
+
+    def update_ephemeral_gully_graph(self,date_changed=False):
+        """Method to update the graph of the ephemeral gully analysis window"""
+        proyectos_seleccionados = [name for name, cb in self.checkboxes_project_ephemeral_gully.items() if cb.isChecked()]
+
+        dictionary_results = {}
+        output_label = None
+        for proyecto in proyectos_seleccionados:
+            df_simulated,output_label = self.obtain_data_ephemeral_gully_analysis(proyecto,date_changed)
+            if type(df_simulated) != int:
+                dictionary_results[proyecto] = [df_simulated.date,df_simulated['value'],df_simulated['value'].sum()]
+
+        observed = self.obtain_observed_data_ephemeral_gully(date_changed)
+        output_label = output_label or self.ephemeral_gully_selected_output()[1]
+
+        self.render_project_comparison_graph(self.dlg_ephemeral_gully_analysis,'canvas_ephemeral_gully','ax_ephemeral_gully_graph',
+            dictionary_results,observed,output_label,date_changed)
+
+
+    def show_ephemeral_gully_analysis_help(self):
+        """Method to show the "How to use ephemeral gully analysis" help popup (button_info)"""
+        text = (
+            "Ephemeral gully analysis is a version of scenario analysis dedicated only to ephemeral "
+            "gully erosion, so you don't have to pick it every time from the full output list.\n\n"
+            "1. Available projects: check the projects you want to compare. Each one gets its own "
+            "fixed color in the graph, based on its name - it won't change if you check or uncheck "
+            "other projects.\n\n"
+            "2. Studied Output: Erosion (total accumulated erosion mass) and Volume (the same "
+            "accumulation in m3) across every gully; Total Gully Length (the sum of every gully's "
+            "headcut position, i.e. how far upstream it has migrated from its mouth) and Average "
+            "Gully Width (the average width of every gully's sections already reached by the "
+            "migrating headcut) - these two keep their last known value between events, since they "
+            "don't change every day; Active Gully Count (how many distinct gullies had activity in "
+            "the period - a widespread problem shows many, a concentrated one shows few); and Gully "
+            "Migration Rate (how fast the total length is growing - spikes on the days the headcut "
+            "actually advances, instead of only showing the flat accumulated total).\n\n"
+            "3. Observed data (optional): load a CSV file (date, value) with real/measured data for "
+            "the output selected above, to compare it against the simulated projects. It is drawn as "
+            "black dots, not a line, since observed data is punctual (one measurement per date) while "
+            "the simulated output is continuous.\n\n"
+            "4. Time step: choose whether to compare the data Daily, or aggregated Monthly or "
+            "Annually (summed).\n\n"
+            "5. Simulation period: the date range currently shown in the graph. It updates "
+            "automatically when you plot, but you can also type dates to zoom into a shorter period.\n\n"
+            "6. Execute: only needed for a project that hasn't been run yet with ephemeral gully "
+            "erosion enabled - it runs AnnAGNPS again for you. A project you already ran with that "
+            "output enabled doesn't need this; just check it above."
+        )
+        QMessageBox.information(self.dlg_ephemeral_gully_analysis,"Ephemeral Gully Analysis - How to use it",text)
+
+
+    def save_figures(self):
         """Method to save figures to the computer"""
         
         dialog =  self.information_figure_save[0]
@@ -3315,6 +3963,13 @@ class qannagnps():
         #Documentation
         documentation_icon = os.path.join(self.plugin_directory, "images/documentation.svg")
         self.inputs.pb_doc.setIcon(QIcon(documentation_icon))
+        #Technical documentation (About tab)
+        self.dlg.button_technical_documentation.setIcon(QIcon(documentation_icon))
+        self.dlg.button_technical_documentation.clicked.connect(
+            lambda: os.startfile(os.path.join(self.plugin_directory,"Documentation","Technical_Documentation.pdf")))
+        #Getting Started popup (About tab) - kept as a popup instead of inline text so the About
+        #tab stays compact
+        self.dlg.button_getting_started.clicked.connect(self.show_getting_started)
         #Runoff output
         runoff = [self.output.pushButton,self.output.pushButton_15,self.output.pushButton_16,self.output.pushButton_17,self.output.pushButton_18]
         icon = os.path.join(self.plugin_directory, "images/bar_graph.svg")
@@ -3333,8 +3988,14 @@ class qannagnps():
         self.dlg_identifiability.delete_row.setIcon(QIcon(os.path.join(self.plugin_directory, "images/remove.svg")))
         #Sensitivity analysis
         self.dlg.sensitivity.setIcon(QIcon(os.path.join(self.plugin_directory, "images/balance.svg")))
+        self.dlg.results_sensitivity.setIcon(QIcon(os.path.join(self.plugin_directory, "images/bar_graph.svg")))
         #Identifiability analysis
         self.dlg.identifiability.setIcon(QIcon(os.path.join(self.plugin_directory, "images/balance.svg")))
+        #Calibration
+        self.dlg.calibration.setIcon(QIcon(os.path.join(self.plugin_directory, "images/balance.svg")))
+        self.dlg.calibration_results.setIcon(QIcon(os.path.join(self.plugin_directory, "images/bar_graph.svg")))
+        #Scenario analysis
+        self.dlg.scenario.setIcon(QIcon(os.path.join(self.plugin_directory, "images/general.svg")))
         #Information of control files
         self.ctopagnps.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
         self.cpeg.info.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
@@ -3346,8 +4007,19 @@ class qannagnps():
         self.inputs.pushButton.setIcon(QIcon(os.path.join(self.plugin_directory, "images/documentation.svg")))
         #Open AnnAGNPS folder
         self.output.open_folder.setIcon(QIcon(os.path.join(self.plugin_directory, "images/folder.svg")))
-        
-        
+
+        #These main-dialog buttons are icon-only (no text) and carry dark/black icons, which are
+        #hard to see against the solid blue QPushButton background applied by
+        #setup_calibration_ui_enhancements - give them the lighter "flatIcon" style instead
+        self.apply_flat_icon_style([
+            self.dlg.button_project,self.dlg.pb_dem,self.dlg.pb_buffer,self.dlg.pb_vegetation,
+            self.dlg.pb_soil,self.dlg.pb_management,
+            self.dlg.sensitivity,self.dlg.identifiability,self.dlg.calibration,
+            self.dlg.results_sensitivity,self.dlg.calibration_results,self.dlg.scenario,
+            self.dlg.button_technical_documentation,
+        ])
+
+
     def url_upna(self,event):
         #Método para abrir las páginas web de la upna
         try:
@@ -3759,11 +4431,14 @@ class qannagnps():
                 topagnps_control_file.to_csv(fichero("TOPAGNPS.csv"), index=False, float_format='%.5f')
             
             
+            #Clear any leftover Preprocessing_outputs from a previous execution first, so a file
+            #that isn't regenerated this time doesn't keep looking like a valid, current result
+            clear_folder_contents(self.direccion+"\\Preprocessing_outputs")
             #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
             self.time_start_preprocessing = datetime.now()
-            
-            
-            #EJECUCIÓN DE TOPAGNPS            
+
+
+            #EJECUCIÓN DE TOPAGNPS
             def main():
                 f = open(self.executable_directory+"\\"+"EjecutarTopagnps.bat","w+")
                 linea_uno = "CD /d {}".format(self.direccion+"\\Preprocessing_inputs")
@@ -3858,11 +4533,14 @@ class qannagnps():
             #Se crea la carpeta de Preprocessing_inputs si no estaba creada. Ahí se meten los inputs y se ejecuta TopAGNPS y luego los outputs se meten a Preprocessing_outputs
             #Una vez creada se meten todos los archivos en esa carpeta
             self.create_folder_processing_and_move_files()
-            
+
+            #Clear any leftover Processing_outputs from a previous execution first, so a file that
+            #isn't regenerated this time doesn't keep looking like a valid, current result
+            clear_folder_contents(self.direccion+"\\Processing_outputs")
             #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
             self.time_start_processing = datetime.now()
-            
-            
+
+
             #EJECUCIÓN DE ANNAGNPS
             #os.chdir(self.direccion+"\\"+directory)
             def execute_bat():
@@ -4145,7 +4823,11 @@ class qannagnps():
                     annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
                 except:
                     self.end_execution = 1
-                    raise Exception( "Error soil map\nThe soil type layer may not cover the full extent of the watershed")
+                    raise Exception( "Error soil map\n\nThe soil type layer may not cover the full extent of the watershed.\n"
+                        "To check this, load 'AnnAGNPS_Cell_IDs.asc' (in this project's Preprocessing_outputs folder) "
+                        "and your soil type layer into QGIS and see if they overlap. Possible fixes: make sure both "
+                        "layers use the same Coordinate Reference System, or make sure the watershed falls entirely "
+                        "inside the soil type map (you can also move the watershed by changing the outlet coordinates).")
                 #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
                 def float_to_str(column):
                     lista = []
@@ -4222,7 +4904,11 @@ class qannagnps():
                     annagnps_eg_data["Mgmt_Field_ID"]= lista_tipos
                 except:
                     self.end_execution = 1
-                    raise Exception("Error soil use map\nThe soil use layer may not cover the full extent of the watershed")
+                    raise Exception("Error soil use map\n\nThe soil use layer may not cover the full extent of the watershed.\n"
+                        "To check this, load 'AnnAGNPS_Cell_IDs.asc' (in this project's Preprocessing_outputs folder) "
+                        "and your soil use/management layer into QGIS and see if they overlap. Possible fixes: make "
+                        "sure both layers use the same Coordinate Reference System, or make sure the watershed falls "
+                        "entirely inside the soil use map (you can also move the watershed by changing the outlet coordinates).")
                 #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
                 def float_to_str(column):
                     lista = []
@@ -4416,7 +5102,11 @@ class qannagnps():
                     annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
                 except:
                     self.end_execution = 1
-                    raise Exception( "Error soil map\nThe soil type layer may not cover the full extent of the watershed")
+                    raise Exception( "Error soil map\n\nThe soil type layer may not cover the full extent of the watershed.\n"
+                        "To check this, load 'AnnAGNPS_Cell_IDs.asc' (in this project's Preprocessing_outputs folder) "
+                        "and your soil type layer into QGIS and see if they overlap. Possible fixes: make sure both "
+                        "layers use the same Coordinate Reference System, or make sure the watershed falls entirely "
+                        "inside the soil type map (you can also move the watershed by changing the outlet coordinates).")
                 #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
                 def float_to_str(column):
                     lista = []
@@ -4489,7 +5179,11 @@ class qannagnps():
                     annagnps_eg_data["Mgmt_Field_ID"]= lista_tipos
                 except:
                     self.end_execution = 1
-                    raise Exception("Error soil use map\nThe soil use layer may not cover the full extent of the watershed")
+                    raise Exception("Error soil use map\n\nThe soil use layer may not cover the full extent of the watershed.\n"
+                        "To check this, load 'AnnAGNPS_Cell_IDs.asc' (in this project's Preprocessing_outputs folder) "
+                        "and your soil use/management layer into QGIS and see if they overlap. Possible fixes: make "
+                        "sure both layers use the same Coordinate Reference System, or make sure the watershed falls "
+                        "entirely inside the soil use map (you can also move the watershed by changing the outlet coordinates).")
                 #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
                 def float_to_str(column):
                     lista = []
@@ -4637,10 +5331,80 @@ class qannagnps():
     
     
     
+    def show_getting_started(self):
+        """Method to show the "Getting Started" help popup (About tab). Kept as a popup instead
+        of permanent text in the About tab so that tab stays compact."""
+        text = (
+            "Getting started:\n\n"
+            "1. Choose a Working directory: the folder where your projects will be organized.\n\n"
+            "2. To start a new project, type a Name of the project and press the button next to "
+            "it: a new folder with that name will be created inside the working directory to "
+            "hold this project.\n\n"
+            "3. Already have a project? Use the \"Load project\" panel to open one you created "
+            "before on this computer, or browse to one saved elsewhere.\n\n"
+            "4. As you run each step, its own subfolder appears inside your project's folder: "
+            "Preprocessing_inputs/Preprocessing_outputs when you run Preprocessing, "
+            "Processing_inputs/Processing_outputs when you run Processing, and similarly for "
+            "Calibration and the other steps.\n\n"
+            "What each tab does:\n\n"
+            "- Preprocessing: runs TopAGNPS on your DEM (and, optionally, buffer/vegetation "
+            "rasters) to delineate the watershed, then lets you assign soil type and land "
+            "management.\n\n"
+            "- Processing: sets up and runs the AnnAGNPS simulation itself from the "
+            "preprocessed watershed.\n\n"
+            "- Sensitivity and uncertainty analysis: explores how sensitive the model outputs "
+            "are to your chosen input parameters, using the Sobol or Morris methods.\n\n"
+            "- Calibration: automatically searches for the input values that best reproduce "
+            "your observed data. Before calibrating, you can run an identifiability analysis "
+            "(Sobol/Morris/FAST) to see which parameters are identifiable - i.e. whose values "
+            "can actually be pinned down through calibration, given your observed data.\n\n"
+            "- Scenario analysis: compares the effect of different input scenarios on the "
+            "simulation results."
+        )
+        QMessageBox.information(self.dlg,"Getting Started",text)
+
+
+    def show_scenario_analysis_help(self):
+        """Method to show the "How to use scenario analysis" help popup (button_info)"""
+        text = (
+            "Scenario analysis lets you compare the results of several already-run projects "
+            "against each other, and optionally against real/measured (observed) data.\n\n"
+            "1. Available projects: check the projects you want to compare. Each one gets its "
+            "own fixed color in the graph, based on its name - it won't change if you check or "
+            "uncheck other projects.\n\n"
+            "2. Studied Output: choose which simulated output to compare (Streamflow, Erosion, "
+            "Nitrogen, Phosphorus, Organic Carbon or Pesticide) - the same list used in "
+            "calibration and identifiability analysis.\n\n"
+            "3. Observed data (optional): load a CSV file (date, value) with real/measured data "
+            "for the output selected above, to compare it against the simulated projects. It is "
+            "drawn as black dots, not a line, since observed data is punctual (one measurement "
+            "per date) while the simulated output is continuous.\n\n"
+            "4. Time step: choose whether to compare the data Daily, or aggregated Monthly or "
+            "Annually (summed).\n\n"
+            "5. Simulation period: the date range currently shown in the graph. It updates "
+            "automatically when you plot, but you can also type dates to zoom into a shorter "
+            "period.\n\n"
+            "6. Execute: only needed for a project that hasn't been run yet with the output "
+            "selected above enabled - it runs AnnAGNPS again for you. A project you already ran "
+            "with that output enabled doesn't need this; just check it above."
+        )
+        QMessageBox.information(self.dlg_scenario_analysis,"Scenario Analysis - How to use it",text)
+
+
     def warning_message(self,message):
         """Method to put a warning message"""
         #Put text
-        self.dlg_warning_message.warning.setText("\n".join(textwrap.wrap(message, width=100, break_long_words=False)))
+        #textwrap.wrap on the whole message would treat every "\n" as just another space and
+        #collapse it away (e.g. a "Title\nDetails" message would come out as "Title Details" on
+        #one flowing line) - wrapping each original line separately instead keeps intentional line
+        #breaks (a title, a blank line, a new paragraph) while still wrapping long lines
+        wrapped_lines = []
+        for line in message.split("\n"):
+            if line == "":
+                wrapped_lines.append("")
+            else:
+                wrapped_lines.extend(textwrap.wrap(line, width=100, break_long_words=False))
+        self.dlg_warning_message.warning.setText("\n".join(wrapped_lines))
         
         courier_font = QFont("Georgia")
         courier_font.setStyleHint(QFont.Monospace)  # Asegura el estilo monoespaciado
@@ -6093,6 +6857,65 @@ class qannagnps():
         except:
             return
     
+    def folder_has_core_subfolders(self,folder_path):
+        """Method to check whether an analysis folder (Sensitivity_analysis or Calibration) has
+        any Core_N subfolder - i.e. whether that analysis was actually parallelized across
+        several CPU cores, each one replicating a full run and therefore taking up extra disk
+        space"""
+        if not os.path.isdir(folder_path):
+            return False
+        return any(nombre.startswith("Core_") and os.path.isdir(os.path.join(folder_path,nombre))
+                   for nombre in os.listdir(folder_path))
+
+
+    def ask_save_core_folders(self,sensitivity_has_cores,calibration_has_cores):
+        """Method to ask the user whether to include the per-core (Core_1, Core_2, ...) folders of
+        sensitivity analysis and/or calibration when saving a project. Both analyses parallelize
+        their execution by replicating a full run in a separate folder per CPU core, which can add
+        up to a lot of disk space, so this is opt-in (unchecked/declined by default) rather than
+        saved automatically. Returns (save_sensitivity_cores, save_calibration_cores)."""
+        explanation = ("parallelizes its execution across several CPU cores, each one replicating "
+            "a full run in its own Core_1, Core_2, ... folder. These folders can take up a lot of "
+            "disk space.\n\nDo you want to include them when saving this project? Its summary CSV "
+            "results will be saved either way.")
+
+        #Only one of the two analyses has per-core folders: a plain Yes/No question is enough
+        if sensitivity_has_cores and not calibration_has_cores:
+            save_sensitivity = QMessageBox.question(self.dlg,"Save sensitivity analysis's per-core folders?",
+                "Sensitivity analysis "+explanation,QMessageBox.Yes | QMessageBox.No,QMessageBox.No) == QMessageBox.Yes
+            return save_sensitivity,False
+        if calibration_has_cores and not sensitivity_has_cores:
+            save_calibration = QMessageBox.question(self.dlg,"Save calibration's per-core folders?",
+                "Calibration "+explanation,QMessageBox.Yes | QMessageBox.No,QMessageBox.No) == QMessageBox.Yes
+            return False,save_calibration
+
+        #Both analyses have per-core folders: let the user pick independently with checkboxes
+        dialog = QtWidgets.QDialog(self.dlg)
+        dialog.setStyleSheet(self.dlg.styleSheet())
+        dialog.setWindowTitle("Save per-core execution folders?")
+        layout = QtWidgets.QVBoxLayout(dialog)
+
+        label = QtWidgets.QLabel("Both sensitivity analysis and calibration parallelize their "
+            "execution across several CPU cores, each one replicating a full run in its own "
+            "Core_1, Core_2, ... folder. These folders can take up a lot of disk space.\n\nChoose "
+            "which of them you want to include when saving this project. Their summary CSV "
+            "results will be saved either way.")
+        label.setWordWrap(True)
+        layout.addWidget(label)
+
+        checkbox_sensitivity = QtWidgets.QCheckBox("Save sensitivity analysis's per-core folders (Core_1, Core_2, ...)")
+        checkbox_calibration = QtWidgets.QCheckBox("Save calibration's per-core folders (Core_1, Core_2, ...)")
+        layout.addWidget(checkbox_sensitivity)
+        layout.addWidget(checkbox_calibration)
+
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+
+        dialog.exec_()
+        return checkbox_sensitivity.isChecked(),checkbox_calibration.isChecked()
+
+
     def save_project(self,overwrite = False):
         #Método para guardar el proyecto
         
@@ -6129,12 +6952,25 @@ class qannagnps():
             self.dlg_overwrite_project.activateWindow()
             return
 
+        #Ask the user whether to save the per-core (Core_1, Core_2, ...) execution folders of
+        #sensitivity analysis and/or calibration, if either of them was actually parallelized -
+        #those folders each replicate a full run and can take a lot of disk space, so saving them
+        #is opt-in rather than automatic
+        sensitivity_source_folder = self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis"
+        calibration_source_folder = self.dlg.project.text()+f"\\{name_of_folder}"+"\\Calibration"
+        sensitivity_has_cores = self.folder_has_core_subfolders(sensitivity_source_folder)
+        calibration_has_cores = self.folder_has_core_subfolders(calibration_source_folder)
+        save_sensitivity_cores = False
+        save_calibration_cores = False
+        if sensitivity_has_cores or calibration_has_cores:
+            save_sensitivity_cores,save_calibration_cores = self.ask_save_core_folders(sensitivity_has_cores,calibration_has_cores)
+
         #Progress dialog so the user can see what save_project is doing at each moment (saving can
         #take a long time when Processing_outputs/Sensitivity_analysis contain a lot of data, and
         #without this it looks like QGIS has frozen)
         save_progress_stages = ["Clearing previous saved project data","Writing project settings file",
             "Copying Preprocessing inputs","Copying Preprocessing outputs","Copying Processing inputs",
-            "Copying Processing outputs","Copying Sensitivity analysis","Updating saved projects list"]
+            "Copying Processing outputs","Copying Sensitivity analysis","Copying Calibration","Updating saved projects list"]
         save_progress_dlg = QProgressDialog("Preparing to save project...", None, 0, len(save_progress_stages), self.dlg)
         save_progress_dlg.setWindowModality(Qt.WindowModal)
         save_progress_dlg.setWindowTitle("Saving project")
@@ -6413,6 +7249,9 @@ class qannagnps():
             elementos_sensitivity_analysis = os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis")
             for idx, elemento in enumerate(elementos_sensitivity_analysis):
                 report_save_item(6, idx+1, len(elementos_sensitivity_analysis), elemento)
+                #Skip the per-core execution folders unless the user chose to save them
+                if elemento.startswith("Core_") and not save_sensitivity_cores:
+                    continue
                 try:
                     ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Sensitivity_analysis", elemento)
                     ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Sensitivity_analysis", elemento)
@@ -6427,13 +7266,47 @@ class qannagnps():
                 except:
                     pass
 
+        #Calibration
+        if os.path.exists(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Calibration"):
+            report_save_stage(7)
+            #Create folder
+            Path(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Calibration").mkdir(parents=True, exist_ok=True)
+            #We eliminate what is inside
+            delete_files_and_folders(f"{name_of_project}\\"+"Calibration")
+            #Move all files
+            elementos_calibration = os.listdir(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Calibration")
+            for idx, elemento in enumerate(elementos_calibration):
+                report_save_item(7, idx+1, len(elementos_calibration), elemento)
+                #Skip the per-core execution folders unless the user chose to save them
+                if elemento.startswith("Core_") and not save_calibration_cores:
+                    continue
+                try:
+                    ruta_origen = os.path.join(self.dlg.project.text()+f"\\{name_of_folder}"+"\\Calibration", elemento)
+                    ruta_destino = os.path.join(self.carpeta_guardar_proyectos+f"\\{name_of_project}\\Calibration", elemento)
+
+                    if os.path.isfile(ruta_origen):
+                        # Copiar archivos
+                        shutil.copy2(ruta_origen, ruta_destino)
+                    elif os.path.isdir(ruta_origen):
+                        # Copiar carpetas completas
+                        shutil.copytree(ruta_origen, ruta_destino, dirs_exist_ok=True)
+
+                except:
+                    pass
+
         #Update the available projects in the computer
-        report_save_stage(7)
+        report_save_stage(8)
         self.update_saved_projects()
         save_progress_dlg.setValue(len(save_progress_stages))
         save_progress_dlg.close()
-        
-        
+
+        #Let the user know where everything just got saved (inputs, outputs, calibration, etc.)
+        self.warning_message(
+            f"Project '{name_of_project}' saved. All its folders (inputs, outputs, calibration, "
+            f"sensitivity analysis, etc.) are stored in:\n{self.carpeta_guardar_proyectos}\\{name_of_project}"
+        )
+
+
     def load_project(self):
         #Método para cargar el proyecto
         
@@ -6682,6 +7555,37 @@ class qannagnps():
         load_progress_dlg.close()
 
 
+    def delete_project(self):
+        """Method to permanently delete a saved project - all its folders (inputs, outputs,
+        calibration, sensitivity analysis, etc.) - from disk, after explicit confirmation."""
+        name_of_project = self.dlg.combo_created_projects.currentText()
+        if name_of_project == "":
+            self.warning_message("There is no saved project selected to delete.")
+            return
+
+        reply = QMessageBox.question(
+            self.dlg,
+            "Delete project",
+            f"Are you sure you want to permanently delete the project '{name_of_project}'?\n\n"
+            f"This will remove all of its folders (inputs, outputs, calibration, sensitivity "
+            f"analysis, etc.) from:\n{self.carpeta_guardar_proyectos}\\{name_of_project}\n\n"
+            f"This cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        try:
+            shutil.rmtree(self.carpeta_guardar_proyectos+f"\\{name_of_project}")
+        except Exception as e:
+            self.warning_message(f"Could not delete project '{name_of_project}'. Reason: {e}")
+            return
+
+        self.update_saved_projects()
+        self.warning_message(f"Project '{name_of_project}' deleted.")
+
+
     def update_saved_projects(self,update_scenario = True):
         """Method to update the projects that are available in the computer"""
         #In the main windo. 
@@ -6752,7 +7656,7 @@ class qannagnps():
 
         #In scenario analysis
         if update_scenario:
-            layout = self.dlg_scenario_analysis.frame.layout()
+            layout = self.dlg_scenario_analysis.projects_container.layout()
             
             if layout is not None:
                 while layout.count():
@@ -6921,13 +7825,13 @@ class qannagnps():
         Watershed/General/Climate/Simulation buttons. Defined once here and shared by the
         sensitivity, calibration AND identifiability dialogs (via build_category_inputs) so it
         never needs to be duplicated again."""
-        dic_spatial = {"TopAgnps":["Pixel Size","Critical Source Area","Minimum Source Channel \nLength"],"Ephemeral Gully":["Absolute CTI","Relative CTI"],"Riparian Buffers":["Cell Threshold","Reach Threshold"],"Hydraulics and hydrology \nfor cells and reaches":["Drainage area \nto concentrated flow","Maximum profile length \nuntil deposition","Maximum Profile Slope"],"Wetland":["Wetness Index Threshold","Erosion Index Threshold","Drainage Area Threshold","Maximum Wetland Ratio","Minimum Wetland Ratio","Barrier Height","Barrier Height Increment","Barrier Height Maximum","Buffer width"],"Pothole":["Pothole Surface Area"]}
+        dic_spatial = {"TopAgnps":["Pixel Size","Critical Source Area","Minimum Source Channel \nLength"],"Ephemeral Gully":["Absolute CTI","Relative CTI"],"Riparian Buffers":["Cell Threshold","Reach Threshold"],"Wetland":["Wetness Index Threshold","Erosion Index Threshold","Drainage Area Threshold","Maximum Wetland Ratio","Minimum Wetland Ratio","Barrier Height","Barrier Height Increment","Barrier Height Maximum","Buffer width"],"Pothole":["Pothole Surface Area"]}
         dic_watershed = {"Aquaculture pond":["Pond area","Pond Depth", "Seepage Rate", "Sediment Delivery Ratio Pond", "Organic Carbon \nCalibration Factor Pond", "Nitrogen Calibration Factor Pond", "Phosphorus Calibration Factor Pond", "Erosion Calibration Factor Pond"],"Cell":["Sheet flow Manning’s n","Concentrated flow \nhydraulic depth","Concentrated flow Manning’s n","Delivery Ratio Pond","Constant USLE C factor","Constant USLE P factor","All Organic Carbon \nCalibration Factor","All Nitrogen Calibration Factor","All Phosphorus Calibration Factor","Sheet and Rill Erosion \nCalibration Factor","Gullies Erosion Calibration Factor"],"Classic Gully":["Head Cut Depth","Erosion Coefficient","Erosion Exponent","Delivery Ratio Gully","Organic Carbon \nCalibration Factor Gully","Nitrogen Calibration Factor Gully","Phosphorus Calibration Factor Gully","Erosion Calibration Factor Gully"],"Ephemeral Gully":["Critical Shear Stress \nEphemeral Gully","Erosion Depth","Delivery Ratio Ephemeral Gully","Manning’s n Ephemeral Gully","Re Plant Period","Organic Carbon","Nitrogen","Phosphorus","Erosion","Headcut detachment leading \ncoefficient a","Headcut erodibility \nleading coefficient a","Headcut detachment exponent \ncoefficient b","Headcut erodibility exponent \ncoefficient b","Maximum Buffer Trapping \nEfficiency TE m"],"Feedlot":["Open Area","Paved Ratio","Roof Area","Upslope Area","Feedlot Initial N","Feedlot Initial P","Feedlot Initial OrgC","Delta N","Delta P","Delta OrgC","Feedlot Max N","Feedlot Max P","Feedlot Max OrgC","Feedlot Pack N","Feedlot Pack P","Feedlot Pack OrgC","Organic Carbon Calibration \nFactor Feedlot","Nitrogen Calibration \nFactor Feedlot","Phosphorus Calibration \nFactor Feedlot","Erosion Calibration \nFactor Feedlot","Cell Buffer Length"],"Field Pond":["Field Pond area","Number of rotation years","Number gate operations","Delivery Ratio Field Pond","Volume of release water","Drain Time","Release rate","Sediment Concentration","Clay content Field Pond","Silt content Field Pond","Organic Carbon Calibration Factor Field Pond","Nitrogen Calibration Factor Field Pond","Phosphorus Calibration Factor Field Pond","Erosion Calibration Factor Field Pond"], "Impoundment":["Impoundment Infiltration","Impoundment Seepage","Permanent Pool Depth","Impound Volume Coefficient","Impound Volume Exponent","Impound Discharge Coefficient","Impound Discharge Exponent","Sediment Clean Out Depth","Sediment Clean Out Year"], "Point Source":["Point Flow","Point Nitrogen","Point Phosphorus","Point Organic Carbon","Organic Carbon Calibration Factor","Nitrogen Calibration Factor","Phosphorus Calibration Factor","Erosion Calibration Factor"], "Reach":["Reach Manning’s n","Reach Flow Depth","Valley Width","Valley n","Delivery Ratio Reach"], "Watershed":["Latitude","Longitude"], "Wetland":["Wetland Area","Initial Water Depth","Minimum Water Depth","Maximum Water Depth","Water Temperature","Potential Daily Infiltration","Weir Coefficient","Weir Width","Weir Height","Soluble N Concentration","Nitrate Loss Rate","Nitrate Loss Rate Coefficient","Temperature Coefficient","Weir Exponent"]}
         dic_general = {"Management Aquaculture \n Pond Schedule":["Maximum Pool Depth","Minimum Pool Depth","Fill/Release Volume","Fill/Drain Time","Fill/Release Rate","Fill/Drain All","Total Sediment Concentration","Clay Content Pond Schedule","Silt Content Pond Schedule","Total Nitrogen","Dissolved Nitrogen","Total Phosphorus","Dissolved Phosphorus","Sediment Concentration—Winter","Total Nitrogen—Winter","Dissolved Nitrogen—Winter","Total Phosphorus—Winter","Dissolved Phosphorus—Winter","Sediment Concentration—Spring","Total Nitrogen—Spring","Dissolved Nitrogen—Spring","Total Phosphorus—Spring","Dissolved Phosphorus—Spring","Sediment Concentration—Summer","Total Nitrogen—Summer","Dissolved Nitrogen—Summer","Total Phosphorus—Summer","Dissolved Phosphorus—Summer","Sediment Concentration—Autumn","Total Nitrogen—Autumn","Dissolved Nitrogen—Autumn","Total Phosphorus—Autumn","Dissolved Phosphorus—Autumn"], "Contour":["Furrow Slope"], "Crop":["Yield Units Harvested per Area","Residue Mass Ratio","Surface decomposition Crop","Sub-surface decomposition Crop","USLE C-Factor Crop","Moisture Depletion","Crop Residue_30%","Crop Residue_60%","Crop Residue_90%","Yield Unit Mass","Harvest C-N Ratio","N Uptake","P Uptake","Harvest C-P Ratio","Growth Time Ini","Growth Time Dev","Growth Time Mat","Basal Crop Coefficient (“Kcb-ini”) crop","Basal Crop Coefficient (“Kcb-mid”) crop","Basal Crop Coefficient (“Kcb-end”) crop"], "Crop Growth":["Root Mass","Canopy Cover","Rain Fall Height"], "Feedlot Management":["Pack Remove Ratio","Pack Start N","Pack Start P","Pack Start OrgC","Pack Change N","Pack Change P","Pack Change OrgC"],"Fertilizer application":["Fertilizer Rate"], "Fertilizer reference":["Fertilizer Inorganic N","Fertilizer Organic N","Fertilizer Inorganic P","Fertilizer Organic P","Fertilizer Organic Matter"], "Geology":["Delay Time","Water Table","Aquifer Saturated \nHydraulic Conductivity","K-vadose Saturated \nHydraulic Conductivity","Aquifer Porosity","Aquifer Field Capacity","Aquifer Specific Yield","Aquifer Thickness","Aquifer Soluble Nitrogen","Aquifer Soluble Phosphorus"], "Hydraulic Geometry":["Channel Length Coefficient","Channel Length Exponent","Channel Width Coefficient","Channel Width Exponent","Channel Depth Coefficient","Channel Depth Exponent","Valley Width Coefficient","Valley Width Exponent"], "Irrigation Application":["Cycle Duration","Amount Lost","Application Rate","Tailwater Recovery","Depletion Lower Limit","Application Amount","Area Fraction","Interval Number","Interval Days","Chemical Multiple","Sediment Rate","Depletion Upper Limit"], "Management Field":["Percent Rock Cover","Random Roughness","Terrace Horizontal Distance","Terrace grade"], "Management Operation":["Residue Cover Remaining","Residue Weight Remaining","Area Disturbed","Initial Random Roughness","Final Random Roughness","Operation Tillage Depth","Added Surface Residue","Surface Decomposition \nmanagement","Sub-surface Decomposition \nmanagement","Surface Residue_30%","Surface Residue_60%","Surface Residue_90%"], "Management Schedule":["Post Event Manning’s n","Post Event Surface Constant","Operation Residue Change","Tile Drain Controlled Depth"], "Non-crop":["Annual Root Mass","Annual Cover Ratio","Annual Rain Fall Height","Surface Residue Cover","USLE C-Factor Non Crop","Basal Crop Coefficient (“Kcb-mid”) Non Crop"],"Pesticide Application":["Pesticide Rate","Pesticide Depth","Pesticide Foliage Fraction","Pesticide Soil Fraction"], "Pesticide Reference":["Pesticide Solubility","Pesticide Partition","Pesticide Soil Half-life","Pesticide Foliage Half-life","Pesticide Washoff","Metabolite Transformation","Pesticide Reach Half-life"],"Reach Nutrient Half-life":["Reach Nitrogen Half-life","Reach Phosphorus Half-life","Reach Organic Carbon Half-life"], "Riparian Buffer":["Slope","Maximum Trapping \nEfficiency “TE-m”","Effective Buffer Width","Effective Concentrated \nFlow Width","Drainage Area to Upstream \nPortion of Buffer","Actual Trapping Efficiency \n“TE-a” Clay","Actual Trapping Efficiency \n“TE-a” Silt","Actual Trapping Efficiency \n“TE-a” Sand","Actual Trapping Efficiency \n“TE-a” Sm Agg","Actual Trapping Efficiency \n“TE-a” Lg Agg","Fraction Trapped “TE-ps” Clay","Fraction Trapped “TE-ps” Silt","Fraction Trapped “TE-ps” Sand","Fraction Trapped “TE-ps” Sm Agg","Fraction Trapped “TE-ps” Lg Agg"], "Runoff Curve":["Curve Number “A”","Curve Number “B”","Curve Number “C”","Curve Number “D”","Curve Number Shift"], "Soil":["K-factor","Albedo","Time to consolidation","Impervious Depth","Specific Gravity"], "Soil Layers":["Layer Depth","Bulk Density","Clay Ratio","Silt Ratio","Sand Ratio","Rock Ratio","Very Fine Sand Ratio","CaCO3","Saturated Conductivity","Field Capacity","Wilting Point","Base Saturation","Unstable Aggregate Ratio","pH","Organic Matter Ratio","Organic N Ratio","Inorganic N Ratio","Organic P Ratio","Inorganic P Ratio"], "Strip Crop":["P Factor","Sediment Delivery Ratio Strip Crop"], "Tile Drain":["Drain Rate","Invert Depth"]}
         dic_climate = {"Climate Station":["Station Latitude","Station Longitude","Station Elevation","Adiabatic Air Temperature \nLapse Rate","Precipitation Nitrogen","Elevation Difference (1)","Elevation Rain Factor (1)","Elevation Difference (2)","Elevation Rain Factor (2)","2 Yr 24 Hr Precipitation","Rainfall Calibration or Areal \nCorrection Coefficient","Areal Rainfall \nCorrection Exponent","Minimum interception \nevaporation station","Maximum interception \nevaporation station"], "EI Percentage":["EI_Pct_01","EI_Pct_02","EI_Pct_03","EI_Pct_04","EI_Pct_05","EI_Pct_06","EI_Pct_07","EI_Pct_08","EI_Pct_09","EI_Pct_10","EI_Pct_11","EI_Pct_12","EI_Pct_13","EI_Pct_14","EI_Pct_15","EI_Pct_16","EI_Pct_17","EI_Pct_18","EI_Pct_19","EI_Pct_20","EI_Pct_21","EI_Pct_22","EI_Pct_23","EI_Pct_24"]}
         dic_simulation = {"Global IDs Factors \n and Flags":["Headcut detachment leading coefficient (a)","Headcut detachment exponent coefficient (b)","Headcut erodibility leading coefficient (a)","Headcut erodibility exponent coefficient (b)","Minimum Interception Evaporation Global","Maximum Interception Evaporation Global","Detention Coefficient “a”","Detention Coefficient “b”","RCN Convergence Tolerance","RCN Maximum Number of Iterations","Available Soil Moisture Ratio for AMC II","Maximum Available Sediment Concentration for Sheet Flow","Maximum Available Sediment Concentration for Concentrated Flow","Critical Shear Stress"],"Pesticide Initial Conditions":["Crop Initial Pesticide Amount 1","Crop Initial Pesticide Amount 2","Non-crop Initial Pesticide Amount 1","Non-crop Initial Pesticide Amount 2"],"PL Calibration":["Organic carbon from all sources","Organic carbon from sheet & rill","Organic carbon from feedlot","Organic carbon from point source","Organic carbon from gully","Organic carbon from pond","Organic carbon from irrigation","Nitrogen from all sources","Nitrogen from sheet & rill","Nitrogen from feedlot","Nitrogen from point source","Nitrogen from gully","Nitrogen from pond","Nitrogen from irrigation","Phosphorus from all sources","Phosphorus from sheet & rill","Phosphorus from feedlot","Phosphorus from point source","Phosphorus from gully","Phosphorus from pond","Phosphorus from irrigation","Sediment from all sources","Sediment from sheet & rill","Sediment from feedlot","Sediment from point source","Sediment from gully","Sediment from pond","Sediment from irrigation"],"RCN Calibration":["Target Average Annual Direct Runoff Load","RCN Retention factor","Reach Ratio","Available Soil Moisture, AMC-II"],"Simulation Period":["Rainfall factor","10-yr EI","EI Number","Initialization Method Code"],"Soil Initial Conditions":["Inorganic_N_1" ,"Inorganic_N_2", "Inorganic_P_1","Inorganic_P_2", "Soil_Moisture_1","Soil_Moisture_2", "Organic_Matter_1","Organic_Matter_2","Organic_N_1","Organic_N_2", "Organic_P_1","Organic_P_2","Surface Residue","Manning’s n","Snow Depth","Snow Density","Surface Constant"]}
         return {
-            "Spatial": (["TopAgnps","Ephemeral Gully","Riparian Buffers","Hydraulics and hydrology \nfor cells and reaches","Wetland","Pothole"], dic_spatial),
+            "Spatial": (["TopAgnps","Ephemeral Gully","Riparian Buffers","Wetland","Pothole"], dic_spatial),
             "Watershed": (["Aquaculture pond","Cell","Classic Gully","Ephemeral Gully","Feedlot","Field Pond", "Impoundment", "Point Source", "Reach", "Watershed", "Wetland"], dic_watershed),
             "General": (["Management Aquaculture \n Pond Schedule", "Contour", "Crop", "Crop Growth", "Feedlot Management","Fertilizer application", "Fertilizer reference", "Geology", "Hydraulic Geometry", "Irrigation Application", "Management Field", "Management Operation", "Management Schedule", "Non-crop","Pesticide Application", "Pesticide Reference","Reach Nutrient Half-life", "Riparian Buffer", "Runoff Curve", "Soil", "Soil Layers", "Strip Crop", "Tile Drain"], dic_general),
             "Climate": (["Climate Station", "EI Percentage"], dic_climate),
@@ -7446,6 +8350,9 @@ class qannagnps():
         icon_search = QIcon(os.path.join(plugin_directory,"images","search.svg"))
         self.dlg_calibration.observed_push.setIcon(icon_document)
         self.dlg_calibration_inputs.browse.setIcon(icon_search)
+        #Both icons (document.svg, search.svg) are dark/black - hard to see against the solid
+        #blue QPushButton background, so give these two the lighter "flatIcon" style
+        self.apply_flat_icon_style([self.dlg_calibration.observed_push,self.dlg_calibration_inputs.browse])
         self.dlg_calibration.observed_push.clicked.connect(lambda: (self.dlg_calibration_inputs.show(), self.dlg_calibration_inputs.raise_()))
 
         #Refresh the observed-data graph (title/y-axis label) when the output to calibrate changes
@@ -7457,13 +8364,17 @@ class qannagnps():
                                  self.dlg_calibration_inputs.annual]:
             time_step_radio.toggled.connect(lambda checked: self.update_graph_calibration_inputs() if checked else None)
 
-        #Modern "control panel" style, applied to the 4 calibration dialogs
+        #Modern "control panel" style, applied to the 4 calibration dialogs and the main dialog
         dialogs_card_frames = {
             self.dlg_calibration: ["frame","frame_4","frame_5","frame_6","frame_7"],
             self.dlg_calibration_inputs: ["frame"],
             self.dlg_calibration_results: ["frame_2","frame","frame_4"],
             self.dlg_fiteval_calibration: ["frame_2","frame_3","frame_4"],
             self.dlg_identifiability: ["frame","frame_4","frame_5","frame_6","frame_7"],
+            self.dlg: ["frame_3","frame_9","frame_10","frame_5","frame_8","frame_6","frame",
+                       "frame_2","frame_7","frame_11","frame_12","frame_13","frame_14"],
+            self.dlg_scenario_analysis: ["frame","frame_2","frame_4","frame_3"],
+            self.dlg_ephemeral_gully_analysis: ["frame","frame_2","frame_4","frame_3"],
         }
         for dialog,card_frames in dialogs_card_frames.items():
             dialog.setStyleSheet(self.modern_panel_stylesheet(card_frames))
@@ -7540,14 +8451,44 @@ class qannagnps():
             QPushButton:pressed {{
                 background-color: #274566;
             }}
+            QPushButton[flatIcon="true"] {{
+                background-color: #ffffff;
+                border: 1px solid #c3ccd4;
+                color: #2c3e50;
+                padding: 4px 10px;
+            }}
+            QPushButton[flatIcon="true"]:hover {{
+                background-color: #eef1f4;
+                border-color: #3f6ea5;
+            }}
+            QPushButton[flatIcon="true"]:pressed {{
+                background-color: #d8dee4;
+            }}
             QLineEdit, QComboBox {{
                 background-color: #ffffff;
+                color: #2c3e50;
                 border: 1px solid #c3ccd4;
                 border-radius: 5px;
                 padding: 3px 6px;
             }}
             QComboBox::drop-down {{
                 border: none;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: #ffffff;
+                color: #2c3e50;
+                border: 1px solid #c3ccd4;
+                outline: none;
+                selection-background-color: #3f6ea5;
+                selection-color: #ffffff;
+            }}
+            QComboBox QAbstractItemView::item {{
+                min-height: 22px;
+                padding: 2px 6px;
+            }}
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: #3f6ea5;
+                color: #ffffff;
             }}
             QTableWidget {{
                 background-color: #ffffff;
@@ -7567,9 +8508,55 @@ class qannagnps():
                 color: #2c3e50;
                 background-color: transparent;
             }}
+            QRadioButton::indicator, QCheckBox::indicator {{
+                width: 15px;
+                height: 15px;
+                border: 2px solid #8fa4b8;
+                background-color: #ffffff;
+            }}
+            QRadioButton::indicator {{
+                border-radius: 8px;
+            }}
+            QCheckBox::indicator {{
+                border-radius: 3px;
+            }}
+            QRadioButton::indicator:hover, QCheckBox::indicator:hover {{
+                border-color: #3f6ea5;
+            }}
+            QRadioButton::indicator:checked, QCheckBox::indicator:checked {{
+                background-color: #3f6ea5;
+                border-color: #3f6ea5;
+            }}
             QScrollArea {{
                 border: none;
                 background-color: transparent;
+            }}
+            QScrollArea > QWidget > QWidget {{
+                background-color: transparent;
+            }}
+            QTabWidget::pane {{
+                background-color: #ffffff;
+                border: 1px solid #d8dee4;
+                border-radius: 10px;
+                top: -1px;
+            }}
+            QTabBar::tab {{
+                background-color: #e3e7eb;
+                color: #55606b;
+                border: 1px solid #d8dee4;
+                border-bottom: none;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                padding: 6px 16px;
+                margin-right: 2px;
+            }}
+            QTabBar::tab:selected {{
+                background-color: #3f6ea5;
+                color: #ffffff;
+                border-color: #3f6ea5;
+            }}
+            QTabBar::tab:hover:!selected {{
+                background-color: #d8dee4;
             }}
         """
 
@@ -7582,6 +8569,18 @@ class qannagnps():
         shadow.setYOffset(2)
         shadow.setColor(QColor(0,0,0,40))
         frame.setGraphicsEffect(shadow)
+
+
+    def apply_flat_icon_style(self,buttons):
+        """Method to give icon-only utility buttons (no text) a light 'ghost' style - white
+        background, thin border - instead of the solid blue used for text buttons. Several of
+        these buttons carry dark/black icons (e.g. images/balance.svg, images/documentation.svg,
+        images/general.svg) that become hard to see against the solid blue QPushButton background
+        from modern_panel_stylesheet; matches that method's QPushButton[flatIcon="true"] rule."""
+        for button in buttons:
+            button.setProperty("flatIcon",True)
+            button.style().unpolish(button)
+            button.style().polish(button)
 
 
     def run_calibration(self):
@@ -7735,21 +8734,33 @@ class qannagnps():
         self.sensitivity_dialog.close()
         self.dlg.close()
 
-        #Start with the progress bar
-        self.progress_metod("Sensitivity",start = True)
-        
-        
+        #Start with the sensitivity progress dialog (same look/detail as calibration's: live
+        #progress bar, status text, execution count, running count, and a Stop button - "objective
+        #metric"/"best result" are repurposed to show which output(s) are being tracked, since
+        #sensitivity can track several outputs at once rather than optimizing towards one)
+        self.dlg_sensitivity_progress = CalibrationProgressDialog(
+            title="Running sensitivity analysis…",
+            window_title="Sensitivity analysis progress",
+            show_best=False,
+            stop_button_text="Stop analysis")
+        self.enable_raise_on_show(self.dlg_sensitivity_progress)
+        self.dlg_sensitivity_progress.stop_requested.connect(self.stop_sensitivity_by_user)
+        self.dlg_sensitivity_progress.set_status("Starting sensitivity analysis...")
+        self.dlg_sensitivity_progress.show()
+        QCoreApplication.processEvents()
+
+
         #Create the dictionary with the input data and the parameter values
-        self.create_dictionary_sensitivity_analysis()        
-        
+        self.create_dictionary_sensitivity_analysis()
+
         #Obtain the number of cores to work with
         self.number_cores = QThreadPool.globalInstance().maxThreadCount() - 1
-        
+
         #Obtener la direccoin de los raster ahora que están en la carpeta de "Sensitivity_analysis"
         self.declare_rasters_sensitivity_analysis("Sensitivity_analysis")
-        
+
         #Move the files from the save project to working directory + name of the project + "Sensitivity_analysis"
-        self.progress_dialog.setLabelText("Moving files to the working directory...")
+        self.dlg_sensitivity_progress.set_status("Moving files to the working directory...")
         self.move_files_to_working_directory_sensitivity_analysis("Sensitivity_analysis")
         if self.end_execution:
             return
@@ -7840,13 +8851,21 @@ class qannagnps():
         # We save the result
         resultado = self.save_result(id_carpeta, n)
         self.resultados.append(resultado)
-        
-        
+
+
         self.terminadas += 1
         # Return folder to pool
         self.carpetas_libres.append(id_carpeta)
-        
-        
+
+        #Sensitivity can track several outputs at once (one per checked checkbox), so there's no
+        #single "objective metric" to show - just list which output(s) are being tracked instead
+        if resultado:
+            outputs_label = ", ".join(list(resultado.keys())[len(self.dic_data):]) or "-"
+        else:
+            outputs_label = "-"
+        self.dlg_sensitivity_progress.update_progress(
+            self.terminadas,len(self.param_values),len(self.tareas_activas),outputs_label,None)
+
         if self.terminadas >= len(self.param_values):
             #Se ponen los resultados en un dataframe, se guarda y se calculan los índices de sensibilidad
             self.run_sensitivity_analysis_two()
@@ -8153,24 +9172,157 @@ class qannagnps():
         return df
 
 
-    def read_gaging_station_table(self,core):
-        """Method to read AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv for one Core folder.
+    def read_gaging_station_table(self,project_folder):
+        """Method to read AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv for one project folder (a saved
+        project's own folder, or a Core_N working copy during calibration/sensitivity/identifiability).
         This single file contains streamflow, sediment, nitrogen, phosphorus, organic carbon and
         pesticide loadings together, so every "gaging_station"-sourced calibratable output is read from it.
         Returns the daily rows for the watershed outlet ("OUTLET")."""
-        fichero = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs\\AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"
+        fichero = project_folder+"\\Processing_outputs\\AnnAGNPS_TBL_Gaging_Station_Data_Hyd.csv"
         df = self.parse_annagnps_daily_table(fichero)
         return df[df["Reach ID"].str.strip()=="OUTLET"]
 
 
-    def read_ephemeral_gully_summary(self,core,column):
-        """Method to read AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv for one Core folder, summing the
+    def read_ephemeral_gully_summary(self,project_folder,column):
+        """Method to read AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv for one project folder, summing the
         given column (e.g. "Total accumulated volume [Mg]") across every ephemeral gully for each day.
         Returns a two-column DataFrame ('date','value')."""
-        fichero = self.direccion_sensitivity+f"\\Core_{core}"+"\\Processing_outputs\\AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv"
+        fichero = project_folder+"\\Processing_outputs\\AnnAGNPS_SIM_Ephemeral_Gully_Summary.csv"
         df = self.parse_annagnps_daily_table(fichero)
         df[column] = pd.to_numeric(df[column],errors='coerce')
         return df.groupby('date',as_index=False)[column].sum().rename(columns={column:'value'})
+
+
+    def read_ephemeral_gully_sections(self,project_folder):
+        """Method to read AnnAGNPS_SIM_Ephemeral_Gully_Sections.csv for one project folder: one row
+        per (event date, gully, section). Unlike parse_annagnps_daily_table's files, this file's
+        header is spread across several metadata rows instead of one single "Gregorian Day" row, so
+        it needs its own parsing: skip everything up to (and including) the row starting with
+        "Gregorian" - the next row is a units row, also skipped - then read data with the fixed
+        EPHEMERAL_GULLY_SECTIONS_COLUMNS names. Returns that DataFrame plus a 'date' column."""
+        fichero = project_folder+"\\Processing_outputs\\AnnAGNPS_SIM_Ephemeral_Gully_Sections.csv"
+        with open(fichero) as file:
+            rows = list(csv.reader(file))
+
+        header_found = False
+        skip_units_row = False
+        data_rows = []
+        for row in rows:
+            if not row:
+                continue
+            if not header_found:
+                if row[0].strip()=="Gregorian":
+                    header_found = True
+                    skip_units_row = True
+                continue
+            if skip_units_row:
+                skip_units_row = False
+                continue
+            data_rows.append(row[:len(EPHEMERAL_GULLY_SECTIONS_COLUMNS)])
+
+        if not header_found:
+            raise ValueError(f"'Gregorian' header row not found in {fichero}")
+
+        df = pd.DataFrame(columns=EPHEMERAL_GULLY_SECTIONS_COLUMNS,data=data_rows)
+
+        #After the last event row, AnnAGNPS may append summary/footer text; drop any row that isn't
+        #a real numeric event row before converting to int
+        for col in ['Gregorian Day','Year','Month','Day']:
+            df[col] = pd.to_numeric(df[col].astype(str).str.strip(),errors='coerce')
+        df = df.dropna(subset=['Gregorian Day','Year','Month','Day']).reset_index(drop=True)
+
+        df['date'] = pd.to_datetime({
+            'year': df['Year'].astype(int),
+            'month': df['Month'].astype(int),
+            'day': df['Day'].astype(int),
+        })
+        return df
+
+
+    def forward_fill_ephemeral_gully_series(self,per_gully,value_column):
+        """Method to turn a sparse per-gully series (one row per date a gully actually had an entry
+        in AnnAGNPS_SIM_Ephemeral_Gully_Sections.csv - it only records a gully on the dates its
+        section data changed, not every day) into a wide, daily table: one row per calendar day
+        between the earliest and latest date seen for ANY gully, one column per Gully ID, with each
+        gully's last known value carried forward (ffill) into the days between its own entries. A
+        gully has NaN before its own first entry (it hasn't produced any data yet) rather than 0, so
+        it is correctly excluded (not counted as a real 0) by whatever the caller does with those
+        columns next (sum treats NaN as 0 - fine for an additive quantity like length; mean(skipna)
+        instead excludes it - fine for an average like width, so a not-yet-active gully doesn't drag
+        the average down)."""
+        wide = per_gully.pivot(index='date',columns='Gully ID',values=value_column)
+        full_range = pd.date_range(wide.index.min(),wide.index.max(),freq='D')
+        return wide.reindex(full_range).ffill()
+
+
+    def read_ephemeral_gully_total_length(self,project_folder):
+        """Method to compute, for each day, the total ephemeral gully length (m) across every gully
+        of the project. "Headcut Migration Distance" is a per-gully property (the headcut's current
+        position, measured from the gully mouth) repeated identically on every one of a gully's
+        section rows for a given date. Since the file only has an entry for a gully on the dates its
+        data actually changed, each gully's length is carried forward (forward_fill_ephemeral_gully_
+        series) between its own entries before summing across every gully for each day - otherwise a
+        gully that hasn't eroded further would incorrectly seem to disappear from the total on the
+        days it has no new entry, instead of keeping its last known length.
+        Returns a two-column DataFrame ('date','value')."""
+        df = self.read_ephemeral_gully_sections(project_folder)
+        df['Headcut Migration Distance'] = pd.to_numeric(df['Headcut Migration Distance'],errors='coerce')
+        per_gully = df.drop_duplicates(subset=['date','Gully ID'])
+        wide = self.forward_fill_ephemeral_gully_series(per_gully,'Headcut Migration Distance')
+        return wide.sum(axis=1).rename('value').rename_axis('date').reset_index()
+
+
+    def read_ephemeral_gully_average_width(self,project_folder):
+        """Method to compute, for each day, the average ephemeral gully width (m) across every gully
+        of the project. For each gully, its "Average Width" is averaged across its 40 fixed sections,
+        excluding the "Nickpoint" row (the scour hole, not one of the 40 sections) and any section
+        still at width 0 (the gully hasn't migrated upstream far enough to reach it yet). Since the
+        file only has an entry for a gully on the dates its data actually changed, each gully's
+        resulting average width is carried forward (forward_fill_ephemeral_gully_series) between its
+        own entries before averaging across every gully for each day - otherwise a gully that hasn't
+        changed would incorrectly seem to disappear from the average on the days it has no new entry,
+        instead of keeping its last known width.
+        Returns a two-column DataFrame ('date','value')."""
+        df = self.read_ephemeral_gully_sections(project_folder)
+        df['Average Width'] = pd.to_numeric(df['Average Width'],errors='coerce')
+        sections = df[df['Section Number'].astype(str).str.strip()!='Nickpoint']
+        sections = sections[sections['Average Width']>0]
+        per_gully = sections.groupby(['date','Gully ID'],as_index=False)['Average Width'].mean()
+        wide = self.forward_fill_ephemeral_gully_series(per_gully,'Average Width')
+        return wide.mean(axis=1,skipna=True).rename('value').rename_axis('date').reset_index()
+
+
+    def read_ephemeral_gully_active_count(self,project_folder,time_step):
+        """Method to compute, per Daily/Monthly/Annual time_step, how many distinct ephemeral gullies
+        had at least one recorded event in AnnAGNPS_SIM_Ephemeral_Gully_Sections.csv during that
+        period - a proxy for how widespread gully erosion is (many gullies slightly active) versus
+        how concentrated it is (few gullies very active). Unlike gully length/width this isn't a
+        persisting state (a gully with no event this period simply isn't counted, rather than
+        carrying its last count forward), and unlike erosion it can't just be summed across days
+        without double-counting a gully active on several days within the same period - so each
+        gully is counted at most once per period no matter how many events it had in it. This is why
+        it's computed here rather than through the generic sum/last resample_ephemeral_gully_series.
+        Returns a two-column DataFrame ('date','value')."""
+        df = self.read_ephemeral_gully_sections(project_folder)
+        per_gully_day = df.drop_duplicates(subset=['date','Gully ID'])[['date','Gully ID']]
+        freq = {"Monthly":"MS","Annual":"YS"}.get(time_step)
+        if freq is None:
+            return per_gully_day.groupby('date')['Gully ID'].nunique().rename('value').reset_index()
+        per_gully_period = per_gully_day.groupby([pd.Grouper(key='date',freq=freq),'Gully ID']).size().reset_index()
+        return per_gully_period.groupby('date')['Gully ID'].nunique().rename('value').reset_index()
+
+
+    def read_ephemeral_gully_migration_rate(self,project_folder):
+        """Method to compute the ephemeral gully migration rate (m/day): how fast the total gully
+        length (read_ephemeral_gully_total_length, already a full daily series thanks to its own
+        forward-fill) is advancing, as the day-to-day change in that total - spikes on the days a
+        gully's headcut actually migrates further, instead of only showing the flat accumulated
+        total. Summed over a Monthly/Annual period (its "sum" aggregation in EPHEMERAL_GULLY_OUTPUTS)
+        this correctly reconstructs how much total length was gained during that period.
+        Returns a two-column DataFrame ('date','value')."""
+        length = self.read_ephemeral_gully_total_length(project_folder).sort_values('date')
+        rate = length.set_index('date')['value'].diff().rename('value').reset_index()
+        return rate.dropna(subset=['value'])
 
 
     def calibration_observed_time_step(self):
@@ -8249,11 +9401,12 @@ class qannagnps():
         source = self.calibration_output_source()
         column = self.calibration_output_column()
         try:
+            core_folder = self.direccion_sensitivity+f"\\Core_{id_carpeta}"
             if source == "gaging_station":
-                df = self.read_gaging_station_table(id_carpeta)
+                df = self.read_gaging_station_table(core_folder)
                 df_simulated = df[['date',column]].rename(columns={column:'value'})
             else: #"ephemeral_gully"
-                df_simulated = self.read_ephemeral_gully_summary(id_carpeta,column)
+                df_simulated = self.read_ephemeral_gully_summary(core_folder,column)
             df_simulated['value'] = pd.to_numeric(df_simulated['value'],errors='coerce')
         except Exception as e:
             self.end_execution = True
@@ -8356,11 +9509,30 @@ class qannagnps():
 
         # Show the warning in English
         self.warning_message(msg)
-        
+
         #Close progress bar
-        self.progress_dialog.close()
-    
-    
+        self.dlg_sensitivity_progress.close()
+
+
+    def stop_sensitivity_by_user(self):
+        """Method called when the user clicks 'Stop analysis' on the sensitivity progress dialog.
+        Unlike calibration, partial results can't be salvaged here: Sobol/Morris need the complete,
+        exact sample matrix to compute sensitivity indices, so stopping early means starting over."""
+        self.end_execution = True
+        self.tareas_pendientes = []
+        for t in self.tareas_activas[:]:
+            try:
+                if t:
+                    t.cancel()
+                    if hasattr(t,"kill_running_processes"):
+                        t.kill_running_processes()
+            except (RuntimeError, ReferenceError):
+                pass
+        self.tareas_activas = []
+        self.dlg_sensitivity_progress.close()
+        self.warning_message("Sensitivity analysis stopped by the user. No results were saved: Sobol/Morris need every execution to finish to compute the sensitivity indices.")
+
+
     def stop_calibration_by_user(self):
         """Method called when the user clicks 'Stop calibration' on the progress dialog"""
         #Once this is set, finalizar_tarea_calibration ignores any task that still completes/fails
@@ -8624,9 +9796,9 @@ class qannagnps():
         self.results_sensitivity.to_csv(path, mode='a',index=False, float_format='%.10f')
         
         #Se cierra la barra de progreso
-        self.progress_dialog.close()
-        
-        
+        self.dlg_sensitivity_progress.close()
+
+
         #Add csv result to the lineEdit and update graph
         if self.sensitivity_dialog.sobol.isChecked():
             self.dlg_results_sensitivity.radio_sobol.setChecked(True)
@@ -8986,11 +10158,12 @@ class qannagnps():
         source = self.calibration_output_source(self.dlg_identifiability)
         column = self.calibration_output_column(self.dlg_identifiability)
         try:
+            core_folder = self.direccion_sensitivity+f"\\Core_{core}"
             if source == "gaging_station":
-                df = self.read_gaging_station_table(core)
+                df = self.read_gaging_station_table(core_folder)
                 df_simulated = df[['date',column]].rename(columns={column:'value'})
             else: #"ephemeral_gully"
-                df_simulated = self.read_ephemeral_gully_summary(core,column)
+                df_simulated = self.read_ephemeral_gully_summary(core_folder,column)
             df_simulated['value'] = pd.to_numeric(df_simulated['value'],errors='coerce')
         except Exception as e:
             self.end_execution = True
@@ -10408,6 +11581,42 @@ class qannagnps():
 
 
 
+def read_agflow_baseline(path):
+    """Function to read the current baseline values of an AGFCNT.inp control file - the
+    plain-text file AnnAGNPS/TopAGNPS itself reads for Drainage area to concentrated flow /
+    Maximum profile length until deposition / Maximum Profile Slope, not a CSV - parsed the
+    same way asignar_valores_control_dialogo does for the "AgFlow" control dialog. Used instead
+    of that dialog by change_inputs_sensitivity (in both Sensitivity_Parallelization and
+    Calibration_Parallelization) so this can run safely from the parallel QgsTask worker threads
+    used by sensitivity analysis/calibration. A module-level function (not a method) since both
+    of those are separate QgsTask subclasses with no shared base to hang a method off of. Returns
+    the same defaults asignar_valores_control_dialogo/create_control_file_agflow use when the
+    file doesn't exist yet."""
+    valores_por_defecto = {"slope":"1","maxim_d":"0.99","maxim_pl":"300.0","maxim_ps":"100.0",
+        "use":"F","write":"F","arc":"F","dat":"F","use_file":"F"}
+    if not os.path.exists(path):
+        return valores_por_defecto
+    try:
+        with open(path,"r") as fichero:
+            texto = fichero.read()
+        valores = texto[237:].split("     ")
+        def normalize_bool_token(valor):
+            return "F" if valor in ("F","F\n") else "T"
+        return {
+            "slope": valores[0],
+            "maxim_d": valores[1],
+            "maxim_pl": valores[2],
+            "maxim_ps": valores[3],
+            "use": normalize_bool_token(valores[4]),
+            "write": normalize_bool_token(valores[5]),
+            "arc": normalize_bool_token(valores[6]),
+            "dat": normalize_bool_token(valores[7]),
+            "use_file": normalize_bool_token(valores[8]),
+        }
+    except Exception:
+        return valores_por_defecto
+
+
 class Sensitivity_Parallelization(QgsTask):
     def __init__(self, n, core,execute_preprocessing_sensitivity,direccion_sensitivity,dic_data,param_values,executable_directory,plugin_dir,dic_name_column,nombre_mdt_sensitivity,extension_mdt_sensitivity,fichero_buf_sensitivity,nombre_buffer_sensitivity,extension_buffer_sensitivity,fichero_veg_sensitivity,nombre_vegetation_sensitivity,extension_vegetation_sensitivity,inputs, epsg_sensitivity,unique_soil_sensitivity,fichero_soil_sensitivity,column_soil_sensitivity,unique_use_sensitivity,fichero_manag_sensitivity,column_use_sensitivity,project_df):
         super().__init__(f"Tarea_{n}_Carpeta_{core}")
@@ -10466,7 +11675,12 @@ class Sensitivity_Parallelization(QgsTask):
             
             #Dar error si no existe el archivo TOPAGNPS.CSV
             if not os.path.exists(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV"):
-                self.error_msg = "Error Input data\nControl file of TopAGNPS, TOPAGNPS.CSV, not found"
+                self.error_msg = (
+                    "Error Input data: the control file TOPAGNPS.CSV was not found for the "
+                    "selected project. This usually means Preprocessing was never run (and the "
+                    "project saved again afterwards) for it - please run Preprocessing on this "
+                    "project, save it, and try again."
+                )
                 self.end_execution = 1
                 return
             #Si el formato de la columna FILENAME no es str entonces dar error
@@ -10478,6 +11692,9 @@ class Sensitivity_Parallelization(QgsTask):
             #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs.
             for j,k in enumerate(self.dic_data.keys()):
                 self.change_inputs_sensitivity(self.param_values[self.n-1],j,k,spatial =True) #cambio de los inputs espaciales
+            #Clear any leftover Preprocessing_outputs from this Core_N's previous execution first,
+            #so a file that isn't regenerated this round doesn't keep looking like a valid, current result
+            clear_folder_contents(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs")
             #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
             self.time_start_preprocessing = datetime.now()
             #EJECUCIÓN DE TOPAGNPS            
@@ -10529,10 +11746,21 @@ class Sensitivity_Parallelization(QgsTask):
                 #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
                 self.save_files_preprocessing_in_folder_sensitivity()
                 self.error_msg =str(e)
-                
+
                 error_completo = traceback.format_exc()
-                
-                
+
+
+                return
+            #add_soil_and_management_cell_sensitivity signals its own problems (no soil/management
+            #layer selected, DEM/layer not overlapping, etc.) by setting self.end_execution and a
+            #specific self.error_msg and returning normally, without raising an exception - so the
+            #"except Exception" above never catches those cases. Without this check, execution
+            #silently continued straight into running AnnAGNPS with a half-finished
+            #AnnAGNPS_Cell_Data_Section.csv (blank Soil_ID/Mgmt_Field_ID), so instead of that
+            #specific, useful message the user only ever saw AnnAGNPS's own generic runtime error
+            #("Blank text field or input record encountered").
+            if self.end_execution:
+                self.save_files_preprocessing_in_folder_sensitivity()
                 return
             #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
             self.save_files_preprocessing_in_folder_sensitivity()
@@ -10547,9 +11775,12 @@ class Sensitivity_Parallelization(QgsTask):
         #Se cambian los inputs
         for j,k in enumerate(self.dic_data.keys()):
             self.change_inputs_sensitivity(self.param_values[self.n-1],j,k,spatial =False) #cambio de los inptus no espaciales
-        
-        
-        
+
+
+
+        #Clear any leftover Processing_outputs from this Core_N's previous execution first, so a
+        #file that isn't regenerated this round doesn't keep looking like a valid, current result
+        clear_folder_contents(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_outputs")
         #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
         self.time_start_processing = datetime.now()
         
@@ -10675,55 +11906,51 @@ class Sensitivity_Parallelization(QgsTask):
         if nombre_parametro =="Pixel Size" and spatial:
             self.change_control_files_pixel(param_values,numero_parametro)
         elif self.dic_name_column[nombre_parametro.split("__")[0]][1]=="AGFLOW.csv" and spatial:#in the case of agflow the input change is different
-            #First we add the data of control files to the dialog. This is important because the rest of the values that are not changed need to be taken from the control file.
-            self.asignar_valores_control_dialogo()
-            #Then we change the inputs of agflow control file
+            #These 3 parameters (Drainage area to concentrated flow, Maximum profile length until
+            #deposition, Maximum Profile Slope) aren't actually stored in AGFLOW.csv during a
+            #normal execution - they're written into the plain-text AGFCNT.inp via a template
+            #substitution (see the "inp" branch of create_control_file_agflow). The previous
+            #implementation went through the shared "AgFlow" control dialog
+            #(asignar_valores_control_dialogo + self.agflow.lineEdit_*) to read the baseline for
+            #the other, non-swept values - but Sensitivity_Parallelization is a QgsTask that runs
+            #on a parallel worker thread and has no self.agflow/self.asignar_valores_control_dialogo
+            #at all (those belong to the main qannagnps dialog), so this raised an AttributeError
+            #on every execution that touched one of these 3 parameters. It also always re-read the
+            #ORIGINAL project's file as the baseline, so whenever more than one of these 3
+            #parameters was selected in the same analysis, each one's change independently
+            #overwrote the whole file and silently discarded whatever an earlier parameter in the
+            #same execution had just set. Reading the baseline directly from this execution's own
+            #Core_N file fixes both problems: no shared widgets are touched, and parameters already
+            #changed earlier in this same execution are preserved instead of being reset. That file
+            #always exists by the time this runs if the original project had one
+            #(move_files_to_working_directory_sensitivity_analysis copies the whole
+            #Preprocessing_inputs folder into every Core_N before any task starts);
+            #read_agflow_baseline already falls back to sensible defaults if it doesn't.
+            core_agfcnt_path = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs\\AGFCNT.inp"
+            baseline = read_agflow_baseline(core_agfcnt_path)
+
             fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
             texto = fichero.read()
             fichero.close()
-            
-            #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
-            try:
-                if self.agflow.lineEdit_4.text() =="":slope="1"
-                else:slope= str(int(self.agflow.lineEdit_4.text()))
 
-                if self.agflow.lineEdit_5.text()=="":maxim_d="0.99"
-                else:maxim_d=float(self.agflow.lineEdit_5.text())
-                if nombre_parametro=="Drainage area \nto concentrated flow": maxim_d=round(param_values[numero_parametro],2)
+            slope = baseline["slope"]
+            maxim_d = baseline["maxim_d"]
+            if nombre_parametro=="Drainage area \nto concentrated flow": maxim_d=round(param_values[numero_parametro],2)
+            maxim_pl = baseline["maxim_pl"]
+            if nombre_parametro=="Maximum profile length \nuntil deposition": maxim_pl=round(param_values[numero_parametro],2)
+            maxim_ps = baseline["maxim_ps"]
+            if nombre_parametro=="Maximum Profile Slope": maxim_ps=round(param_values[numero_parametro],2)
+            use,write,arc,dat,use_file = baseline["use"],baseline["write"],baseline["arc"],baseline["dat"],baseline["use_file"]
 
-                if self.agflow.lineEdit_6.text()=="":maxim_pl="300.0"
-                else:maxim_pl=float(self.agflow.lineEdit_6.text())
-                if nombre_parametro=="Maximum profile length \nuntil deposition": maxim_pl=round(param_values[numero_parametro],2)
-
-                if self.agflow.lineEdit_7.text()=="":maxim_ps="100.0"
-                else:maxim_ps=float(self.agflow.lineEdit_7.text())
-                if nombre_parametro=="Maximum Profile Slope": maxim_ps=round(param_values[numero_parametro],2)
-                
-                def funcion_t(numero):
-                    if numero==1:
-                        return "T"
-                    elif numero ==0:
-                        return "F"
-                
-                use=funcion_t(int(self.agflow.checkBox.isChecked()))
-                write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
-                arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
-                dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
-                use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
-            
-            except:
-                iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning,duration = 10)
-                return
-            
             texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
             try:
-                f = open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\"+"AGFCNT.inp","w+")
+                f = open(core_agfcnt_path,"w+")
             except:
                 iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
-                return 
+                return
             f.write(texto_nuevo)
             f.close()
-        
+
         else:
             try:
                 direccion#Check if "direccion" and "columna" exist. If they don't, then do anything
@@ -11017,9 +12244,9 @@ class Sensitivity_Parallelization(QgsTask):
             #Se aplica el suelo al fichero de cells
             try:
                 suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil_sensitivity,self.column_soil_sensitivity,1)
-            except:
+            except Exception as e:
                 self.end_execution = 1
-                self.error_msg = f"Error with soil layer: The DEM and the soil layer have to overlap"
+                self.error_msg = f"Error with soil layer: The DEM and the soil layer have to overlap\nDetails: {e}"
                 return
             annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
             annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
@@ -11060,7 +12287,11 @@ class Sensitivity_Parallelization(QgsTask):
                     annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
                 except:
                     self.end_execution = 1
-                    self.error_msg =  "Error soil map\nThe soil type layer may not cover the full extent of the watershed"
+                    self.error_msg =  ("Error soil map\n\nThe soil type layer may not cover the full extent of the watershed.\n"
+                        "To check this, load 'AnnAGNPS_Cell_IDs.asc' (in this project's Preprocessing_outputs folder) "
+                        "and your soil type layer into QGIS and see if they overlap. Possible fixes: make sure both "
+                        "layers use the same Coordinate Reference System, or make sure the watershed falls entirely "
+                        "inside the soil type map (you can also move the watershed by changing the outlet coordinates).")
                     return
                 #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
                 def float_to_str(column):
@@ -11086,9 +12317,9 @@ class Sensitivity_Parallelization(QgsTask):
                 return
             try:
                 manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_manag_sensitivity,self.column_use_sensitivity,2)
-            except:
+            except Exception as e:
                 self.end_execution = 1
-                self.error_msg = f"Error with management layer: The DEM and the management layer have to overlap"
+                self.error_msg = f"Error with management layer: The DEM and the management layer have to overlap\nDetails: {e}"
                 return
                 
                     
@@ -11136,7 +12367,11 @@ class Sensitivity_Parallelization(QgsTask):
                     annagnps_eg_data["Mgmt_Field_ID"]= lista_tipos
                 except:
                     self.end_execution = 1
-                    self.error_msg ="Error soil use map\nThe soil use layer may not cover the full extent of the watershed"
+                    self.error_msg =("Error soil use map\n\nThe soil use layer may not cover the full extent of the watershed.\n"
+                        "To check this, load 'AnnAGNPS_Cell_IDs.asc' (in this project's Preprocessing_outputs folder) "
+                        "and your soil use/management layer into QGIS and see if they overlap. Possible fixes: make "
+                        "sure both layers use the same Coordinate Reference System, or make sure the watershed falls "
+                        "entirely inside the soil use map (you can also move the watershed by changing the outlet coordinates).")
                     return
                     
                 #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
@@ -11251,7 +12486,12 @@ class Calibration_Parallelization(QgsTask):
             
             #Dar error si no existe el archivo TOPAGNPS.CSV
             if not os.path.exists(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV"):
-                self.error_msg = "Error Input data\nControl file of TopAGNPS, TOPAGNPS.CSV, not found"
+                self.error_msg = (
+                    "Error Input data: the control file TOPAGNPS.CSV was not found for the "
+                    "selected project. This usually means Preprocessing was never run (and the "
+                    "project saved again afterwards) for it - please run Preprocessing on this "
+                    "project, save it, and try again."
+                )
                 self.end_execution = 1
                 return
             #Si el formato de la columna FILENAME no es str entonces dar error
@@ -11263,6 +12503,9 @@ class Calibration_Parallelization(QgsTask):
             #si se está haciendo un análisis de sensibilidad entonces se cambian los inputs.
             for j,k in enumerate(self.dic_data.keys()):
                 self.change_inputs_sensitivity(self.proximos_inputs[self.counter_calibration_round],j,k,spatial =True) #cambio de los inputs espaciales
+            #Clear any leftover Preprocessing_outputs from this Core_N's previous execution first,
+            #so a file that isn't regenerated this round doesn't keep looking like a valid, current result
+            clear_folder_contents(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_outputs")
             #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
             self.time_start_preprocessing = datetime.now()
             #EJECUCIÓN DE TOPAGNPS
@@ -11314,10 +12557,21 @@ class Calibration_Parallelization(QgsTask):
                 #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
                 self.save_files_preprocessing_in_folder_sensitivity()
                 self.error_msg =str(e)
-                
+
                 error_completo = traceback.format_exc()
-                
-                
+
+
+                return
+            #add_soil_and_management_cell_sensitivity signals its own problems (no soil/management
+            #layer selected, DEM/layer not overlapping, etc.) by setting self.end_execution and a
+            #specific self.error_msg and returning normally, without raising an exception - so the
+            #"except Exception" above never catches those cases. Without this check, execution
+            #silently continued straight into running AnnAGNPS with a half-finished
+            #AnnAGNPS_Cell_Data_Section.csv (blank Soil_ID/Mgmt_Field_ID), so instead of that
+            #specific, useful message the user only ever saw AnnAGNPS's own generic runtime error
+            #("Blank text field or input record encountered").
+            if self.end_execution:
+                self.save_files_preprocessing_in_folder_sensitivity()
                 return
             #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
             self.save_files_preprocessing_in_folder_sensitivity()
@@ -11334,6 +12588,9 @@ class Calibration_Parallelization(QgsTask):
             self.change_inputs_sensitivity(self.proximos_inputs[self.counter_calibration_round],j,k,spatial =False) #cambio de los inptus no espaciales
 
 
+        #Clear any leftover Processing_outputs from this Core_N's previous execution first, so a
+        #file that isn't regenerated this round doesn't keep looking like a valid, current result
+        clear_folder_contents(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Processing_outputs")
         #Save the time when this is executed. The files that have been created or modificed after that will be save in Preprocessing_outputs
         self.time_start_processing = datetime.now()
 
@@ -11456,55 +12713,51 @@ class Calibration_Parallelization(QgsTask):
             
 
         if self.dic_name_column[nombre_parametro.split("__")[0]][1]=="AGFLOW.csv" and spatial:#in the case of agflow the input change is different
-            #First we add the data of control files to the dialog. This is important because the rest of the values that are not changed need to be taken from the control file.
-            self.asignar_valores_control_dialogo()
-            #Then we change the inputs of agflow control file
+            #These 3 parameters (Drainage area to concentrated flow, Maximum profile length until
+            #deposition, Maximum Profile Slope) aren't actually stored in AGFLOW.csv during a
+            #normal execution - they're written into the plain-text AGFCNT.inp via a template
+            #substitution (see the "inp" branch of create_control_file_agflow). The
+            #previous implementation went through the shared "AgFlow" control dialog
+            #(asignar_valores_control_dialogo + self.agflow.lineEdit_*) to read the baseline for
+            #the other, non-swept values - but this method runs on the parallel QgsTask worker
+            #threads used by sensitivity analysis/calibration, so touching that (main-thread-only)
+            #dialog concurrently from several Core_N executions at once is unsafe. It also always
+            #re-read the ORIGINAL project's file as the baseline, so whenever more than one of
+            #these 3 parameters was selected in the same analysis, each one's change independently
+            #overwrote the whole file and silently discarded whatever an earlier parameter in the
+            #same execution had just set - only the last one processed ever actually took effect.
+            #Reading the baseline directly from this execution's own Core_N file fixes both
+            #problems: no shared widgets are touched, and parameters already changed earlier in
+            #this same execution are preserved instead of being reset. That file always exists by
+            #the time this runs if the original project had one (move_files_to_working_directory_
+            #sensitivity_analysis copies the whole Preprocessing_inputs folder into every Core_N
+            #before any task starts); read_agflow_baseline already falls back to sensible defaults
+            #if it doesn't.
+            core_agfcnt_path = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs\\AGFCNT.inp"
+            baseline = read_agflow_baseline(core_agfcnt_path)
+
             fichero = open(self.plugin_dir+r"\Documentos\agflow.inp","r+")
             texto = fichero.read()
             fichero.close()
 
-            #Aquí se ponen los parámetros en el texto (el ejemplo) importado y se vuelve a guardar
-            try:
-                if self.agflow.lineEdit_4.text() =="":slope="1"
-                else:slope= str(int(self.agflow.lineEdit_4.text()))
+            slope = baseline["slope"]
+            maxim_d = baseline["maxim_d"]
+            if nombre_parametro=="Drainage area \nto concentrated flow": maxim_d=round(proximos_inputs[numero_parametro],2)
+            maxim_pl = baseline["maxim_pl"]
+            if nombre_parametro=="Maximum profile length \nuntil deposition": maxim_pl=round(proximos_inputs[numero_parametro],2)
+            maxim_ps = baseline["maxim_ps"]
+            if nombre_parametro=="Maximum Profile Slope": maxim_ps=round(proximos_inputs[numero_parametro],2)
+            use,write,arc,dat,use_file = baseline["use"],baseline["write"],baseline["arc"],baseline["dat"],baseline["use_file"]
 
-                if self.agflow.lineEdit_5.text()=="":maxim_d="0.99"
-                else:maxim_d=float(self.agflow.lineEdit_5.text())
-                if nombre_parametro=="Drainage area \nto concentrated flow": maxim_d=round(proximos_inputs[numero_parametro],2)
-
-                if self.agflow.lineEdit_6.text()=="":maxim_pl="300.0"
-                else:maxim_pl=float(self.agflow.lineEdit_6.text())
-                if nombre_parametro=="Maximum profile length \nuntil deposition": maxim_pl=round(proximos_inputs[numero_parametro],2)
-
-                if self.agflow.lineEdit_7.text()=="":maxim_ps="100.0"
-                else:maxim_ps=float(self.agflow.lineEdit_7.text())
-                if nombre_parametro=="Maximum Profile Slope": maxim_ps=round(proximos_inputs[numero_parametro],2)
-                
-                def funcion_t(numero):
-                    if numero==1:
-                        return "T"
-                    elif numero ==0:
-                        return "F"
-                
-                use=funcion_t(int(self.agflow.checkBox.isChecked()))
-                write=funcion_t(int(self.agflow.checkBox_2.isChecked()))
-                arc=funcion_t(int(self.agflow.checkBox_3.isChecked()))
-                dat=funcion_t(int(self.agflow.checkBox_4.isChecked()))
-                use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
-            
-            except:
-                iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning,duration = 10)
-                return
-            
             texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
             try:
-                f = open(self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs"+"\\"+"AGFCNT.inp","w+")
+                f = open(core_agfcnt_path,"w+")
             except:
                 iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
-                return 
+                return
             f.write(texto_nuevo)
             f.close()
-        
+
         else:
             try:
                 direccion#Check if "direccion" and "columna" exist. If they don't, then do anything
@@ -11780,9 +13033,9 @@ class Calibration_Parallelization(QgsTask):
             #Se aplica el suelo al fichero de cells
             try:
                 suelos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_soil_sensitivity,self.column_soil_sensitivity,1)
-            except:
+            except Exception as e:
                 self.end_execution = 1
-                self.error_msg = f"Error with soil layer: The DEM and the soil layer have to overlap"
+                self.error_msg = f"Error with soil layer: The DEM and the soil layer have to overlap\nDetails: {e}"
                 return
             annagnps_cell_data["Soil_ID"] = [suelos[annagnps_cell_data["Cell_ID"].iloc[x]] for x in range(len(annagnps_cell_data))]
             annagnps_cell_data.to_csv(fichero('AnnAGNPS_Cell_Data_Section.csv'), index=False, float_format='%.5f')
@@ -11823,7 +13076,11 @@ class Calibration_Parallelization(QgsTask):
                     annagnps_eg_data["Soil_ID"]= [dic_conv[x] for x in suelos_eg]
                 except:
                     self.end_execution = 1
-                    self.error_msg =  "Error soil map\nThe soil type layer may not cover the full extent of the watershed"
+                    self.error_msg =  ("Error soil map\n\nThe soil type layer may not cover the full extent of the watershed.\n"
+                        "To check this, load 'AnnAGNPS_Cell_IDs.asc' (in this project's Preprocessing_outputs folder) "
+                        "and your soil type layer into QGIS and see if they overlap. Possible fixes: make sure both "
+                        "layers use the same Coordinate Reference System, or make sure the watershed falls entirely "
+                        "inside the soil type map (you can also move the watershed by changing the outlet coordinates).")
                     return
                 #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros
                 def float_to_str(column):
@@ -11849,9 +13106,9 @@ class Calibration_Parallelization(QgsTask):
                 return
             try:
                 manejos,dic_conv = aplicar("AnnAGNPS_Cell_IDs.asc",self.fichero_manag_sensitivity,self.column_use_sensitivity,2)
-            except:
+            except Exception as e:
                 self.end_execution = 1
-                self.error_msg = f"Error with management layer: The DEM and the management layer have to overlap"
+                self.error_msg = f"Error with management layer: The DEM and the management layer have to overlap\nDetails: {e}"
                 return
                 
                     
@@ -11899,7 +13156,11 @@ class Calibration_Parallelization(QgsTask):
                     annagnps_eg_data["Mgmt_Field_ID"]= lista_tipos
                 except:
                     self.end_execution = 1
-                    self.error_msg ="Error soil use map\nThe soil use layer may not cover the full extent of the watershed"
+                    self.error_msg =("Error soil use map\n\nThe soil use layer may not cover the full extent of the watershed.\n"
+                        "To check this, load 'AnnAGNPS_Cell_IDs.asc' (in this project's Preprocessing_outputs folder) "
+                        "and your soil use/management layer into QGIS and see if they overlap. Possible fixes: make "
+                        "sure both layers use the same Coordinate Reference System, or make sure the watershed falls "
+                        "entirely inside the soil use map (you can also move the watershed by changing the outlet coordinates).")
                     return
                     
                 #Esto se hace porque cuando se asigna el suelo y su uso, las celdas de cada EG estan en formato float "5f" con cinco decimales, y el número de celdas son valores enteros

@@ -13,73 +13,18 @@
   <property name="windowTitle">
    <string>QAnnAGNPS Simulation</string>
   </property>
-  <property name="styleSheet">
-   <string notr="true">/* Background color for main window*/
-background-color: #87CEEB
-
-
-</string>
-  </property>
   <layout class="QGridLayout" name="gridLayout_2">
-   <item row="1" column="0" rowspan="2">
-    <widget class="QLabel" name="upna_label">
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="3">
-    <widget class="QLabel" name="label_99">
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="4">
-    <widget class="QLabel" name="label_15">
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="1" rowspan="2">
-    <widget class="QLabel" name="usda_label">
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="5">
-    <widget class="QLabel" name="label_11">
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="8">
-    <widget class="QLabel" name="label_6">
-     <property name="font">
-      <font>
-       <weight>75</weight>
-       <bold>true</bold>
-      </font>
-     </property>
-     <property name="text">
-      <string>Version 1.0.0</string>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="0" colspan="9">
+   <item row="0" column="0">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
        <string>About</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_18">
-       <item row="0" column="0" rowspan="2">
+       <item row="0" column="0">
         <layout class="QVBoxLayout" name="verticalLayout_2">
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -132,19 +77,71 @@ background-color: #87CEEB
                 <enum>QFrame::Raised</enum>
                </property>
                <layout class="QGridLayout" name="gridLayout_5">
-                <item row="1" column="0">
-                 <widget class="QLabel" name="label_10">
+                <item row="0" column="0">
+                 <widget class="QLabel" name="label_doc_title">
+                  <property name="font">
+                   <font>
+                    <weight>75</weight>
+                    <bold>true</bold>
+                   </font>
+                  </property>
                   <property name="text">
-                   <string>Poner un boton en el que salga la información de annagnps y el pdf de technical documentation
- pasos que hay que hacer (primero seleccionar workin directory etc.)</string>
-                  </property>
-                  <property name="alignment">
-                   <set>Qt::AlignJustify|Qt::AlignVCenter</set>
-                  </property>
-                  <property name="wordWrap">
-                   <bool>true</bool>
+                   <string>AnnAGNPS Technical Documentation</string>
                   </property>
                  </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QPushButton" name="button_technical_documentation">
+                  <property name="text">
+                   <string>Open PDF</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="2">
+                 <spacer name="horizontalSpacer_doc">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="label_help_title">
+                  <property name="font">
+                   <font>
+                    <weight>75</weight>
+                    <bold>true</bold>
+                   </font>
+                  </property>
+                  <property name="text">
+                   <string>New to QAnnAGNPS?</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QPushButton" name="button_getting_started">
+                  <property name="text">
+                   <string>Getting Started</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <spacer name="horizontalSpacer_help">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
                 </item>
                </layout>
               </widget>
@@ -203,21 +200,54 @@ background-color: #87CEEB
               <item row="1" column="1">
                <widget class="QLineEdit" name="name_of_project"/>
               </item>
-              <item row="1" column="2">
-               <widget class="QPushButton" name="pushButton_2">
-                <property name="text">
-                 <string/>
-                </property>
-               </widget>
-              </item>
              </layout>
             </widget>
            </item>
           </layout>
          </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_save">
+           <item>
+            <widget class="QPushButton" name="pb_save">
+             <property name="font">
+              <font>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QPushButton {
+    background-color: #becbd1;
+    color: black;
+}
+
+QPushButton:hover {
+    color: white;
+}</string>
+             </property>
+             <property name="text">
+              <string>Save project</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_save">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
         </layout>
        </item>
-       <item row="0" column="1">
+       <item row="0" column="1" alignment="Qt::AlignTop">
         <widget class="QFrame" name="frame_9">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
@@ -228,30 +258,53 @@ background-color: #87CEEB
          <layout class="QGridLayout" name="gridLayout_12">
           <item row="0" column="0" colspan="2">
            <widget class="QLabel" name="label_26">
+            <property name="font">
+             <font>
+              <pointsize>12</pointsize>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
             <property name="text">
-             <string>Load proyect</string>
+             <string>Load project</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="0">
+          <item row="1" column="0" colspan="2">
+           <widget class="Line" name="line_load">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="2">
            <widget class="QLabel" name="label_27">
+            <property name="styleSheet">
+             <string notr="true">color: #6b7680;</string>
+            </property>
             <property name="text">
              <string>Created previously in your computer</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
-           <widget class="QLabel" name="label_28">
+          <item row="3" column="0" colspan="2">
+           <widget class="QComboBox" name="combo_created_projects"/>
+          </item>
+          <item row="4" column="0">
+           <widget class="QPushButton" name="pb_load">
+            <property name="font">
+             <font>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
             <property name="text">
-             <string>Other</string>
+             <string>Load project</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
-           <widget class="QComboBox" name="combo_created_projects"/>
-          </item>
-          <item row="2" column="1">
-           <widget class="QPushButton" name="pb_load">
+          <item row="4" column="1">
+           <widget class="QPushButton" name="pb_delete_project">
             <property name="font">
              <font>
               <weight>75</weight>
@@ -260,68 +313,96 @@ background-color: #87CEEB
             </property>
             <property name="styleSheet">
              <string notr="true">QPushButton {
-    background-color: #becbd1;
-    color: black;
+    background-color: #c0392b;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
 }
-
 QPushButton:hover {
-    color: white;
+    background-color: #a5301f;
 }</string>
             </property>
             <property name="text">
-             <string>Load project</string>
+             <string>Delete project</string>
             </property>
            </widget>
           </item>
          </layout>
         </widget>
        </item>
-       <item row="1" column="1" rowspan="2">
-        <widget class="QLabel" name="label_25">
-         <property name="text">
-          <string>que se ponga un esquema de como van a ser las carpetas en algún sitio
-que el proyecto que salga por defecto sea el último modificado
-que en algun sitio salga para borrar proyectos dentro del ordenador de qannagnps
- poner a la hora de gaurdar, ¿estas seguro que quieres guardar?
-falta poner el cambio de inputs en AGFLOW.csv en en analisis de sensibilidad</string>
+       <item row="1" column="0" colspan="2">
+        <layout class="QHBoxLayout" name="horizontalLayout_header">
+         <property name="spacing">
+          <number>10</number>
          </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QPushButton" name="pb_save">
-         <property name="font">
-          <font>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="styleSheet">
-          <string notr="true">QPushButton {
-    background-color: #becbd1;
-    color: black;
-}
-
-QPushButton:hover {
-    color: white;
-}</string>
-         </property>
-         <property name="text">
-          <string>Save project</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QLabel" name="label_24">
-         <property name="text">
-          <string>cerca del boton save project que se explique qué es. que se diga que es un archivo csv que guarda la direccion de la carpeta que contiene toda la información del proyecto</string>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
+         <item>
+          <widget class="QLabel" name="upna_label">
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="usda_label">
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_header">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_6">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>Version 1.0.0</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pg_github">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>GitHub repository</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="article">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>Article</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>
@@ -343,8 +424,8 @@ QPushButton:hover {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>474</width>
-            <height>602</height>
+            <width>641</width>
+            <height>598</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout">
@@ -987,25 +1068,6 @@ QCheckBox::indicator:unchecked {
                      </property>
                     </widget>
                    </item>
-                   <item>
-                    <widget class="QPushButton" name="pushButton">
-                     <property name="minimumSize">
-                      <size>
-                       <width>32</width>
-                       <height>0</height>
-                      </size>
-                     </property>
-                     <property name="maximumSize">
-                      <size>
-                       <width>32</width>
-                       <height>16777215</height>
-                      </size>
-                     </property>
-                     <property name="text">
-                      <string/>
-                     </property>
-                    </widget>
-                   </item>
                   </layout>
                  </item>
                 </layout>
@@ -1386,8 +1448,8 @@ QCheckBox::indicator:unchecked {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>658</width>
-            <height>365</height>
+            <width>479</width>
+            <height>216</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_11">
@@ -2043,62 +2105,7 @@ QPushButton:hover {
      </widget>
     </widget>
    </item>
-   <item row="1" column="8">
-    <widget class="QPushButton" name="article">
-     <property name="font">
-      <font>
-       <weight>75</weight>
-       <bold>true</bold>
-      </font>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">QPushButton {
-    background-color: #becbd1;
-    color: black;
-}
-
-QPushButton:hover {
-    color: white;
-}</string>
-     </property>
-     <property name="text">
-      <string>Article</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="7">
-    <widget class="QPushButton" name="pg_github">
-     <property name="font">
-      <font>
-       <weight>75</weight>
-       <bold>true</bold>
-      </font>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">QPushButton {
-    background-color: #becbd1;
-    color: black;
-}
-
-QPushButton:hover {
-    color: white;
-}</string>
-     </property>
-     <property name="text">
-      <string>GitHub repository</string>
-     </property>
-    </widget>
-   </item>
   </layout>
-  <zorder>upna_label</zorder>
-  <zorder>tabWidget</zorder>
-  <zorder>label_6</zorder>
-  <zorder>label_11</zorder>
-  <zorder>label_15</zorder>
-  <zorder>label_99</zorder>
-  <zorder>usda_label</zorder>
-  <zorder>article</zorder>
-  <zorder>pg_github</zorder>
  </widget>
  <tabstops>
   <tabstop>pb_load</tabstop>

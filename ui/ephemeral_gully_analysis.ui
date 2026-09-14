@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Scenario Analysis</string>
+   <string>Ephemeral Gully Analysis</string>
   </property>
   <layout class="QGridLayout" name="gridLayout_2">
    <item row="0" column="0" colspan="4">
@@ -25,23 +25,7 @@
         </size>
        </property>
        <property name="toolTip">
-        <string>How to use scenario analysis</string>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="button_ephemeral_gully">
-       <property name="maximumSize">
-        <size>
-         <width>28</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="toolTip">
-        <string>Open ephemeral gully analysis - a dedicated window to compare projects using only ephemeral gully erosion</string>
+        <string>How to use ephemeral gully analysis</string>
        </property>
        <property name="text">
         <string/>
@@ -170,6 +154,51 @@
        </widget>
       </item>
       <item>
+       <widget class="QRadioButton" name="output_erosion">
+        <property name="text">
+         <string>Erosion: Ephemeral Gully (Mg)</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="output_volume">
+        <property name="text">
+         <string>Volume: Ephemeral Gully (m³)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="output_length">
+        <property name="text">
+         <string>Total Gully Length (m)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="output_width">
+        <property name="text">
+         <string>Average Gully Width (m)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="output_active_gullies">
+        <property name="text">
+         <string>Active Gully Count</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="output_migration_rate">
+        <property name="text">
+         <string>Gully Migration Rate (m/day)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QLabel" name="label_observed_title">
         <property name="font">
          <font>
@@ -191,7 +220,7 @@
          </font>
         </property>
         <property name="text">
-         <string>Optional: load measured data for the output above, to compare it against the simulated projects in the graph</string>
+         <string>Optional: load measured data for ephemeral gully erosion, to compare it against the simulated projects in the graph</string>
         </property>
         <property name="wordWrap">
          <bool>true</bool>
@@ -219,7 +248,7 @@
            </size>
           </property>
           <property name="toolTip">
-           <string>Select a CSV file (date, value) with observed/measured data for the output selected above</string>
+           <string>Select a CSV file (date, value) with observed/measured ephemeral gully erosion data</string>
           </property>
           <property name="text">
            <string/>
@@ -245,32 +274,17 @@
        </layout>
       </item>
       <item>
-       <widget class="Line" name="line_observed">
+       <spacer name="verticalSpacer_outputs">
         <property name="orientation">
-         <enum>Qt::Horizontal</enum>
+         <enum>Qt::Vertical</enum>
         </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QScrollArea" name="scrollArea_2">
-        <property name="frameShape">
-         <enum>QFrame::NoFrame</enum>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
         </property>
-        <property name="widgetResizable">
-         <bool>true</bool>
-        </property>
-        <widget class="QWidget" name="scrollAreaWidgetContents_2">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>0</y>
-           <width>252</width>
-           <height>400</height>
-          </rect>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_5"/>
-        </widget>
-       </widget>
+       </spacer>
       </item>
      </layout>
     </widget>
@@ -412,7 +426,7 @@
        </spacer>
       </item>
       <item>
-       <widget class="QPushButton" name="execute_scenario">
+       <widget class="QPushButton" name="execute_ephemeral_gully">
         <property name="text">
          <string>Execute</string>
         </property>
@@ -445,7 +459,7 @@
          </font>
         </property>
         <property name="text">
-         <string>Simulated outputs</string>
+         <string>Ephemeral gully erosion</string>
         </property>
        </widget>
       </item>
