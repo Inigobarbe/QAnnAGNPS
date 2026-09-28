@@ -11,10 +11,10 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Sensitivity Analysis</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">background-color: #87CEEB</string>
+   <string notr="true">background-color: #eef1f4</string>
   </property>
   <layout class="QGridLayout" name="gridLayout_5">
    <item row="1" column="0">
@@ -321,7 +321,7 @@
            </property>
           </widget>
          </item>
-         <item row="13" column="0">
+         <item row="16" column="0">
           <spacer name="verticalSpacer_3">
            <property name="orientation">
             <enum>Qt::Vertical</enum>
@@ -333,6 +333,54 @@
             </size>
            </property>
           </spacer>
+         </item>
+         <item row="13" column="0">
+          <widget class="QCheckBox" name="gully_length">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>Ephemeral Gully: Total Length (m) - final</string>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="14" column="0">
+          <widget class="QCheckBox" name="gully_width">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>Ephemeral Gully: Average Width (m) - final</string>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="15" column="0">
+          <widget class="QCheckBox" name="gully_count">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>Ephemeral Gully: Active Gully Count - final</string>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
+           </property>
+          </widget>
          </item>
          <item row="12" column="0">
           <widget class="QCheckBox" name="phosphorus">
@@ -605,16 +653,17 @@
               <widget class="QPushButton" name="add">
                <property name="styleSheet">
                 <string notr="true">QPushButton {
-    background-color: #becbd1;
-    color: black;
-}
-
-QPushButton:hover {
+    background-color: #3f6ea5;
     color: white;
+    border-radius: 6px;
+    padding: 6px 14px;
+}
+QPushButton:hover {
+    background-color: #335a89;
 }</string>
                </property>
                <property name="text">
-                <string/>
+                <string>Add</string>
                </property>
               </widget>
              </item>
@@ -624,14 +673,15 @@ QPushButton:hover {
                 <string notr="true">QPushButton {
     background-color: #becbd1;
     color: black;
+    border-radius: 6px;
+    padding: 6px 14px;
 }
-
 QPushButton:hover {
     color: white;
 }</string>
                </property>
                <property name="text">
-                <string/>
+                <string>Delete</string>
                </property>
               </widget>
              </item>

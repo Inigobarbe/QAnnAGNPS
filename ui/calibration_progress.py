@@ -12,9 +12,12 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
     stop_requested = pyqtSignal()
 
     def __init__(self, parent=None, title="Calibrating…", window_title="Calibration progress",
-                 show_best=True, stop_button_text="Stop calibration"):
+                 show_best=True, show_last=True, metric_label_prefix="Objective metric",
+                 stop_button_text="Stop calibration"):
         super(CalibrationProgressDialog, self).__init__(parent)
         self.show_best = show_best
+        self.show_last = show_last
+        self.metric_label_prefix = metric_label_prefix
         self.setWindowTitle(window_title)
         self.setMinimumWidth(420)
         self.setWindowModality(Qt.NonModal)
@@ -88,11 +91,14 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
         separator.setStyleSheet("color: #d8dee4;")
         layout.addWidget(separator)
 
-        self.metric_label = QtWidgets.QLabel("Objective metric: -", self)
+        self.metric_label = QtWidgets.QLabel(f"{metric_label_prefix}: -", self)
         layout.addWidget(self.metric_label)
 
-        self.last_label = QtWidgets.QLabel("Last result: -", self)
-        layout.addWidget(self.last_label)
+        if show_last:
+            self.last_label = QtWidgets.QLabel("Last result: -", self)
+            layout.addWidget(self.last_label)
+        else:
+            self.last_label = None
 
         if show_best:
             self.best_label = QtWidgets.QLabel("Best result so far: -", self)
@@ -120,8 +126,9 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
         self.progress_bar.setValue(min(completed,total))
         self.executions_label.setText(f"Execution {completed} / {total}")
         self.running_label.setText(f"Running now: {active}")
-        self.metric_label.setText(f"Objective metric: {metric_name}")
-        self.last_label.setText(f"Last result: {last_value:.4f}" if last_value is not None else "Last result: -")
+        self.metric_label.setText(f"{self.metric_label_prefix}: {metric_name}")
+        if self.show_last:
+            self.last_label.setText(f"Last result: {last_value:.4f}" if last_value is not None else "Last result: -")
         if self.show_best:
             self.best_label.setText(f"Best result so far: {best_value:.4f}" if best_value is not None else "Best result so far: -")
 
