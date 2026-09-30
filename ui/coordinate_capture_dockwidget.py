@@ -56,14 +56,14 @@ class CoordinateCaptureDockWidget(QDockWidget):
         self.userCrsEdit.setReadOnly(True)
         self.userCrsEdit.setToolTip(self.tr("Coordinate in your selected CRS (lat,lon or east,north)"))
         self.copyUserCrsCoordinatesAction = self.userCrsEdit.addAction(QIcon(':/plugins/ephemeral_gully/delete_icon.png'),
-                                                                       QLineEdit.TrailingPosition)
+                                                                       QLineEdit.ActionPosition.TrailingPosition)
         self.copyUserCrsCoordinatesAction.triggered.connect(self.copyUserCrsCoordinates)
 
         self.canvasCrsEdit = QLineEdit(self.dockWidgetContents)
         self.canvasCrsEdit.setReadOnly(True)
         self.canvasCrsEdit.setToolTip(self.tr("Coordinate in map canvas coordinate reference system (lat,lon or east,north)"))
         self.copyCanvasCrsCoordinatesAction = self.canvasCrsEdit.addAction(QIcon(':/plugins/ephemeral_gully/delete_icon.png'),
-                                                                           QLineEdit.TrailingPosition)
+                                                                           QLineEdit.ActionPosition.TrailingPosition)
         self.copyCanvasCrsCoordinatesAction.triggered.connect(self.copyCanvasCrsCoordinates)
 
         self.trackMouseButton = QToolButton(self.dockWidgetContents)

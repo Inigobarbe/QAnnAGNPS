@@ -21,19 +21,24 @@
 
     
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt
-from PyQt5.QtWidgets import QFrame,QTableWidgetItem,QProgressDialog,QLabel, QLineEdit, QMessageBox,QRadioButton,QCheckBox,QSizePolicy,QSpacerItem
+from qgis.PyQt.QtWidgets import QFrame,QTableWidgetItem,QProgressDialog,QLabel, QLineEdit, QMessageBox,QRadioButton,QCheckBox,QSizePolicy,QSpacerItem
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QFileDialog
+from qgis.PyQt.QtWidgets import QFileDialog
+#QAction vive en QtGui en Qt6 (QGIS 4) y en QtWidgets en Qt5 (QGIS 3)
+try:
+    from qgis.PyQt.QtGui import QAction
+except ImportError:
+    from qgis.PyQt.QtWidgets import QAction
 from qgis.core import QgsProject
-from PyQt5.QtCore import QVariant,QObject, QThread, pyqtSignal, QSize, QThreadPool
+from qgis.PyQt.QtCore import QObject, QThread, pyqtSignal, QSize, QThreadPool
 from qgis.PyQt import QtWidgets,QtGui, uic
 from qgis.utils import iface
 from qgis.core import *
 from qgis.gui import QgsMapToolEmitPoint,QgsMessageBar
-from PyQt5.QtGui import QFont,QColor
+from qgis.PyQt.QtGui import QFont,QColor
 from qgis.PyQt.QtWidgets import QApplication, QMainWindow, QProgressBar, QLabel, QWidget, QHBoxLayout, QVBoxLayout
 from qgis.core import QgsTask, QgsApplication
-from PyQt5.QtGui import QPixmap
+from qgis.PyQt.QtGui import QPixmap
 from pathlib import Path
 
 import subprocess
@@ -50,6 +55,13 @@ from osgeo import gdal, gdalconst
 import math
 import processing
 import csv
+#matplotlib elige la versión de Qt según la variable de entorno QT_API. Si en el equipo vale p.ej.
+#"pyqt5" (resto de una instalación de QGIS 3) en un QGIS 4, matplotlib intentaría cargar PyQt5, que
+#QGIS 4 bloquea ("PyQt5 classes cannot be imported in a QGIS build based on Qt6"). Se fuerza a que
+#use la misma versión de Qt que el propio QGIS, antes de importar matplotlib.
+from qgis.PyQt.QtCore import QT_VERSION_STR
+QT6 = QT_VERSION_STR.startswith("6")
+os.environ["QT_API"] = "pyqt6" if QT6 else "pyqt5"
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
@@ -58,7 +70,11 @@ from functools import partial
 import itertools
 from matplotlib.ticker import FuncFormatter
 import sys
-import chardet
+#chardet venía con QGIS 3 pero no con QGIS 4: es opcional (ver obtener_codificacion)
+try:
+    import chardet
+except ImportError:
+    chardet = None
 import glob
 import textwrap
 import matplotlib.ticker as ticker
@@ -72,7 +88,8 @@ from .libraries.SALib.sample.morris import sample as sample_morris
 from .libraries.SALib.analyze.morris import analyze as analyze_morris
 from .libraries.SALib.sample import fast_sampler
 from .libraries.SALib.analyze import fast as fast_analyze
-from .libraries.skopt.optimizer import Optimizer
+#skopt (calibración) depende de scikit-learn, que no viene con QGIS: se importa de forma diferida
+#en run_calibration para que el plugin cargue igualmente aunque no esté instalado
 
 #Dialog files
 from .ui.inputs_dialog import InputsDialog
@@ -119,10 +136,33 @@ from .ui.dialog_base import Dialog_Base
 import os.path
 import webbrowser
 #from .Coordinate_capturer import PrintClickedPoint
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+#backend_qtagg funciona con Qt5 y Qt6. backend_qt5agg queda como respaldo SOLO en QGIS 3 (Qt5) para
+#matplotlib antiguos que no tienen backend_qtagg: en QGIS 4 importa PyQt5, que está bloqueado
+try:
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+except ImportError:
+    if QT6:
+        raise
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import threading
 
 qgis_processing_lock = threading.Lock()
+
+#Compatibilidad QGIS 3 / QGIS 4 (Qt6).
+#Tipos de campo para QgsField: QGIS >= 3.38 (y QGIS 4, donde QVariant.Type ya no existe) usa
+#QMetaType.Type; las versiones anteriores de QGIS 3 solo aceptan QVariant.
+try:
+    from qgis.PyQt.QtCore import QMetaType
+    QgsField("_", QMetaType.Type.Double)
+    FIELD_TYPE_INT, FIELD_TYPE_DOUBLE, FIELD_TYPE_STRING = QMetaType.Type.Int, QMetaType.Type.Double, QMetaType.Type.QString
+except (ImportError, TypeError, AttributeError):
+    from qgis.PyQt.QtCore import QVariant
+    FIELD_TYPE_INT, FIELD_TYPE_DOUBLE, FIELD_TYPE_STRING = QVariant.Int, QVariant.Double, QVariant.String
+#Unidad "grados": Qgis.DistanceUnit desde QGIS 3.30 (el único que existe en QGIS 4)
+try:
+    DISTANCE_UNIT_DEGREES = Qgis.DistanceUnit.Degrees
+except AttributeError:
+    DISTANCE_UNIT_DEGREES = QgsUnitTypes.DistanceDegrees
 
 #Folder where saved projects live. A module-level constant (instead of only a "self." attribute
 #set in the main class) so the Sensitivity_Parallelization/Calibration_Parallelization task
@@ -1425,7 +1465,7 @@ class qannagnps():
             getattr(self.dlg_scenario_analysis, name).stateChanged.connect(lambda _: self.update_scenario_analysis_graph(False))
 
         # 3️Añadir un vertical spacer para empujar todo hacia arriba
-        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         layout.addItem(spacer)
     
     
@@ -1810,7 +1850,7 @@ class qannagnps():
             setattr(self.dlg_ephemeral_gully_analysis, name, checkbox)
             getattr(self.dlg_ephemeral_gully_analysis, name).stateChanged.connect(lambda _: self.update_ephemeral_gully_graph(False))
 
-        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         layout.addItem(spacer)
 
         #Longitudinal profile (chart_type "profile") works on a single reference project instead of
@@ -3050,12 +3090,12 @@ class qannagnps():
             if type_input=="DEM" or type_input=="buffer" or type_input=="vegetation":
                 layer = QgsRasterLayer(fname[0],type_input)
                 if not layer.isValid():
-                    iface.messageBar().pushMessage("Please select a raster file",level=Qgis.Warning)
+                    iface.messageBar().pushMessage("Please select a raster file",level=Qgis.MessageLevel.Warning)
                     return
             else:
                 layer = QgsVectorLayer(fname[0],type_input)
                 if not layer.isValid():
-                    iface.messageBar().pushMessage("Please select a vector file",level=Qgis.Warning)
+                    iface.messageBar().pushMessage("Please select a vector file",level=Qgis.MessageLevel.Warning)
                     return
                     
             QgsProject.instance().addMapLayer(layer, False)
@@ -3120,8 +3160,21 @@ class qannagnps():
     def obtener_codificacion(self,archivo_csv):
         #Metod to detect code type of csv. If I dont do this ' character gives an error for example in Global IDs, Factors and Flags. 
         with open(archivo_csv, 'rb') as file:
-            resultado = chardet.detect(file.read())
-        return resultado['encoding']
+            contenido = file.read()
+        if chardet is not None:
+            codificacion = chardet.detect(contenido)['encoding']
+            if codificacion:
+                return codificacion
+        #Sin chardet (p.ej. QGIS 4, que no lo incluye) o si no ha podido detectarla: si el archivo es
+        #UTF-8 válido se usa UTF-8 (con o sin BOM); si no, ISO-8859-1, que es la codificación con la
+        #que el resto del plugin ya lee los CSV de AnnAGNPS y que nunca falla al decodificar
+        if contenido.startswith(b'\xef\xbb\xbf'):
+            return 'utf-8-sig'
+        try:
+            contenido.decode('utf-8')
+            return 'utf-8'
+        except UnicodeDecodeError:
+            return 'ISO-8859-1'
     
     def instantiate_table(self):
         #Metod to instantiate the dialog for the inputs of annagnps in a table
@@ -3232,7 +3285,7 @@ class qannagnps():
                     for columna, valor in enumerate(datos):
                         item = QTableWidgetItem(valor)
                         table_class.tableWidget.setItem(fila, columna, item)
-                        item.setTextAlignment(Qt.AlignCenter)
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 #Add name to dialog
                 table_class.setWindowTitle(" ".join([x.capitalize() for x in self.dic_table_filename[button].split("_")]))
                 #Show dialog
@@ -3307,7 +3360,7 @@ class qannagnps():
                 table_input.close()
                 self.table_inputs_front()
             except:
-                iface.messageBar().pushMessage(f"Please close {file_path} to update data",level=Qgis.Warning,duration = 10)
+                iface.messageBar().pushMessage(f"Please close {file_path} to update data",level=Qgis.MessageLevel.Warning,duration = 10)
                 return
     
     def add_row(self,numero_table_input):
@@ -3377,7 +3430,7 @@ class qannagnps():
             return os.path.dirname(self.output.lineEdit.text())+f"\\{fich}"
         #Si no está el archivo AnnAGNPS_Cell_IDs.asc, entonces dar error
         if not path.exists(fichero("AnnAGNPS_Cell_IDs.asc")):
-            iface.messageBar().pushMessage(f"AnnAGNPS_Cell_IDs.asc not found: AnnAGNPS_Cell_IDs.asc file must be in {os.path.dirname(self.output.lineEdit.text())}",level=Qgis.Warning)
+            iface.messageBar().pushMessage(f"AnnAGNPS_Cell_IDs.asc not found: AnnAGNPS_Cell_IDs.asc file must be in {os.path.dirname(self.output.lineEdit.text())}",level=Qgis.MessageLevel.Warning)
             return
         #Función para cambiar de coordenadas
         def change_coordinates(filename,outputname):
@@ -3408,7 +3461,7 @@ class qannagnps():
         try:
             copiar_archivo(f"cell_runoff_all_{c}.gpkg",f"cell_runoff_all_out_{c}.gpkg")
         except:
-            iface.messageBar().pushMessage("Some error with CRS has ocurred: Please select another CRS for the project",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Some error with CRS has ocurred: Please select another CRS for the project",level=Qgis.MessageLevel.Warning)
             return
         if self.data_type == "Runoff":
             name_layer = "Runoff(mm)"
@@ -3447,7 +3500,7 @@ class qannagnps():
                 except:
                     erosion_final.append(0)
             pv = layer.dataProvider()
-            pv.addAttributes([QgsField(str(nombre_columna),QVariant.Double)])
+            pv.addAttributes([QgsField(str(nombre_columna),FIELD_TYPE_DOUBLE)])
             context = QgsExpressionContext()
             with edit(layer):
                 contador = 0
@@ -3502,7 +3555,7 @@ class qannagnps():
             date_in = datetime(int(date_in.split("/")[2]),int(date_in.split("/")[1]),int(date_in.split("/")[0]))
             date_fin = datetime(int(date_fin.split("/")[2]),int(date_fin.split("/")[1]),int(date_fin.split("/")[0]))
         except:
-            iface.messageBar().pushMessage("Please select correct dates",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Please select correct dates",level=Qgis.MessageLevel.Warning)
             self.error = True
             return
         #Se obtienen los datos ordenados
@@ -3511,7 +3564,7 @@ class qannagnps():
             try:
                 df_raw = self.df_section_output(path,delete_second=True).iloc[2:,]
             except:
-                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
+                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.MessageLevel.Warning)
                 self.error = True
                 return
             df = pd.DataFrame(data = {"Year": df_raw["Year"].astype(int),"Month": df_raw["Month"].astype(int),"Day": df_raw["Day"].astype(int),"Cell": df_raw["ID"].astype(int),"Runoff": df_raw["Depth"].astype(float),"RSS": df_raw["Rainfall"].astype(float) + df_raw["Snowfall"].astype(float) + df_raw["Snowmelt"].astype(float) + df_raw["Irrigation"].astype(float)})
@@ -3521,7 +3574,7 @@ class qannagnps():
             try:
                 df_raw = self.df_section_output(path,delete_second=False)
             except:
-                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.Warning)
+                iface.messageBar().pushMessage(f"{path} has not a correct format",level=Qgis.MessageLevel.Warning)
                 self.error = True
                 return
             self.units = df_raw.columns[-1][-4:]
@@ -4264,7 +4317,7 @@ class qannagnps():
             try:
                 table = ax.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center', colColours=['#f5f5f5'] * len(table_df.columns))
             except:
-                iface.messageBar().pushMessage("No day with value higher than 0",level=Qgis.Warning)
+                iface.messageBar().pushMessage("No day with value higher than 0",level=Qgis.MessageLevel.Warning)
                 return
             table.auto_set_font_size(False)
             table.set_fontsize(12)
@@ -4614,7 +4667,7 @@ class qannagnps():
             full_image_path = os.path.join(self.plugin_directory, url_image) 
             pixmap = QPixmap(full_image_path)
             new_width = width
-            scaled_pixmap = pixmap.scaledToWidth(new_width, Qt.SmoothTransformation)
+            scaled_pixmap = pixmap.scaledToWidth(new_width, Qt.TransformationMode.SmoothTransformation)
             label.setPixmap(scaled_pixmap)
         #Upna
         put_image("images/upna.png",self.dlg.upna_label,100)
@@ -4866,7 +4919,7 @@ class qannagnps():
         self.crs = QgsCoordinateReferenceSystem(self.epsg)
         self.transform = QgsCoordinateTransform()
         self.transform.setDestinationCrs(self.crs)
-        if self.crs.mapUnits() == QgsUnitTypes.DistanceDegrees:
+        if self.crs.mapUnits() == DISTANCE_UNIT_DEGREES:
             self.userCrsDisplayPrecision = 5
         else:
             self.userCrsDisplayPrecision = 3
@@ -4894,7 +4947,7 @@ class qannagnps():
             self.dockwidget.closingPlugin.connect(self.onClosePlugin)
             # show the dockwidget
             # TODO: fix to allow choice of dock location
-            #self.iface.addDockWidget(Qt.LeftDockWidgetArea, self.dockwidget)
+            #self.iface.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dockwidget)
             #self.dockwidget.show()'''
                 
     def cambios_suelo(self):
@@ -5094,13 +5147,13 @@ class qannagnps():
             
             #Dar error si no existe el archivo TOPAGNPS.CSV
             if not os.path.exists(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV"):
-                iface.messageBar().pushMessage("Error Input data", "Control file of TopAGNPS, TOPAGNPS.CSV, not found" ,level=Qgis.Warning)
+                iface.messageBar().pushMessage("Error Input data", "Control file of TopAGNPS, TOPAGNPS.CSV, not found" ,level=Qgis.MessageLevel.Warning)
                 self.end_execution = 1
                 return
             #Si el formato de la columna FILENAME no es str entonces dar error
             topagnps_control_file = pd.read_csv(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS.CSV",encoding = "ISO-8859-1",delimiter=",")
             if type(topagnps_control_file["FILENAME"].iloc[0])!=str:
-                iface.messageBar().pushMessage("Error Input data", "Please select a correct FILENAME in TOPAGNPS.CSV" ,level=Qgis.Warning)
+                iface.messageBar().pushMessage("Error Input data", "Please select a correct FILENAME in TOPAGNPS.CSV" ,level=Qgis.MessageLevel.Warning)
                 self.end_execution = 1
                 return
             
@@ -5135,7 +5188,7 @@ class qannagnps():
             try:
                 open(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.csv", "r+") 
             except PermissionError:
-                iface.messageBar().pushMessage("Error TopAGNPS","Close TOPAGNPS_err.csv before the start of execution",level=Qgis.Warning,duration = 10)
+                iface.messageBar().pushMessage("Error TopAGNPS","Close TOPAGNPS_err.csv before the start of execution",level=Qgis.MessageLevel.Warning,duration = 10)
                 #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
                 self.save_files_preprocessing_in_folder()
                 self.end_execution = 1
@@ -5147,7 +5200,7 @@ class qannagnps():
             if os.path.isfile(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV") and os.path.getsize(self.direccion+"\\Preprocessing_inputs"+"\\TOPAGNPS_err.CSV")>0 and (not self.dlg.checkBox_2.isChecked() or self.segunda_ronda):
                 self.end_execution = 1
                 error = pd.read_csv(fichero("TOPAGNPS_err.CSV"),encoding = "ISO-8859-1",delimiter=",")
-                iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.Warning,duration = 10)
+                iface.messageBar().pushMessage("Error TOPAGNPS", error.columns[3],level=Qgis.MessageLevel.Warning,duration = 10)
                 #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
                 self.save_files_preprocessing_in_folder()
                 #Se abre el archivo de errores
@@ -5173,7 +5226,7 @@ class qannagnps():
                     except Exception as e:
                         #Los outputs de TopAGNPS se guardan en Preprocessing_outputs
                         self.save_files_preprocessing_in_folder()
-                        self.iface.messageBar().pushMessage(str(e),level=Qgis.Info)
+                        self.iface.messageBar().pushMessage(str(e),level=Qgis.MessageLevel.Info)
                         return
                     #Return porque dentro del add_coordinates_to_topagnps_control_file ya se ejecuta de nuevo y no hay que seguir con el código
                     return
@@ -5198,7 +5251,7 @@ class qannagnps():
                 self.warning_message("Preprocessing executed succesfully!")
             #Mensaje para que selecciones las coordenadas
             if not self.dlg.cbAnn.isChecked() and self.dlg.checkBox_2.isChecked() and self.ejecucion_condicion == 0:
-                self.iface.messageBar().pushMessage("Coordinate selection", "Please move the mouse to the outlet and click on it",level=Qgis.Info)
+                self.iface.messageBar().pushMessage("Coordinate selection", "Please move the mouse to the outlet and click on it",level=Qgis.MessageLevel.Info)
             
             #If add outlet automatically was checked, then uncheck
             if self.dlg.checkBox_2.isChecked(): self.dlg.checkBox_2.setChecked(False)
@@ -5251,7 +5304,7 @@ class qannagnps():
             try:
                 open(self.direccion+"\\Processing_inputs\\"+"AnnAGNPS_LOG_Error.csv", "r+") 
             except PermissionError:
-                iface.messageBar().pushMessage("Error AnnAGNPS","Close AnnAGNPS_LOG_Error.csv before the start of execution",level=Qgis.Warning,duration = 10)
+                iface.messageBar().pushMessage("Error AnnAGNPS","Close AnnAGNPS_LOG_Error.csv before the start of execution",level=Qgis.MessageLevel.Warning,duration = 10)
                 self.end_execution = 1
                 return
             except:
@@ -5268,7 +5321,7 @@ class qannagnps():
                         text = text.replace("\"", "/") 
                         texto = text.splitlines()
                         txt = texto[2].split(",")[-1]
-                        iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.Warning,duration = 10)
+                        iface.messageBar().pushMessage("Error AnnAGNPS",txt,level=Qgis.MessageLevel.Warning,duration = 10)
                     except:
                         pass
                     
@@ -5357,7 +5410,7 @@ class qannagnps():
                 tipos_suelo_dic = {tipos_suelo[x]:x+1 for x in range(len(tipos_suelo))}
 
                 pv = layer.dataProvider()
-                pv.addAttributes([QgsField("id_prueba",QVariant.Int)])
+                pv.addAttributes([QgsField("id_prueba",FIELD_TYPE_INT)])
                 context = QgsExpressionContext()
                 with edit(layer):
                     for f in layer.getFeatures():
@@ -5412,7 +5465,7 @@ class qannagnps():
             def create_attribute(layer_name, expresion,nombre_columna):
                 layer = QgsVectorLayer(fichero(layer_name),"union")
                 pv = layer.dataProvider()
-                pv.addAttributes([QgsField(nombre_columna,QVariant.Double)])
+                pv.addAttributes([QgsField(nombre_columna,FIELD_TYPE_DOUBLE)])
                 expression1 = QgsExpression(expresion)
                 context = QgsExpressionContext()
                 context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
@@ -5495,7 +5548,7 @@ class qannagnps():
                 summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.dataProvider().addAttributes([QgsField("id",FIELD_TYPE_STRING)])
                     layer.updateFields()
                     features = []
                     for i in range(len(summary)):
@@ -5571,7 +5624,7 @@ class qannagnps():
                 summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.dataProvider().addAttributes([QgsField("id",FIELD_TYPE_STRING)])
                     layer.updateFields()
                     features = []
                     for i in range(len(summary)):
@@ -5654,7 +5707,7 @@ class qannagnps():
                 tipos_suelo_dic = {tipos_suelo[x]:x+1 for x in range(len(tipos_suelo))}
 
                 pv = layer.dataProvider()
-                pv.addAttributes([QgsField("id_prueba",QVariant.Int)])
+                pv.addAttributes([QgsField("id_prueba",FIELD_TYPE_INT)])
                 context = QgsExpressionContext()
                 with edit(layer):
                     for f in layer.getFeatures():
@@ -5709,7 +5762,7 @@ class qannagnps():
             def create_attribute(layer_name, expresion,nombre_columna):
                 layer = QgsVectorLayer(fichero(layer_name),"union")
                 pv = layer.dataProvider()
-                pv.addAttributes([QgsField(nombre_columna,QVariant.Double)])
+                pv.addAttributes([QgsField(nombre_columna,FIELD_TYPE_DOUBLE)])
                 expression1 = QgsExpression(expresion)
                 context = QgsExpressionContext()
                 context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
@@ -5786,7 +5839,7 @@ class qannagnps():
                 summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.dataProvider().addAttributes([QgsField("id",FIELD_TYPE_STRING)])
                     layer.updateFields()
                     features = []
                     for i in range(len(summary)):
@@ -5858,7 +5911,7 @@ class qannagnps():
                 summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.dataProvider().addAttributes([QgsField("id",FIELD_TYPE_STRING)])
                     layer.updateFields()
                     features = []
                     for i in range(len(summary)):
@@ -6090,7 +6143,7 @@ class qannagnps():
         self.dlg_warning_message.warning.setText("\n".join(wrapped_lines))
         
         courier_font = QFont("Georgia")
-        courier_font.setStyleHint(QFont.Monospace)  # Asegura el estilo monoespaciado
+        courier_font.setStyleHint(QFont.StyleHint.Monospace)  # Asegura el estilo monoespaciado
         courier_font.setFixedPitch(True)            # Garantiza el espaciado fijo
         courier_font.setPointSize(12)               # Ajusta el tamaño de fuente, si es necesario
 
@@ -6099,7 +6152,7 @@ class qannagnps():
             
         #Put to the front
         self.dlg_warning_message.setWindowFlags(
-            self.dlg_warning_message.windowFlags() | Qt.WindowStaysOnTopHint
+            self.dlg_warning_message.windowFlags() | Qt.WindowType.WindowStaysOnTopHint
         )
 
         self.dlg_warning_message.show()
@@ -6474,7 +6527,7 @@ class qannagnps():
         
     def setSourceCrs(self):
         self.transform.setSourceCrs(self.iface.mapCanvas().mapSettings().destinationCrs())
-        if self.iface.mapCanvas().mapSettings().destinationCrs().mapUnits() == QgsUnitTypes.DistanceDegrees:
+        if self.iface.mapCanvas().mapSettings().destinationCrs().mapUnits() == DISTANCE_UNIT_DEGREES:
             self.canvasCrsDisplayPrecision = 5
         else:
             self.canvasCrsDisplayPrecision = 3
@@ -6492,7 +6545,7 @@ class qannagnps():
         if selector.exec():
             self.crs = selector.crs()
             self.transform.setDestinationCrs(self.crs)
-            if self.crs.mapUnits() == QgsUnitTypes.DistanceDegrees:
+            if self.crs.mapUnits() == DISTANCE_UNIT_DEGREES:
                 self.userCrsDisplayPrecision = 5
             else:
                 self.userCrsDisplayPrecision = 3
@@ -6577,7 +6630,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"TOPAGNPS.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select project folder", "Please before creating the topagnps control file first select de project folder you are going to work with",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select project folder", "Please before creating the topagnps control file first select de project folder you are going to work with",level=Qgis.MessageLevel.Warning)
             return 
         self.ctopagnps.close()
         #Update use of control files
@@ -6594,7 +6647,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"PEG.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the PEG control file first select de DEM you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the PEG control file first select de DEM you are going to use",level=Qgis.MessageLevel.Warning)
             return 
         self.cpeg.close()
         #Update use of control files
@@ -6615,7 +6668,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"AgBuf.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the AGBUF control file first select de DEM you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the AGBUF control file first select de DEM you are going to use",level=Qgis.MessageLevel.Warning)
             return 
         self.cagbuf.close()
         #Update use of control files
@@ -6638,7 +6691,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"AgWet.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the AGWET control file first select de DEM you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the AGWET control file first select de DEM you are going to use",level=Qgis.MessageLevel.Warning)
             return 
         self.cagwet.close()
         #Update use of control files
@@ -6652,7 +6705,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"CONCEPTS.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the CONCEPTS control file first select de DEM you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the CONCEPTS control file first select de DEM you are going to use",level=Qgis.MessageLevel.Warning)
             return 
         self.cconcepts.close()
         #Update use of control files
@@ -6665,7 +6718,7 @@ class qannagnps():
         try:
             control_file.to_csv(self.direccion+"\\"+"Preprocessing_inputs\\"+"POTHOLE.csv", index=False, float_format='%.5f')
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the POTHOLE control file first select de DEM you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the POTHOLE control file first select de DEM you are going to use",level=Qgis.MessageLevel.Warning)
             return 
         self.cpothole.close()
         #Update use of control files
@@ -6689,7 +6742,7 @@ class qannagnps():
         try:
             output_format+1
         except:
-            iface.messageBar().pushMessage("Select Output Format Option", "please choose among the four output format options",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select Output Format Option", "please choose among the four output format options",level=Qgis.MessageLevel.Warning)
             return
         #Inputs que se cogen de lo que haya elegido el usuario
         input_dem = int(self.crasfor.checkBox_6.isChecked())
@@ -6735,7 +6788,7 @@ class qannagnps():
         try:
             f = open(self.direccion+"\\"+"Preprocessing_inputs\\"+"rasfor.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select Project Folder", "Please before creating the RASFOR data first select de project folder you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select Project Folder", "Please before creating the RASFOR data first select de project folder you are going to use",level=Qgis.MessageLevel.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
@@ -6767,7 +6820,7 @@ class qannagnps():
         try:
             f = open(self.direccion+"\\"+"Preprocessing_inputs\\"+"raspro.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select Project Folder", "Please before creating the RASPRO data first select de project folder you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select Project Folder", "Please before creating the RASPRO data first select de project folder you are going to use",level=Qgis.MessageLevel.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
@@ -6832,7 +6885,7 @@ class qannagnps():
             subcatchment_area=int(self.dednm.checkBox_7.isChecked())
             subcatchment_window=int(self.dednm.checkBox_8.isChecked())
         except:
-            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.MessageLevel.Warning)
             return 
         #Se obteiene el texto de un archivo rasfor (un ejemplo) para luego añadirle los valores que se han escogido en el plugin
         fichero = open(self.plugin_dir+"\Documentos\dednm.inp","r+")
@@ -6842,7 +6895,7 @@ class qannagnps():
         try:
             lista_parametros = [utm_zone,utm_e,utm_n,dem_r,dem_c,min_e,max_e,indet_el,dem_res,dem_or,out_row,out_col,dem_proc,dem_smooth,passes,center,cross,diagonal,perform_raster,partial,csa,mscl,depression,cal_options,progr_rep,inp_data,drainage_area,subcatchment_area,subcatchment_window]
         except:
-            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.MessageLevel.Warning)
             return 
         lista = [1101, 1377, 1657, 1871, 2088, 2249, 2411, 2765, 2879, 3258, 3632, 4012, 4480, 4817, 5096, 5346, 5830, 5834, 5838, 6202, 6740, 7506, 10873, 11034, 11419, 11498, 11568, 11639, 11714]
         texto_nuevo = texto
@@ -6853,7 +6906,7 @@ class qannagnps():
         try:
             f = open(self.direccion+"\\"+"Preprocessing_inputs\\"+"dednm.inp","w+")
         except:
-            iface.messageBar().pushMessage("Select DEM", "Please before creating the DEDNM data first select de DEM you are going to use",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select DEM", "Please before creating the DEDNM data first select de DEM you are going to use",level=Qgis.MessageLevel.Warning)
             return 
         f.write(texto_nuevo)
         f.close()
@@ -6899,14 +6952,14 @@ class qannagnps():
                 use_file=funcion_t(int(self.agflow.checkBox_5.isChecked()))
             
             except:
-                iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.Warning,duration = 10)
+                iface.messageBar().pushMessage("Check the data", "Check that all data have been entered correctly.",level=Qgis.MessageLevel.Warning,duration = 10)
                 return
             
             texto_nuevo = texto.replace("aaaaa",f"    {slope}     {maxim_d}     {maxim_pl}     {maxim_ps}     {use}     {write}     {arc}     {dat}     {use_file}")
             try:
                 f = open(self.direccion+"\\"+"Preprocessing_inputs\\"+"AGFCNT.inp","w+")
             except:
-                iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.MessageLevel.Warning)
                 return 
             f.write(texto_nuevo)
             f.close()
@@ -6927,7 +6980,7 @@ class qannagnps():
         if hasattr(self,"direccion"):
             pass
         else:
-            iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.Warning,duration = 10)
+            iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.MessageLevel.Warning,duration = 10)
             return 
         #TOPAGNPS
         #Primero se borra lo que haya previamente
@@ -7115,7 +7168,7 @@ class qannagnps():
         self.epsg = QgsProject.instance().crs().authid()
         #Primero se pone condición para que se haya elegido el DEM
         if self.output.lineEdit_2.text()=="":
-            iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.Warning)
+            iface.messageBar().pushMessage("Select the project folder", "To view the parameters of the control files and to modify them, first select the project folder",level=Qgis.MessageLevel.Warning)
             return
         #Se pone una función para cambiar coordenadas y otra para la dirección de ficheros que será usada luego por varios
         def change_coordinates(filename,outputname):
@@ -7153,7 +7206,7 @@ class qannagnps():
         #CELDAS RASTER
         if output_type == "Cell_raster":
             if not os.path.exists(fichero("AnnAGNPS_Cell_IDs.asc")):
-                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.MessageLevel.Warning)
                 return 
             change_coordinates("AnnAGNPS_Cell_IDs.asc","AnnAGNPS_Cell_IDs_EPSG.asc")
             layer = QgsRasterLayer(fichero("AnnAGNPS_Cell_IDs_EPSG.asc"),"Cells_ras")
@@ -7162,7 +7215,7 @@ class qannagnps():
         #CELDAS VECTORIAL
         elif output_type == "Cell_vectorial":
             if not os.path.exists(fichero("AnnAGNPS_Cell_IDs.asc")):
-                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Cell_IDs.asc does not exist",level=Qgis.MessageLevel.Warning)
                 return
             direccion = save_vectorials("cell")
             change_coordinates("AnnAGNPS_Cell_IDs.asc","cell_1.asc")
@@ -7204,7 +7257,7 @@ class qannagnps():
         #DELIMITACIÓN DE LA CUENCA RASTER
         elif output_type == "Boundary_raster":
             if not os.path.exists(fichero("BOUND.ASC")):
-                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.MessageLevel.Warning)
                 return
             change_coordinates("BOUND.ASC","BOUND_EPSG.ASC")
             layer = QgsRasterLayer(fichero("BOUND_EPSG.ASC"),"Watershed_boundary_ras")
@@ -7213,7 +7266,7 @@ class qannagnps():
         #DELIMITACIÓN DE LA CUENCA VECTORIAL
         elif output_type == "Boundary_vectorial":
             if not os.path.exists(fichero("BOUND.ASC")):
-                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "BOUND.ASC does not exist",level=Qgis.MessageLevel.Warning)
                 return
             direccion = save_vectorials("bound")
             change_coordinates("BOUND.ASC","BOUND_EPSG.ASC")
@@ -7230,7 +7283,7 @@ class qannagnps():
         #REACHES RASTER
         elif output_type == "Reaches_raster":
             if not os.path.exists(fichero("AnnAGNPS_Reach_IDs.asc")):
-                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.MessageLevel.Warning)
                 return
             change_coordinates("AnnAGNPS_Reach_IDs.asc","AnnAGNPS_Reach_IDs_EPSG.asc")
             layer = QgsRasterLayer(fichero("AnnAGNPS_Reach_IDs_EPSG.asc"),"Reaches_ras")
@@ -7239,7 +7292,7 @@ class qannagnps():
         #REACHES VECTORIAL
         elif output_type == "Reaches_vectorial":
             if not os.path.exists(fichero("AnnAGNPS_Reach_IDs.asc")):
-                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "AnnAGNPS_Reach_IDs.asc does not exist",level=Qgis.MessageLevel.Warning)
                 return
             change_coordinates("AnnAGNPS_Reach_IDs.asc","AnnAGNPS_Reach_IDs_EPSG.asc")
             direccion = save_vectorials("reaches")
@@ -7292,7 +7345,7 @@ class qannagnps():
         #ACCUMULATED AREA
         elif output_type == "Accumulated":
             if not os.path.exists(fichero("UPAREA.asc")):
-                iface.messageBar().pushMessage("Output not found", "UPAREA.asc does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "UPAREA.asc does not exist",level=Qgis.MessageLevel.Warning)
                 return
             layer = QgsRasterLayer(fichero("UPAREA.asc"),"Accumulated_area")
             QgsProject.instance().addMapLayer(layer)
@@ -7300,7 +7353,7 @@ class qannagnps():
         #TERRAIN SLOPE
         elif output_type == "Terrain_slope":
             if not os.path.exists(fichero("TSLOPE.ASC")):
-                iface.messageBar().pushMessage("Output not found", "TSLOPE.ASC does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "TSLOPE.ASC does not exist",level=Qgis.MessageLevel.Warning)
                 return
             layer = QgsRasterLayer(fichero("TSLOPE.ASC"),"Terrain_slope")
             QgsProject.instance().addMapLayer(layer)
@@ -7308,7 +7361,7 @@ class qannagnps():
         #HYDRAULIC SLOPE
         elif output_type == "Hydraulic":
             if not os.path.exists(fichero("HSLOPE.ASC")):
-                iface.messageBar().pushMessage("Output not found", "HSLOPE.ASC does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "HSLOPE.ASC does not exist",level=Qgis.MessageLevel.Warning)
                 return
             layer = QgsRasterLayer(fichero("HSLOPE.ASC"),"Hydraulic_slope")
             QgsProject.instance().addMapLayer(layer)
@@ -7316,7 +7369,7 @@ class qannagnps():
         #TERRAIN ASPECT
         elif output_type == "Terrain_aspect":
             if not os.path.exists(fichero("TASPEC.ASC")):
-                iface.messageBar().pushMessage("Output not found", "TASPEC.ASC does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "TASPEC.ASC does not exist",level=Qgis.MessageLevel.Warning)
                 return
             layer = QgsRasterLayer(fichero("TASPEC.ASC"),"Terrain_aspect")
             QgsProject.instance().addMapLayer(layer)
@@ -7324,7 +7377,7 @@ class qannagnps():
         #RUSLE LS FACTOR
         elif output_type == "RUSLE":
             if not os.path.exists(fichero("AgFlow_LS_Factor.asc")):
-                iface.messageBar().pushMessage("Output not found", "AgFlow_LS_Factor.asc does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "AgFlow_LS_Factor.asc does not exist",level=Qgis.MessageLevel.Warning)
                 return
             layer = QgsRasterLayer(fichero("AgFlow_LS_Factor.asc"),"RUSLE_LS_factor")
             QgsProject.instance().addMapLayer(layer)
@@ -7332,7 +7385,7 @@ class qannagnps():
         #CELL LONGEST FLOW PATH RASTER
         elif output_type == "Longest_raster":
             if not os.path.exists(fichero("AgFlow_Cell_Longest_Flow_Path.asc")):
-                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.MessageLevel.Warning)
                 return
             layer = QgsRasterLayer(fichero("AgFlow_Cell_Longest_Flow_Path.asc"),"Cell_longest_flow_raster")
             QgsProject.instance().addMapLayer(layer)
@@ -7340,7 +7393,7 @@ class qannagnps():
         #CELL LONGEST FLOW PATH VECTORIAL
         elif output_type == "Longest_vectorial":
             if not os.path.exists(fichero("AgFlow_Cell_Longest_Flow_Path.asc")):
-                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Output not found", "AgFlow_Cell_Longest_Flow_Path.asc does not exist",level=Qgis.MessageLevel.Warning)
                 return
             direccion = save_vectorials("longpath")
             change_coordinates("AgFlow_Cell_Longest_Flow_Path.asc","AgFlow_Cell_Longest_Flow_Path_epsg.asc")
@@ -7370,17 +7423,17 @@ class qannagnps():
                 #Función para crear la capa con los puntos PEG
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg), "PEG_Points", "memory")
-                    layer.dataProvider().addAttributes([QgsField("id", QVariant.String), 
-                                                        QgsField("Drainage_area", QVariant.Double),
-                                                        QgsField("Luparea", QVariant.Double),
-                                                        QgsField("Subarea", QVariant.Double),
-                                                        QgsField("Slope", QVariant.Double),
-                                                        QgsField("CTI", QVariant.Double),
-                                                        QgsField("Headcut_barrier", QVariant.Double),
-                                                        QgsField("Stream_order", QVariant.Double),
-                                                        QgsField("Cell_ID", QVariant.Double),
-                                                        QgsField("Reach_ID", QVariant.Double),
-                                                        QgsField("StreamCNT", QVariant.Double)])
+                    layer.dataProvider().addAttributes([QgsField("id", FIELD_TYPE_STRING), 
+                                                        QgsField("Drainage_area", FIELD_TYPE_DOUBLE),
+                                                        QgsField("Luparea", FIELD_TYPE_DOUBLE),
+                                                        QgsField("Subarea", FIELD_TYPE_DOUBLE),
+                                                        QgsField("Slope", FIELD_TYPE_DOUBLE),
+                                                        QgsField("CTI", FIELD_TYPE_DOUBLE),
+                                                        QgsField("Headcut_barrier", FIELD_TYPE_DOUBLE),
+                                                        QgsField("Stream_order", FIELD_TYPE_DOUBLE),
+                                                        QgsField("Cell_ID", FIELD_TYPE_DOUBLE),
+                                                        QgsField("Reach_ID", FIELD_TYPE_DOUBLE),
+                                                        QgsField("StreamCNT", FIELD_TYPE_DOUBLE)])
                     layer.updateFields()
                     features = []
                     for i in range(len(summary)):
@@ -7663,11 +7716,11 @@ class qannagnps():
         #Only one of the two analyses has per-core folders: a plain Yes/No question is enough
         if sensitivity_has_cores and not calibration_has_cores:
             save_sensitivity = QMessageBox.question(self.dlg,"Save sensitivity analysis's per-core folders?",
-                "Sensitivity analysis "+explanation,QMessageBox.Yes | QMessageBox.No,QMessageBox.No) == QMessageBox.Yes
+                "Sensitivity analysis "+explanation,QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes
             return save_sensitivity,False
         if calibration_has_cores and not sensitivity_has_cores:
             save_calibration = QMessageBox.question(self.dlg,"Save calibration's per-core folders?",
-                "Calibration "+explanation,QMessageBox.Yes | QMessageBox.No,QMessageBox.No) == QMessageBox.Yes
+                "Calibration "+explanation,QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes
             return False,save_calibration
 
         #Both analyses have per-core folders: let the user pick independently with checkboxes
@@ -7689,11 +7742,11 @@ class qannagnps():
         layout.addWidget(checkbox_sensitivity)
         layout.addWidget(checkbox_calibration)
 
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         buttons.accepted.connect(dialog.accept)
         layout.addWidget(buttons)
 
-        dialog.exec_()
+        dialog.exec()
         return checkbox_sensitivity.isChecked(),checkbox_calibration.isChecked()
 
 
@@ -7753,7 +7806,7 @@ class qannagnps():
             "Copying Preprocessing inputs","Copying Preprocessing outputs","Copying Processing inputs",
             "Copying Processing outputs","Copying Sensitivity analysis","Copying Calibration","Updating saved projects list"]
         save_progress_dlg = QProgressDialog("Preparing to save project...", None, 0, len(save_progress_stages), self.dlg)
-        save_progress_dlg.setWindowModality(Qt.WindowModal)
+        save_progress_dlg.setWindowModality(Qt.WindowModality.WindowModal)
         save_progress_dlg.setWindowTitle("Saving project")
         save_progress_dlg.setMinimumDuration(0)
         save_progress_dlg.show()
@@ -7920,7 +7973,7 @@ class qannagnps():
                     else:
                         file.write(f"{key},{value}\n")
         except:
-            iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.Warning)
+            iface.messageBar().pushMessage("Error Saving Project", f"Please close {file_path}" ,level=Qgis.MessageLevel.Warning)
             save_progress_dlg.close()
             return
         
@@ -8113,7 +8166,7 @@ class qannagnps():
         #folder with many Core_N subfolders, and without this it looks like QGIS has frozen)
         load_progress_stages = ["Reading project settings","Copying project folders","Adding map layers","Loading control file settings"]
         load_progress_dlg = QProgressDialog("Reading project settings...", None, 0, len(load_progress_stages), self.dlg)
-        load_progress_dlg.setWindowModality(Qt.WindowModal)
+        load_progress_dlg.setWindowModality(Qt.WindowModality.WindowModal)
         load_progress_dlg.setWindowTitle("Loading project")
         load_progress_dlg.setMinimumDuration(0)
         load_progress_dlg.show()
@@ -8371,10 +8424,10 @@ class qannagnps():
             f"This will remove all of its folders (inputs, outputs, calibration, sensitivity "
             f"analysis, etc.) from:\n{self.carpeta_guardar_proyectos}\\{name_of_project}\n\n"
             f"This cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
 
         try:
@@ -8631,7 +8684,7 @@ class qannagnps():
                 boton = QtWidgets.QPushButton(nombre, dlg.scrollAreaWidgetContents)
                 boton.setObjectName(nombre)
                 dlg.verticalLayout_2.addWidget(boton)
-                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
                 boton.setSizePolicy(política_tamaño)
                 boton.clicked.connect(lambda _, b = dic[nombre]: self.show_category_parameters(dlg,b,callback))
 
@@ -8647,7 +8700,7 @@ class qannagnps():
             boton = QtWidgets.QPushButton(nombre, dlg.scrollAreaWidgetContents_3)
             boton.setObjectName(nombre)
             dlg.verticalLayout_3.addWidget(boton)
-            política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+            política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
             boton.setSizePolicy(política_tamaño)
             boton.clicked.connect(lambda _, b = nombre: callback(b))
 
@@ -8741,7 +8794,7 @@ class qannagnps():
         def add_element(columna,texto):
             item = QTableWidgetItem(texto)
             self.sensitivity_dialog.table.setItem(numero_filas, columna, item)
-            item.setTextAlignment(Qt.AlignCenter)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         
         #Primero la información de los lineEdits
         numero_filas = self.sensitivity_dialog.table.rowCount()
@@ -8786,7 +8839,7 @@ class qannagnps():
         def add_element(columna,texto):
             item = QTableWidgetItem(texto)
             self.dlg_calibration.table.setItem(numero_filas, columna, item)
-            item.setTextAlignment(Qt.AlignCenter)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         
         #Primero la información de los lineEdits
         numero_filas = self.dlg_calibration.table.rowCount()
@@ -8914,7 +8967,7 @@ class qannagnps():
                     boton = QtWidgets.QPushButton(nombre, self.oat_dialog.scrollAreaWidgetContents_3)
                     boton.setObjectName(nombre)
                     self.oat_dialog.verticalLayout_3.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
                     boton.setSizePolicy(política_tamaño)
                     boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label_oat(b))
             except:
@@ -9071,7 +9124,7 @@ class qannagnps():
         def add_element(columna,texto):
             item = QTableWidgetItem(texto)
             self.oat_dialog.table.setItem(numero_filas, columna, item)
-            item.setTextAlignment(Qt.AlignCenter)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
         numero_filas = self.oat_dialog.table.rowCount()
         self.oat_dialog.table.setRowCount(numero_filas + 1)
@@ -9714,6 +9767,23 @@ class qannagnps():
             self.warning_message("Please select a working directory where the files are going to be loaded")
             return
 
+        #Import diferido del optimizador bayesiano (skopt, vendorizado en libraries/): depende de
+        #scikit-learn y joblib, que no vienen instalados con QGIS. Importarlo al cargar el módulo
+        #impedía que el plugin llegara a cargar (ni siquiera el preprocesamiento) en un QGIS sin
+        #esas librerías; aquí solo afecta a la calibración y se explica cómo instalarlas.
+        try:
+            from .libraries.skopt.optimizer import Optimizer
+        except ImportError as e:
+            self.warning_message(
+                "Calibration requires the Python library scikit-learn, which is not installed in this QGIS.\n\n"
+                "To install it (on Windows):\n"
+                "1. Close QGIS.\n"
+                "2. Open the \"OSGeo4W Shell\" from the Start menu (inside the QGIS folder), as administrator if QGIS is installed in Program Files.\n"
+                "3. Run:  python -m pip install scikit-learn\n"
+                "4. Open QGIS again.\n\n"
+                f"Details: {e}")
+            return
+
         #Check that an observed data file has been selected before running the calibration
         #(otherwise pandas fails deep inside check_period_match_observed_simulated_calibration
         #trying to open an empty path, with a confusing FileNotFoundError instead of a clear message)
@@ -9973,7 +10043,7 @@ class qannagnps():
         if task in self.tareas_activas:
             self.tareas_activas.remove(task)
 
-        if task.status() != QgsTask.Complete:
+        if task.status() != QgsTask.TaskStatus.Complete:
             # The task itself crashed (e.g. AnnAGNPS/TopAGNPS error, or the "soil layer" edge case)
             # before ever reaching save_result, so there's no output data at all for this task -
             # only the input values it was sampled with (needed so create_df_sensitivity can still
@@ -10150,7 +10220,7 @@ class qannagnps():
         if task in self.tareas_activas:
             self.tareas_activas.remove(task)
 
-        if task.status() != QgsTask.Complete:
+        if task.status() != QgsTask.TaskStatus.Complete:
             try:
                 reason = task.error_msg
             except (RuntimeError, ReferenceError, AttributeError):
@@ -10229,7 +10299,7 @@ class qannagnps():
             return
 
         # Check if the task failed or was canceled
-        if task.status() != QgsTask.Complete:
+        if task.status() != QgsTask.TaskStatus.Complete:
             # A single execution failing (e.g. AnnAGNPS rejects a sampled parameter combination as
             # out of range) shouldn't stop a whole calibration that might have hours of runs left:
             # log it to this run's error file and keep going, telling the optimizer a heavy penalty
@@ -11499,7 +11569,7 @@ class qannagnps():
             boton = QtWidgets.QPushButton(nombre, self.dlg_identifiability.scrollAreaWidgetContents_3)
             boton.setObjectName(nombre)
             self.dlg_identifiability.verticalLayout_3.addWidget(boton)
-            política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+            política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
             boton.setSizePolicy(política_tamaño)
             boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label_identifiability(b))
 
@@ -11523,7 +11593,7 @@ class qannagnps():
         def add_element(columna,texto):
             item = QTableWidgetItem(texto)
             self.dlg_identifiability.table.setItem(numero_filas, columna, item)
-            item.setTextAlignment(Qt.AlignCenter)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
         numero_filas = self.dlg_identifiability.table.rowCount()
         self.dlg_identifiability.table.setRowCount(numero_filas + 1)
@@ -11757,7 +11827,7 @@ class qannagnps():
         if task in self.tareas_activas:
             self.tareas_activas.remove(task)
 
-        if task.status() != QgsTask.Complete:
+        if task.status() != QgsTask.TaskStatus.Complete:
             if len(self.tareas_pendientes) > 0:
                 self.stop_identifiability_execution(task)
             return
@@ -11986,7 +12056,7 @@ class qannagnps():
         for r,fila in enumerate(filas):
             for c,valor in enumerate(fila):
                 item = QTableWidgetItem(valor)
-                item.setTextAlignment(Qt.AlignCenter)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 table.setItem(r,c,item)
 
         #Per-execution results table (one row per AnnAGNPS execution)
@@ -11997,7 +12067,7 @@ class qannagnps():
         for r,fila in enumerate(exec_filas):
             for c,valor in enumerate(fila):
                 item = QTableWidgetItem(valor)
-                item.setTextAlignment(Qt.AlignCenter)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 table_exec.setItem(r,c,item)
 
         #Graph: Sobol/FAST get a bar chart of S1 per parameter; Morris gets the same mu*/sigma
@@ -12633,7 +12703,7 @@ class qannagnps():
         if start == True:
             #Start of the progress bar
             self.progress_dialog = QProgressDialog(f"Starting {type_analysis} analysis...", "Cancelar", 0, 101)
-            self.progress_dialog.setWindowModality(Qt.WindowModal)
+            self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
             self.progress_dialog.setWindowTitle("Progress")
             self.progress_dialog.show()
             QCoreApplication.processEvents()# Permitir que la interfaz gráfica responda
@@ -12676,7 +12746,7 @@ class qannagnps():
                     boton = QtWidgets.QPushButton(nombre, self.sensitivity_dialog.scrollAreaWidgetContents_3)
                     boton.setObjectName(nombre)
                     self.sensitivity_dialog.verticalLayout_3.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
                     boton.setSizePolicy(política_tamaño)
                     boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label(b))
             except:
@@ -12707,7 +12777,7 @@ class qannagnps():
                     boton = QtWidgets.QPushButton(nombre, self.dlg_calibration.scrollAreaWidgetContents_3)
                     boton.setObjectName(nombre)
                     self.dlg_calibration.verticalLayout_3.addWidget(boton)
-                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+                    política_tamaño = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
                     boton.setSizePolicy(política_tamaño)
                     boton.clicked.connect(lambda _, b = nombre: self.add_parameter_label_calibration(b))
             except:
@@ -13782,7 +13852,7 @@ class Sensitivity_Parallelization(QgsTask):
             try:
                 f = open(core_agfcnt_path,"w+")
             except:
-                iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.MessageLevel.Warning)
                 return
             f.write(texto_nuevo)
             f.close()
@@ -13974,7 +14044,7 @@ class Sensitivity_Parallelization(QgsTask):
                 tipos_suelo_dic = {tipos_suelo[x]:x+1 for x in range(len(tipos_suelo))}
 
                 pv = layer.dataProvider()
-                pv.addAttributes([QgsField("id_prueba",QVariant.Int)])
+                pv.addAttributes([QgsField("id_prueba",FIELD_TYPE_INT)])
                 context = QgsExpressionContext()
                 with edit(layer):
                     for f in layer.getFeatures():
@@ -14041,7 +14111,7 @@ class Sensitivity_Parallelization(QgsTask):
             def create_attribute(layer_name, expresion,nombre_columna):
                 layer = QgsVectorLayer(fichero(layer_name),"union")
                 pv = layer.dataProvider()
-                pv.addAttributes([QgsField(nombre_columna,QVariant.Double)])
+                pv.addAttributes([QgsField(nombre_columna,FIELD_TYPE_DOUBLE)])
                 expression1 = QgsExpression(expresion)
                 context = QgsExpressionContext()
                 context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
@@ -14122,7 +14192,7 @@ class Sensitivity_Parallelization(QgsTask):
                 summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.dataProvider().addAttributes([QgsField("id",FIELD_TYPE_STRING)])
                     layer.updateFields()
                     features = []
                     for i in range(len(summary)):
@@ -14204,7 +14274,7 @@ class Sensitivity_Parallelization(QgsTask):
                 summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.dataProvider().addAttributes([QgsField("id",FIELD_TYPE_STRING)])
                     layer.updateFields()
                     features = []
                     for i in range(len(summary)):
@@ -14627,7 +14697,7 @@ class Calibration_Parallelization(QgsTask):
             try:
                 f = open(core_agfcnt_path,"w+")
             except:
-                iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.Warning)
+                iface.messageBar().pushMessage("Select project folder", "Please before creating the agflow data first select de project folder you are going to use",level=Qgis.MessageLevel.Warning)
                 return
             f.write(texto_nuevo)
             f.close()
@@ -14801,7 +14871,7 @@ class Calibration_Parallelization(QgsTask):
                 tipos_suelo_dic = {tipos_suelo[x]:x+1 for x in range(len(tipos_suelo))}
 
                 pv = layer.dataProvider()
-                pv.addAttributes([QgsField("id_prueba",QVariant.Int)])
+                pv.addAttributes([QgsField("id_prueba",FIELD_TYPE_INT)])
                 context = QgsExpressionContext()
                 with edit(layer):
                     for f in layer.getFeatures():
@@ -14868,7 +14938,7 @@ class Calibration_Parallelization(QgsTask):
             def create_attribute(layer_name, expresion,nombre_columna):
                 layer = QgsVectorLayer(fichero(layer_name),"union")
                 pv = layer.dataProvider()
-                pv.addAttributes([QgsField(nombre_columna,QVariant.Double)])
+                pv.addAttributes([QgsField(nombre_columna,FIELD_TYPE_DOUBLE)])
                 expression1 = QgsExpression(expresion)
                 context = QgsExpressionContext()
                 context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
@@ -14949,7 +15019,7 @@ class Calibration_Parallelization(QgsTask):
                 summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.dataProvider().addAttributes([QgsField("id",FIELD_TYPE_STRING)])
                     layer.updateFields()
                     features = []
                     for i in range(len(summary)):
@@ -15031,7 +15101,7 @@ class Calibration_Parallelization(QgsTask):
                 summary = pd.read_csv(fichero("PEG_Summary.txt"),encoding = "ISO-8859-1",delimiter=",")
                 def create_layer():
                     layer = QgsVectorLayer("Point?crs={}".format(self.epsg_sensitivity),"PEG_Points","memory")
-                    layer.dataProvider().addAttributes([QgsField("id",QVariant.String)])
+                    layer.dataProvider().addAttributes([QgsField("id",FIELD_TYPE_STRING)])
                     layer.updateFields()
                     features = []
                     for i in range(len(summary)):

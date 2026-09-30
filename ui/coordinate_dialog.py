@@ -27,7 +27,12 @@ import os
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtCore import pyqtSignal, Qt
-from qgis.core import QgsWkbTypes, QgsPointXY, QgsApplication
+from qgis.core import Qgis, QgsWkbTypes, QgsPointXY, QgsApplication
+#Tipos de geometría: Qgis.GeometryType desde QGIS 3.30 (el único que existe en QGIS 4)
+try:
+    GEOMETRY_POLYGON, GEOMETRY_LINE = Qgis.GeometryType.Polygon, Qgis.GeometryType.Line
+except AttributeError:
+    GEOMETRY_POLYGON, GEOMETRY_LINE = QgsWkbTypes.PolygonGeometry, QgsWkbTypes.LineGeometry
 from qgis.gui import QgsMapToolEmitPoint, QgsRubberBand
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
@@ -43,8 +48,8 @@ class Coordinate(QgsMapToolEmitPoint):
         super(Coordinate, self).__init__(canvas)
 
         self.mapCanvas = canvas
-        self.rubberBand = QgsRubberBand(self.mapCanvas, QgsWkbTypes.PolygonGeometry)
-        self.rubberBand.setColor(Qt.red)
+        self.rubberBand = QgsRubberBand(self.mapCanvas, GEOMETRY_POLYGON)
+        self.rubberBand.setColor(Qt.GlobalColor.red)
         self.rubberBand.setWidth(1)
         self.setCursor(QgsApplication.getThemeCursor(QgsApplication.Cursor.CrossHair))
 
@@ -53,7 +58,7 @@ class Coordinate(QgsMapToolEmitPoint):
         self.mouseMoved.emit(originalPoint)
 
     def canvasPressEvent(self, e):
-        if e.button() == Qt.LeftButton:
+        if e.button() == Qt.MouseButton.LeftButton:
             originalPoint = QgsPointXY(self.mapCanvas.getCoordinateTransform().toMapCoordinates(e.x(), e.y()))
             self.mouseClicked.emit(originalPoint)
 
@@ -62,7 +67,7 @@ class Coordinate(QgsMapToolEmitPoint):
             point3 = QgsPointXY(self.mapCanvas.getCoordinateTransform().toMapCoordinates(e.x() + 1, e.y() + 1))
             point4 = QgsPointXY(self.mapCanvas.getCoordinateTransform().toMapCoordinates(e.x() - 1, e.y() + 1))
 
-            self.rubberBand.reset(QgsWkbTypes.PolygonGeometry )
+            self.rubberBand.reset(GEOMETRY_POLYGON )
 
             self.rubberBand.addPoint(point1, False)
             self.rubberBand.addPoint(point2, False)
@@ -70,9 +75,9 @@ class Coordinate(QgsMapToolEmitPoint):
             self.rubberBand.addPoint(point4, True)
             self.rubberBand.show()
 
-        elif e.button() == Qt.RightButton:
+        elif e.button() == Qt.MouseButton.RightButton:
             self.deactivate()
 
     def deactivate(self):
-        self.rubberBand.reset(QgsWkbTypes.LineGeometry)
+        self.rubberBand.reset(GEOMETRY_LINE)
         super(Coordinate, self).deactivate()

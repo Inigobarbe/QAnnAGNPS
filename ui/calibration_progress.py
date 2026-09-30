@@ -20,11 +20,11 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
         self.metric_label_prefix = metric_label_prefix
         self.setWindowTitle(window_title)
         self.setMinimumWidth(420)
-        self.setWindowModality(Qt.NonModal)
+        self.setWindowModality(Qt.WindowModality.NonModal)
         #Each parallel AnnAGNPS/TopAGNPS execution opens its own console window, which can end up
         #covering this dialog after it's shown. Keep it on top of every other window (including
         #those native console windows) so it stays visible for the whole calibration run.
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self.setStyleSheet("""
             QDialog {
                 background-color: #eef1f4;
@@ -87,7 +87,7 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
         layout.addWidget(self.running_label)
 
         separator = QtWidgets.QFrame(self)
-        separator.setFrameShape(QtWidgets.QFrame.HLine)
+        separator.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         separator.setStyleSheet("color: #d8dee4;")
         layout.addWidget(separator)
 
@@ -111,7 +111,7 @@ class CalibrationProgressDialog(QtWidgets.QDialog):
 
         self.stop_button = QtWidgets.QPushButton(stop_button_text, self)
         self.stop_button.clicked.connect(self.stop_requested.emit)
-        layout.addWidget(self.stop_button, alignment=Qt.AlignRight)
+        layout.addWidget(self.stop_button, alignment=Qt.AlignmentFlag.AlignRight)
 
 
     def set_status(self,text):
