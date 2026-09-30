@@ -166,6 +166,15 @@ def clear_folder_contents(folder_path):
 #(compared in lower case, since Windows file names are case-insensitive)
 PROCESSING_INPUT_FILES_NEVER_MOVED = ("annagnps_master.csv","annagnps.fil")
 
+#Clima secundario: la columna SECONDARY_CLIMATE_COLUMN del archivo de celdas indica, para cada celda,
+#el identificador N de una estación climática secundaria. AnnAGNPS espera encontrar sus datos en la
+#carpeta climate de Processing_inputs, en un fichero por cada patrón de SECONDARY_CLIMATE_FILE_PATTERNS
+#(p.ej. N=4 -> climate_station_4.csv y climate_daily_4.csv). Estos ficheros no se seleccionan en la
+#interfaz ni aparecen en annagnps_master.csv, así que se localizan y copian automáticamente en
+#create_folder_processing_and_move_files.
+SECONDARY_CLIMATE_COLUMN = "Secondary_Climate_File_ID"
+SECONDARY_CLIMATE_FILE_PATTERNS = ("climate_station_{}.csv","climate_daily_{}.csv")
+
 #Module-level for the same reason as clear_folder_contents (also used by the task classes).
 def snapshot_folder(folder_path):
     """Method to take a "photo" of what is directly inside a folder right before running
@@ -6288,6 +6297,60 @@ class qannagnps():
                 return False
             return True
 
+        #CLIMAS SECUNDARIOS REQUERIDOS POR EL ARCHIVO DE CELDAS
+        #Se comprueba ANTES de copiar nada, para que si falta alguna estación se avise de todas a la
+        #vez y no se lance el modelo (que fallaría después al no encontrarla). Se buscan en las
+        #mismas ubicaciones de donde se toman los datos climáticos: la carpeta de clima del diálogo
+        #de inputs y la carpeta de cada archivo de clima elegido con ruta completa.
+        secondary_climate_files = []
+        if cell_data != "":
+            ruta_celdas = origin_direction(cell_data,"watershed")
+            #Si el archivo de celdas no existe no se comprueba aquí: la copia de inputs de abajo ya
+            #muestra el error correspondiente
+            if os.path.isfile(ruta_celdas):
+                try:
+                    secondary_ids = self.secondary_climate_station_ids(ruta_celdas)
+                except Exception as e:
+                    self.warning_message(f"Error AnnAGNPS\nCould not read the secondary climate column ({SECONDARY_CLIMATE_COLUMN}) of the cell file.\nFile: {ruta_celdas}\nReason: {e}")
+                    self.end_execution = 1
+                    return
+
+                if secondary_ids:
+                    carpetas_clima = []
+                    candidatas = [self.inputs.l_47.text()] + [os.path.dirname(origin_direction(f,"climate")) for f in climate_files]
+                    for carpeta_clima in candidatas:
+                        if carpeta_clima and not any(misma_ruta(carpeta_clima,c) for c in carpetas_clima):
+                            carpetas_clima.append(carpeta_clima)
+
+                    #Cada estación necesita TODOS sus ficheros (station + daily): si falta cualquiera
+                    #de ellos la estación se considera ausente
+                    estaciones_ausentes = []
+                    ficheros_ausentes = []
+                    for secondary_id in secondary_ids:
+                        faltan_en_estacion = False
+                        for patron in SECONDARY_CLIMATE_FILE_PATTERNS:
+                            nombre_fichero = patron.format(secondary_id)
+                            encontrado = next((os.path.join(c,nombre_fichero) for c in carpetas_clima
+                                               if os.path.isfile(os.path.join(c,nombre_fichero))), None)
+                            if encontrado is None:
+                                faltan_en_estacion = True
+                                ficheros_ausentes.append(nombre_fichero)
+                            else:
+                                secondary_climate_files.append(encontrado)
+                        if faltan_en_estacion:
+                            estaciones_ausentes.append(secondary_id)
+
+                    if estaciones_ausentes:
+                        lista_ausentes = ", ".join(f"Climate Station {x}" for x in estaciones_ausentes)
+                        ficheros_ausentes = ", ".join(ficheros_ausentes)
+                        carpetas_buscadas = "\n".join(carpetas_clima) if carpetas_clima else "(no climate folder selected)"
+                        self.warning_message(
+                            f"Error AnnAGNPS\nSecondary climate station required by the cell file but not found: {lista_ausentes}.\n\n"
+                            f"Expected file(s): {ficheros_ausentes}\n"
+                            f"Searched in:\n{carpetas_buscadas}")
+                        self.end_execution = 1
+                        return
+
         #Bucle para mover los archivos inputs de AnnAGNPS
         for t in tipes_of_files:
             for f in t:
@@ -6299,6 +6362,12 @@ class qannagnps():
                     return
                 if t == watershed_files and copiar_input(f,"watershed") is False:
                     return
+
+        #Copiar también los ficheros de clima secundario a la carpeta climate (no se añaden a
+        #annagnps_master.csv: AnnAGNPS los localiza por su nombre a partir del archivo de celdas)
+        for f in secondary_climate_files:
+            if copiar_input(f,"climate") is False:
+                return
 
         #CREACIÓN DEL ARCHIVO annagnps_master.csv
         def fichero_master(nombre):
@@ -6362,6 +6431,34 @@ class qannagnps():
     
     
     
+    def secondary_climate_station_ids(self,cell_file):
+        """Method to obtain the secondary climate stations required by a cell file: the distinct
+        values of its SECONDARY_CLIMATE_COLUMN column, ignoring empty/null/blank cells and
+        duplicates, in ascending order. Returns [] if the column doesn't exist.
+        Read as text (dtype=str) so empty cells aren't turned into NaN and IDs aren't turned into
+        floats; numeric IDs are normalized to their integer form because the plugin itself rewrites
+        the cell file with float_format='%.5f' (e.g. "1.00000" -> "1", matching climate_station_1.csv)."""
+        df = pd.read_csv(cell_file,encoding = "ISO-8859-1",delimiter=",",dtype=str,keep_default_na=False)
+        df.columns = df.columns.str.strip()
+        if SECONDARY_CLIMATE_COLUMN not in df.columns:
+            return []
+
+        ids = []
+        for valor in df[SECONDARY_CLIMATE_COLUMN]:
+            valor = str(valor).strip()
+            if valor == "" or valor.lower() in ("nan","none","null","na","n/a"):
+                continue
+            try:
+                numero = float(valor)
+                if numero.is_integer():
+                    valor = str(int(numero))
+            except ValueError:
+                pass
+            if valor not in ids:
+                ids.append(valor)
+        return sorted(ids,key=lambda v: (0,int(v),"") if v.isdigit() else (1,0,v))
+
+
     def ephemeral_gully_file(self):
         #Metod to select the file name containing ephemeral gully information depending on the presence of other control files
         #Files that go from more to less information
@@ -7376,28 +7473,29 @@ class qannagnps():
             dic_general = {}
             dic_climate = {}
             dic_simulation = {}
+            #Se resuelve cada "File Name" del master a una ruta completa. Una ruta relativa
+            #(".\general\x.csv", "./general/x.csv", ".\x.csv"...) es relativa a la carpeta del propio
+            #master. Se aceptan tanto "\" como "/" como separador: antes se separaba con
+            #split("\\")[1], que solo entendía "\", de modo que una entrada escrita con "/" (p.ej.
+            #"./general/hydgeom.csv") daba un IndexError que el except de abajo se tragaba en
+            #silencio, dejando ese input vacío.
+            carpeta_master = os.path.split(fname[0])[0]
+            def resolver_ruta(nombre_fichero):
+                nombre_fichero = str(nombre_fichero).strip()
+                if nombre_fichero[0]==".":
+                    return os.path.normpath(os.path.join(carpeta_master,nombre_fichero.replace("\\","/"))).replace("\\","/")
+                return nombre_fichero
             for k,i in enumerate(self.lines_dialog):
                 try:
+                    ruta = resolver_ruta(master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0])
                     if k<21:
-                        if master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0][0]==".":
-                            dic_watershed[i]=os.path.split(fname[0])[0]+"/"+r"{}".format(master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]).split("\\")[1]+"/"+r"{}".format(master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]).split("\\")[-1]
-                        else:
-                            dic_watershed[i]=master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]
+                        dic_watershed[i]=ruta
                     elif 21<=k<44:
-                        if master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0][0]==".":
-                            dic_general[i]=os.path.split(fname[0])[0]+"/"+r"{}".format(master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]).split("\\")[1]+"/"+r"{}".format(master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]).split("\\")[-1]
-                        else:
-                            dic_general[i]=master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]
+                        dic_general[i]=ruta
                     elif 44<=k<49:
-                        if master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0][0]==".":
-                            dic_climate[i]=os.path.split(fname[0])[0]+"/"+r"{}".format(master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]).split("\\")[1]+"/"+r"{}".format(master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]).split("\\")[-1]
-                        else:
-                            dic_climate[i]=master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]
+                        dic_climate[i]=ruta
                     elif 49<=k<67:
-                        if master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0][0]==".":
-                            dic_simulation[i]=os.path.split(fname[0])[0]+"/"+r"{}".format(master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]).split("\\")[1]+"/"+r"{}".format(master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]).split("\\")[-1]
-                        else:
-                            dic_simulation[i]=master_df[master_df["Data Section ID"]==inverted_dic[i]]["File Name"].iloc[0]
+                        dic_simulation[i]=ruta
                 except:
                     pass
             #Se pone el nombre de la carpeta que más se repite para cada sección
@@ -7412,25 +7510,25 @@ class qannagnps():
             #Se añaden los nombres de los archivos. Si la carpeta que se ha puesto es la misma del archivo entonces se pone solo el nombre del archivo, sino toda la dirección. 
             #Watershed
             for i in dic_watershed.keys():
-                if os.path.dirname(dic_watershed[i])==self.inputs.l_1.text():
+                if os.path.normcase(os.path.normpath(os.path.dirname(dic_watershed[i])))==os.path.normcase(os.path.normpath(self.inputs.l_1.text())):
                     i.setText(os.path.split(dic_watershed[i])[1])
                 else:
                     i.setText(dic_watershed[i])
             #General
             for i in dic_general.keys():
-                if os.path.dirname(dic_general[i])==self.inputs.l_23.text():
+                if os.path.normcase(os.path.normpath(os.path.dirname(dic_general[i])))==os.path.normcase(os.path.normpath(self.inputs.l_23.text())):
                     i.setText(os.path.split(dic_general[i])[1])
                 else:
                     i.setText(dic_general[i])
             #Climate
             for i in dic_climate.keys():
-                if os.path.dirname(dic_climate[i])==self.inputs.l_47.text():
+                if os.path.normcase(os.path.normpath(os.path.dirname(dic_climate[i])))==os.path.normcase(os.path.normpath(self.inputs.l_47.text())):
                     i.setText(os.path.split(dic_climate[i])[1])
                 else:
                     i.setText(dic_climate[i])
             #Simulation
             for i in dic_simulation.keys():
-                if os.path.dirname(dic_simulation[i])==self.inputs.l_53.text():
+                if os.path.normcase(os.path.normpath(os.path.dirname(dic_simulation[i])))==os.path.normcase(os.path.normpath(self.inputs.l_53.text())):
                     i.setText(os.path.split(dic_simulation[i])[1])
                 else:
                     i.setText(dic_simulation[i])
@@ -8300,73 +8398,31 @@ class qannagnps():
         self.dlg.combo_created_projects.clear()
         self.dlg.combo_created_projects.addItems(project_names)
 
-        #Nothing saved yet (e.g. a brand new install with an empty projects folder) - there's
-        #nothing to preselect, so leave the three combo boxes empty instead of trying to index
-        #into an empty list below (max()/.index() on an empty sequence would raise ValueError and
-        #crash initGui(), preventing the plugin from loading at all)
-        if not project_names:
-            latest_folder_name = None
-        elif self.dlg.name_of_project.text() == "": #we put the last modified folder
-            folders = [
-                os.path.join(self.carpeta_guardar_proyectos, f)
-                for f in os.listdir(self.carpeta_guardar_proyectos)
-                if os.path.isdir(os.path.join(self.carpeta_guardar_proyectos, f))
-            ]
+        #Project to preselect in every combo box: the one typed in the main window if it is a saved
+        #project, the last modified folder if nothing is typed, and none otherwise
+        indice_preseleccion = None
+        if project_names:
+            #We put lower because the creation of folders is not case sensitive and the .index is case sensitive.
+            nombres_lower = [x.lower() for x in project_names]
+            nombre_main = self.dlg.name_of_project.text().strip().lower()
+            if nombre_main in nombres_lower:
+                indice_preseleccion = nombres_lower.index(nombre_main)
+            elif nombre_main == "": #we put the last modified folder
+                latest_folder = max(project_names, key=lambda f: os.path.getmtime(os.path.join(self.carpeta_guardar_proyectos, f)))
+                indice_preseleccion = project_names.index(latest_folder)
 
-            # Carpeta más recientemente modificada
-            latest_folder = max(folders, key=os.path.getmtime)
-            # Solo el nombre (sin ruta completa)
-            latest_folder_name = os.path.basename(latest_folder)
-            self.dlg.combo_created_projects.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
+        if indice_preseleccion is not None:
+            self.dlg.combo_created_projects.setCurrentIndex(indice_preseleccion)
 
-        else:
-            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive.
-            self.dlg.combo_created_projects.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
-
-        #In sensitivity
-        self.sensitivity_dialog.project_sensitivity.clear()
-        self.sensitivity_dialog.project_sensitivity.addItems(project_names)
-        if not project_names:
-            pass
-        elif self.dlg.name_of_project.text() == "": #we put the last modified folder
-            self.sensitivity_dialog.project_sensitivity.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
-        else:
-            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive.
-            self.sensitivity_dialog.project_sensitivity.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
-
-        #In calibration
-        self.dlg_calibration.project_calibration.clear()
-        self.dlg_calibration.project_calibration.addItems(project_names)
-        if not project_names:
-            pass
-        elif self.dlg.name_of_project.text() == "": #we put the last modified folder
-            self.dlg_calibration.project_calibration.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
-        else:
-            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive.
-            self.dlg_calibration.project_calibration.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
-        
-        
-        #In identifiability analysis
-        self.dlg_identifiability.project_identifiability.clear()
-        self.dlg_identifiability.project_identifiability.addItems(project_names)
-        if not project_names:
-            pass
-        elif self.dlg.name_of_project.text() == "": #we put the last modified folder
-            self.dlg_identifiability.project_identifiability.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
-        else:
-            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive.
-            self.dlg_identifiability.project_identifiability.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
-
-        #In one-at-a-time analysis
-        self.oat_dialog.project_oat.clear()
-        self.oat_dialog.project_oat.addItems(project_names)
-        if not project_names:
-            pass
-        elif self.dlg.name_of_project.text() == "": #we put the last modified folder
-            self.oat_dialog.project_oat.setCurrentIndex([x.lower() for x in project_names].index(latest_folder_name.lower()))
-        else:
-            #We put lower because the creatoin of folders is not case sensitive and the .index is case sensitive.
-            self.oat_dialog.project_oat.setCurrentIndex([x.lower() for x in project_names].index(self.dlg.name_of_project.text().lower()))
+        #In sensitivity, calibration, identifiability analysis and one-at-a-time analysis
+        for combo in [self.sensitivity_dialog.project_sensitivity,
+                      self.dlg_calibration.project_calibration,
+                      self.dlg_identifiability.project_identifiability,
+                      self.oat_dialog.project_oat]:
+            combo.clear()
+            combo.addItems(project_names)
+            if indice_preseleccion is not None:
+                combo.setCurrentIndex(indice_preseleccion)
 
         #In scenario analysis
         if update_scenario:
@@ -12143,10 +12199,10 @@ class qannagnps():
             #So the new project shows up right away in every "select project" combo box
             self.dlg_calibration_progress.set_status(f"Saving calibrated project '{nombre_final}': updating the list of saved projects...")
             QCoreApplication.processEvents()
-            self.update_saved_projects()
-            return f" Calibrated project saved as '{nombre_final}'."
         except Exception as e:
             return f" Calibrated project NOT saved. Reason: {e}"
+        self.update_saved_projects()
+        return f" Calibrated project saved as '{nombre_final}'."
 
 
     def run_calibration_two(self,stopped_by_user=False):
@@ -12247,8 +12303,11 @@ class qannagnps():
                 n = len(observed)
                 average = np.sum(observed)/len(observed)
                 values = 0
+                #Autocovarianza muestral R(k) = (1/n)*sum((x_i-media)*(x_{i+|k|}-media)): es un
+                #producto, no un cociente (el cociente distorsionaba G y D, y por tanto el tamaño
+                #de bloque, y además podía dividir por cero cuando un valor coincidía con la media)
                 for i in range(n-abs(k)):
-                    values += (observed[i]-average)/(observed[i+abs(k)]-average)
+                    values += (observed[i]-average)*(observed[i+abs(k)]-average)
                 return values/n
 
 
@@ -12278,10 +12337,11 @@ class qannagnps():
             D = D + values
 
             #Calculate optimal size of block
-            b = (((2*(G**2))/D)**(1/3))*(len(observed)**(1/3))
+            b = (((2*(G**2))/D)**(1/3))*(len(observed)**(1/3)) if D>0 else 0
 
             #Calculate probability for geometrical distribution after we calculated the expected length
-            p = 1/b
+            #(b<=0 o no finito, p.ej. con una serie constante: se usa el mismo valor por defecto que para p>=1)
+            p = 1/b if np.isfinite(b) and b>0 else 0.9
             #if pequal or same as 1 then there is not distribution
             if p>=1: p = 0.9
             
@@ -13660,6 +13720,8 @@ class Sensitivity_Parallelization(QgsTask):
     
     def change_inputs_sensitivity(self,param_values,numero_parametro,nombre_parametro,spatial):
         #Metod to change the inputs of sensitivity analysis
+        #Se queda en None si el parámetro no corresponde a esta pasada (espacial/no espacial)
+        direccion = None
         try: #este try es para cuando cuando de error si elige la misma columna pero distintas filas
             if self.dic_name_column[nombre_parametro][0]=="Spatial" and spatial:
                 direccion = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs\\"+self.dic_name_column[nombre_parametro][1]
@@ -13726,8 +13788,16 @@ class Sensitivity_Parallelization(QgsTask):
             f.close()
 
         else:
+            #Parámetro de la otra pasada (p.ej. uno no espacial durante la pasada espacial, o
+            #viceversa): aquí no hay nada que cambiar. Antes esto se detectaba dejando que
+            #"direccion" no existiera y tragándose el NameError con un except: pass genérico, que
+            #también se tragaba cualquier error REAL al escribir el parámetro (archivo que no está
+            #en el master, columna mal escrita, fila fuera de rango...), de modo que la ejecución
+            #seguía con el valor original sin ningún aviso y el resultado quedaba etiquetado con un
+            #valor que en realidad nunca se simuló.
+            if direccion is None:
+                return
             try:
-                direccion#Check if "direccion" and "columna" exist. If they don't, then do anything
                 
                 df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
                 if nombre_parametro.split("__")[0] == "Curve Number Shift":
@@ -13790,8 +13860,13 @@ class Sensitivity_Parallelization(QgsTask):
                 if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
                 if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
                 df.to_csv(direccion, index=False, float_format='%.5f')
-            except:
-                pass
+            except Exception as e:
+                #Error real al aplicar el parámetro: se propaga para que run() lo recoja en
+                #self.error_msg y la tarea cuente como ejecución fallida (sensibilidad/OAT/
+                #identificabilidad: se marca en el CSV de resultados; calibración: se penaliza y se
+                #anota en el log de errores), en vez de simular en silencio con el valor original
+                raise Exception(f"Could not apply parameter '{nombre_parametro.replace(chr(10),' ')}' "
+                    f"(column {columna}) to {direccion}: {e}") from e
     
     def file_input(self,lineEdit):
         #Metod to go from line edit to the final direction
@@ -14492,6 +14567,8 @@ class Calibration_Parallelization(QgsTask):
     
     def change_inputs_sensitivity(self,proximos_inputs,numero_parametro,nombre_parametro,spatial):
         #Metod to change the inputs of sensitivity analysis
+        #Se queda en None si el parámetro no corresponde a esta pasada (espacial/no espacial)
+        direccion = None
         try: #este try es para cuando cuando de error si elige la misma columna pero distintas filas
             if self.dic_name_column[nombre_parametro][0]=="Spatial" and spatial:
                 direccion = self.direccion_sensitivity+f"\\Core_{self.core}"+"\\Preprocessing_inputs\\"+self.dic_name_column[nombre_parametro][1]
@@ -14556,8 +14633,16 @@ class Calibration_Parallelization(QgsTask):
             f.close()
 
         else:
+            #Parámetro de la otra pasada (p.ej. uno no espacial durante la pasada espacial, o
+            #viceversa): aquí no hay nada que cambiar. Antes esto se detectaba dejando que
+            #"direccion" no existiera y tragándose el NameError con un except: pass genérico, que
+            #también se tragaba cualquier error REAL al escribir el parámetro (archivo que no está
+            #en el master, columna mal escrita, fila fuera de rango...), de modo que la ejecución
+            #seguía con el valor original sin ningún aviso y el resultado quedaba etiquetado con un
+            #valor que en realidad nunca se simuló.
+            if direccion is None:
+                return
             try:
-                direccion#Check if "direccion" and "columna" exist. If they don't, then do anything
                 
                 df = pd.read_csv(direccion,encoding = "ISO-8859-1",delimiter=",")
                 if nombre_parametro.split("__")[0] == "Curve Number Shift":
@@ -14620,8 +14705,13 @@ class Calibration_Parallelization(QgsTask):
                 if "Cell_ID" in df.columns: float_to_str(df,"Cell_ID")
                 if "Reach_ID" in df.columns: float_to_str(df,"Reach_ID")
                 df.to_csv(direccion, index=False, float_format='%.5f')
-            except:
-                pass
+            except Exception as e:
+                #Error real al aplicar el parámetro: se propaga para que run() lo recoja en
+                #self.error_msg y la tarea cuente como ejecución fallida (sensibilidad/OAT/
+                #identificabilidad: se marca en el CSV de resultados; calibración: se penaliza y se
+                #anota en el log de errores), en vez de simular en silencio con el valor original
+                raise Exception(f"Could not apply parameter '{nombre_parametro.replace(chr(10),' ')}' "
+                    f"(column {columna}) to {direccion}: {e}") from e
     
     def file_input(self,lineEdit):
         #Metod to go from line edit to the final direction
